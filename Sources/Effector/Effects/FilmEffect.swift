@@ -169,14 +169,16 @@ struct FilmEffect: Effect {
         [
             .choice("stock", "Film Stock", options: FilmStock.all.map { ChoiceOption(id: $0.id, label: $0.name, group: $0.group) },
                     "portra400", section: "Film"),
-            .slider("intensity", "Intensity", 0, 100, 100, unit: "%", section: "Film"),
-            .slider("exposure", "Exposure", -2, 2, 0, unit: " EV", section: "Film"),
-            .slider("warmth", "Warmth", -100, 100, 0, section: "Film"),
-            .slider("fade", "Fade", 0, 100, 0, unit: "%", section: "Film"),
-            .slider("grain", "Grain", 0, 100, 35, unit: "%", section: "Texture"),
-            .slider("grainSize", "Grain Size", 0.25, 4, 1, step: 0.05, curve: 1.8, section: "Texture"),
-            .slider("halation", "Halation", 0, 100, 30, unit: "%", section: "Texture"),
-            .seed(section: "Texture"),
+            .slider("intensity", "Intensity", 0, 100, 100, step: 1, unit: "%", section: "Film"),
+            .slider("exposure", "Exposure", -2, 2, 0, step: 0.05, unit: " EV", section: "Film"),
+            .slider("warmth", "Warmth", -100, 100, 0, step: 1, section: "Film"),
+            .slider("fade", "Fade", 0, 100, 0, step: 1, unit: "%", section: "Film"),
+            .sectionSwitch("grainOn", section: "Grain"),
+            .slider("grain", "Amount", 0, 100, 35, step: 1, unit: "%", section: "Grain"),
+            .slider("grainSize", "Size", 0.25, 4, 1, step: 0.05, curve: 1.8, section: "Grain"),
+            .seed(section: "Grain"),
+            .sectionSwitch("halationOn", section: "Halation"),
+            .slider("halation", "Amount", 0, 100, 30, step: 1, unit: "%", section: "Halation"),
         ]
     }
 
@@ -191,14 +193,14 @@ struct FilmEffect: Effect {
         u += st.matrix
         // Halation from the original highlights, before tone mapping
         var img = input
-        let hal = p.f("halation", 30) / 100 * st.halation * intensity
+        let hal = p.bool("halationOn", true) ? p.f("halation", 30) / 100 * st.halation * intensity : 0
         if hal > 0.001 {
             img = GlowPipeline.run(img, ctx, threshold: 0.68, knee: 0.15, radius: 9, intensity: hal * 1.2,
                                    tint: st.bw ? .white : RGBA(hex: "#FF4418"), colorize: true, saturation: 1, mode: 0,
                                    multiScale: true, neutral: st.bw)
         }
         img = ctx.apply("k_film", [img], u)
-        let g = p.num("grain", 35) / 100 * Double(st.grain) * Double(intensity)
+        let g = p.bool("grainOn", true) ? p.num("grain", 35) / 100 * Double(st.grain) * Double(intensity) : 0
         if g > 0.001 {
             var gp = Params()
             gp["amount"] = .number(g * 100)

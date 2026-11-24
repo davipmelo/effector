@@ -85,10 +85,13 @@ struct DustEffect: Effect {
     var symbol: String { "aqi.low" }
     var summary: String { "Specks, hairs and film scratches, like a dusty scan or an old print." }
     let params: [ParamDef] = [
-        .segmented("style", "Style", [("dark", "Dark"), ("light", "Light"), ("mixed", "Mixed")], "light", section: "Dust"),
+        .segmented("style", "Style", [("dark", "Dark"), ("light", "Light"), ("mixed", "Mixed")], "light", section: "Look"),
+        .sectionSwitch("dustOn", section: "Dust"),
         .slider("amount", "Density", 0, 100, 35, step: 1, unit: "%", curve: 1.5, section: "Dust"),
         .slider("size", "Size", 0.2, 5, 1, step: 0.05, curve: 1.8, section: "Dust"),
-        .slider("hairs", "Hairs", 0, 40, 5, step: 1, section: "Dust"),
+        .sectionSwitch("hairsOn", section: "Hairs"),
+        .slider("hairs", "Hairs", 0, 40, 5, step: 1, section: "Hairs"),
+        .sectionSwitch("scratchesOn", section: "Scratches"),
         .slider("scratches", "Scratches", 0, 40, 3, step: 1, section: "Scratches"),
         .slider("scratchLen", "Scratch Length", 5, 100, 55, step: 1, unit: "%", section: "Scratches"),
         .slider("opacity", "Opacity", 0, 100, 80, step: 1, unit: "%", section: "Look"),
@@ -121,7 +124,7 @@ struct DustEffect: Effect {
         }
         // specks: many tiny, a few larger clumps
         let refArea = Double(W / s) * Double(H / s)
-        let n = Int(p.num("amount", 35) / 100 * refArea * 0.0012)
+        let n = p.bool("dustOn", true) ? Int(p.num("amount", 35) / 100 * refArea * 0.0012) : 0
         for _ in 0..<min(n, 40000) {
             let x = r() * W, y = r() * H
             let rad = (0.35 + pow(r(), 5) * 5.5) * size * s
@@ -135,7 +138,7 @@ struct DustEffect: Effect {
         }
         // hairs / fibres
         g.setLineCap(.round)
-        for _ in 0..<Int(p.num("hairs", 5)) {
+        for _ in 0..<(p.bool("hairsOn", true) ? Int(p.num("hairs", 5)) : 0) {
             g.setStrokeColor(color())
             g.setLineWidth((0.5 + r() * 0.8) * s * size)
             var pt = CGPoint(x: r() * W, y: r() * H)
@@ -154,7 +157,7 @@ struct DustEffect: Effect {
         }
         // scratches run along the film (vertical)
         let lenF = CGFloat(p.num("scratchLen", 55) / 100)
-        for _ in 0..<Int(p.num("scratches", 3)) {
+        for _ in 0..<(p.bool("scratchesOn", true) ? Int(p.num("scratches", 3)) : 0) {
             let light = style != "dark" && (style == "light" || r() < 0.6)
             g.setStrokeColor(light ? CGColor(srgbRed: 0.95, green: 0.95, blue: 0.95, alpha: 0.25 + r() * 0.5)
                                    : CGColor(srgbRed: 0.05, green: 0.05, blue: 0.05, alpha: 0.25 + r() * 0.5))

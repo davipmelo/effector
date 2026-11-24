@@ -255,6 +255,18 @@ Ao final, o app é instalado em `/Applications` e o usuário testa tudo e manda 
 - **Sessão restaurada:** o app reabre a última imagem e os layers (salvamento automático), sem perguntar ao sair.
 - 9 presets novos (Pro-Mist Portrait, Black Mist Cinema, Anamorphic Night, Starry Lights, Prism Dream, Halo Glow, Miniature World, Smooth Motion, Skate Fisheye).
 
+## 9.4 v0.4.0 (feedback do terceiro teste)
+- **Corrigido:** Filtro Estrela (controle "Pontas" duplicado e "Só Luzes Pequenas" sumido — chave repetida). Criado `--lint` que verifica chaves duplicadas, valores padrão e chaves de Looks/presets.
+- **Removidos:** Filtro de Difusão e Artefatos de JPEG (o Digicam continua usando JPEG real por dentro). Molduras: saíram Tira de Filme, Slide e Instax.
+- **Interruptores por seção** (padrão do app): CRT (borda preta, máscara, linhas, brilho, vinheta, ruído), Blob Tracker (marcadores, destaque, rótulos, conexões), Digicam, Filme (grão, halation), Poeira, Anamórfico, VHS, Fotocópia, Cupom.
+- **Prisma & Caleidoscópio:** modos Prisma, Caleidoscópio e Cristal, com 12 Looks.
+- **Categoria Distorção (nova):** Olho de Peixe (barril até 400% e olho de peixe real até 340°), Redemoinho, Pinçar & Inflar, Ondas & Ondulações, Mini Planeta & Túnel, Líquido & Vidro, Espelho & Mosaico, Esticar Pixels.
+- **Molduras:** letterbox de cinema em 9 proporções, Reenquadrar, legenda.
+- **Layout:** título "EFFECTOR vX" centralizado no topo; barra de informações embaixo da imagem com zoom; removidos o cabeçalho da sidebar, o nome do arquivo no rodapé e o título da janela.
+- **Recorte:** 1.85:1, 2:1, 2.35:1, 2.7:1 e 1:2.35.
+- **Extras:** tela cheia (F), Antes/Depois dividido (/), aleatorizar layer (R / dado), copiar e colar layers (⌥⌘C / ⌥⌘V).
+- **Padronização:** todos os sliders com passo definido; nomes e seções revisados.
+
 ## 10. Backlog futuro (não fazer agora)
 - Importar paletas .ase (Adobe)
 - Pixel sort e outros glitches

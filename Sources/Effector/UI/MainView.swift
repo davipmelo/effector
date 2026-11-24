@@ -17,14 +17,21 @@ struct MainView: View {
             let lw = min(max(leftWidth, 200), maxLeft)
             let rw = min(max(rightWidth, 240), maxRight)
             HStack(spacing: 0) {
-                sidebar
-                    .frame(width: lw)
-                ResizeHandle(width: $leftWidth, range: 200...maxLeft, sign: 1)
-                CanvasContainer()
-                    .frame(minWidth: 300, maxWidth: .infinity, maxHeight: .infinity)
-                ResizeHandle(width: $rightWidth, range: 240...maxRight, sign: -1)
-                InspectorView()
-                    .frame(width: rw)
+                if !app.presenting {
+                    sidebar
+                        .frame(width: lw)
+                    ResizeHandle(width: $leftWidth, range: 200...maxLeft, sign: 1)
+                }
+                VStack(spacing: 0) {
+                    CanvasContainer()
+                        .frame(minWidth: 300, maxWidth: .infinity, maxHeight: .infinity)
+                    if !app.presenting { InfoBar() }
+                }
+                if !app.presenting {
+                    ResizeHandle(width: $rightWidth, range: 240...maxRight, sign: -1)
+                    InspectorView()
+                        .frame(width: rw)
+                }
             }
             .overlay(alignment: .topLeading) { panels(left: lw) }
         }
@@ -44,7 +51,7 @@ struct MainView: View {
         .sheet(isPresented: $app.showExport) { ExportSheet() }
         .toolbar { toolbarContent }
         .navigationTitle(title)
-        .navigationSubtitle(subtitle)
+        .toolbar(app.presenting ? .hidden : .visible, for: .windowToolbar)
         .preferredColorScheme(settings.theme.colorScheme)
         .tint(Theme.accent)
     }
@@ -83,7 +90,6 @@ struct MainView: View {
 
     private var sidebar: some View {
         VStack(spacing: 0) {
-            AppHeader()
             LayersPanel()
         }
         .background(Theme.panelBG)
@@ -98,30 +104,15 @@ struct MainView: View {
                 .help(tr("Save Project") + "  ⌘S")
                 .disabled(!app.hasImage)
         }
-        ToolbarItemGroup(placement: .principal) {
-            HStack(spacing: 2) {
-                Button { app.zoomOut() } label: { Image(systemName: "minus") }.buttonStyle(.borderless)
-                    .help(tr("Zoom Out") + "  ⌘-")
-                Menu {
-                    Button(tr("Fit to Window")) { app.setZoom(nil) }
-                    Button("50%") { app.setZoom(0.5 / app.backingScale) }
-                    Button("100%") { app.zoomActual() }
-                    Button("200%") { app.setZoom(2 / app.backingScale) }
-                    Button("400%") { app.setZoom(4 / app.backingScale) }
-                } label: {
-                    Text(app.hasImage ? "\(Int((app.displayZoom * app.backingScale * 100).rounded()))%" : "—")
-                        .font(.system(size: 12).monospacedDigit())
-                        .frame(width: 46)
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .help(tr("Zoom level · Z fits the image"))
-                Button { app.zoomIn() } label: { Image(systemName: "plus") }.buttonStyle(.borderless)
-                    .help(tr("Zoom In") + "  ⌘=")
+        ToolbarItem(placement: .principal) {
+            HStack(spacing: 7) {
+                Text("EFFECTOR").font(.system(size: 13, weight: .heavy)).tracking(2.2).foregroundStyle(Theme.text)
+                Text("v" + AppInfo.version)
+                    .font(.system(size: 10.5, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Theme.textDim)
             }
-            .padding(.horizontal, 8)
-            .disabled(!app.hasImage)
+            .padding(.horizontal, 10)
+            .help("EFFECTOR " + AppInfo.version)
         }
         ToolbarItemGroup(placement: .primaryAction) {
             Button { app.undo() } label: { Label(tr("Undo"), systemImage: "arrow.uturn.backward") }
@@ -130,6 +121,9 @@ struct MainView: View {
                 .disabled(!app.canRedo).help(tr("Redo") + "  ⇧⌘Z")
             Button { Actions.perform(.crop) } label: { Label(tr("Crop"), systemImage: "crop") }
                 .disabled(!app.hasImage).help(tr("Crop") + "  C")
+            Toggle(isOn: $app.compareSplit) { Label(tr("Split Before / After"), systemImage: "rectangle.split.2x1") }
+                .disabled(!app.hasImage)
+                .help(tr("Split Before / After") + "  /")
             Toggle(isOn: $app.showOriginal) { Label(tr("Before / After"), systemImage: "square.split.2x1") }
                 .disabled(!app.hasImage)
                 .help(tr("Toggle Before / After") + "  " + (shortcuts.combo(.beforeAfter)?.display ?? ""))
@@ -141,31 +135,107 @@ struct MainView: View {
     }
 }
 
-/// App identity at the top of the sidebar: icon, name and version.
-struct AppHeader: View {
-    private var version: String {
-        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "dev"
-    }
+enum AppInfo {
+    static var version: String { (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "dev" }
+}
+
+/// Thin status bar under the canvas: image details on the left, zoom on the right.
+struct InfoBar: View {
+    @ObservedObject var app = AppState.shared
+
     var body: some View {
-        HStack(spacing: 9) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .interpolation(.high)
-                .frame(width: 26, height: 26)
-            Text("EFFECTOR")
-                .font(.system(size: 13, weight: .heavy))
-                .tracking(1.6)
-                .foregroundStyle(Theme.text)
-            Spacer()
-            Text("v" + version)
-                .font(.system(size: 10.5, weight: .medium, design: .monospaced))
-                .foregroundStyle(Theme.textFaint)
-                .padding(.horizontal, 6).padding(.vertical, 2)
-                .background(Capsule().fill(Theme.field))
+        HStack(spacing: 10) {
+            if let src = app.source {
+                let (w, h) = src.croppedSize(app.state.crop)
+                item("photo", src.fileName, help: "File")
+                sep
+                item("aspectratio", "\(w) × \(h) px", help: "Size")
+                sep
+                Text(aspect(w, h) + " · " + megapixels(w, h)).font(font).foregroundStyle(Theme.textFaint)
+                    .help(tr("Aspect ratio and megapixels"))
+                if !app.state.crop.isFull {
+                    sep
+                    item("crop", tr("Cropped from %@", "\(src.width) × \(src.height)"), help: "Crop")
+                }
+                sep
+                Text((src.fileName as NSString).pathExtension.uppercased() + (src.hasAlpha ? " · " + tr("Alpha") : ""))
+                    .font(font).foregroundStyle(Theme.textFaint).help(tr("File type"))
+                sep
+                item("square.3.layers.3d", tr("%d layers", app.state.layers.flattened().filter { !$0.node.isGroup }.count), help: "Layers")
+                if app.isDirty {
+                    sep
+                    HStack(spacing: 4) {
+                        Circle().fill(Theme.accent).frame(width: 6, height: 6)
+                        Text(app.projectURL == nil ? tr("Not saved") : tr("Edited")).font(font).foregroundStyle(Theme.textDim)
+                    }
+                    .help(tr("Unsaved changes are kept automatically and come back when you reopen the app"))
+                }
+            } else {
+                Text(tr("No image open")).font(font).foregroundStyle(Theme.textFaint)
+            }
+            Spacer(minLength: 8)
+            if app.isRendering { ProgressView().controlSize(.mini).help(tr("Rendering…")) }
+            zoomControl
         }
         .padding(.horizontal, 12)
-        .frame(height: 44)
-        .overlay(alignment: .bottom) { Rectangle().fill(Theme.separator).frame(height: 1) }
+        .frame(height: 28)
+        .background(Theme.panelBG)
+        .overlay(alignment: .top) { Rectangle().fill(Theme.separator).frame(height: 1) }
+    }
+
+    private let font = Font.system(size: 11)
+    private var sep: some View { Rectangle().fill(Theme.separator).frame(width: 1, height: 12) }
+
+    private func item(_ symbol: String, _ text: String, help: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: symbol).font(.system(size: 10)).foregroundStyle(Theme.textFaint)
+            Text(text).font(font).foregroundStyle(Theme.textDim).lineLimit(1).truncationMode(.middle)
+        }
+        .help(tr(help))
+    }
+
+    private func aspect(_ w: Int, _ h: Int) -> String {
+        func gcd(_ a: Int, _ b: Int) -> Int { b == 0 ? a : gcd(b, a % b) }
+        let g = gcd(w, h)
+        let (a, b) = (w / max(1, g), h / max(1, g))
+        return a <= 32 && b <= 32 ? "\(a):\(b)" : String(format: "%.2f:1", Double(w) / Double(max(1, h)))
+    }
+    private func megapixels(_ w: Int, _ h: Int) -> String { String(format: "%.1f MP", Double(w * h) / 1_000_000) }
+
+    private var zoomControl: some View {
+        HStack(spacing: 2) {
+            Button { app.zoomOut() } label: { Image(systemName: "minus").font(.system(size: 10, weight: .semibold)) }
+                .buttonStyle(.borderless)
+                .help(tr("Zoom Out") + "  ⌘-")
+            Menu {
+                Button(tr("Fit to Window") + "  Z") { app.setZoom(nil) }
+                Divider()
+                Button("50%") { app.setZoom(0.5 / app.backingScale) }
+                Button("100%") { app.zoomActual() }
+                Button("200%") { app.setZoom(2 / app.backingScale) }
+                Button("400%") { app.setZoom(4 / app.backingScale) }
+            } label: {
+                Text(app.hasImage ? "\(Int((app.displayZoom * app.backingScale * 100).rounded()))%" : "—")
+                    .font(.system(size: 11).monospacedDigit())
+                    .frame(width: 42)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help(tr("Zoom level · Z fits the image"))
+            Button { app.zoomIn() } label: { Image(systemName: "plus").font(.system(size: 10, weight: .semibold)) }
+                .buttonStyle(.borderless)
+                .help(tr("Zoom In") + "  ⌘=")
+            Button { app.setZoom(nil) } label: { Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 10, weight: .semibold)) }
+                .buttonStyle(.borderless)
+                .help(tr("Fit to Window") + "  Z")
+            Button { app.togglePresentation() } label: { Image(systemName: "rectangle.inset.filled").font(.system(size: 10, weight: .semibold)) }
+                .buttonStyle(.borderless)
+                .help(tr("Full Screen Preview") + "  F")
+        }
+        .padding(.horizontal, 6).padding(.vertical, 2)
+        .background(Capsule().fill(Theme.field))
+        .disabled(!app.hasImage)
     }
 }
 

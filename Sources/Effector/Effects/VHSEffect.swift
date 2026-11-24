@@ -187,6 +187,7 @@ struct VHSEffect: Effect {
     var summary: String { "Analog tape: soft luma, bleeding chroma, tracking errors, noise and OSD. Try the Looks." }
 
     let params: [ParamDef] = [
+        .sectionSwitch("soft", section: "Signal"),
         .slider("softAmt", "Softness", 0, 10, 3, step: 0.1, section: "Signal"),
         .slider("sharpen", "Edge Enhance", 0, 100, 35, step: 1, unit: "%", section: "Signal"),
         .toggle("chroma", "Chroma Bleed", true, section: "Signal"),
@@ -194,6 +195,7 @@ struct VHSEffect: Effect {
         .slider("shift", "Chroma Delay", -15, 15, 3, step: 0.5, section: "Signal", visible: whenOn("chroma")),
         .slider("chromaNoise", "Chroma Noise", 0, 100, 25, step: 1, unit: "%", section: "Signal"),
 
+        .sectionSwitch("colorOn", section: "Color"),
         .slider("saturation", "Saturation", 0, 150, 85, step: 1, unit: "%", section: "Color"),
         .slider("contrast", "Contrast", 50, 150, 92, step: 1, unit: "%", section: "Color"),
         .slider("blackLift", "Black Lift", 0, 30, 6, step: 0.5, unit: "%", section: "Color"),
@@ -215,24 +217,24 @@ struct VHSEffect: Effect {
         .toggle("dropouts", "Dropouts", true, section: "Noise"),
         .slider("dropAmt", "Dropout Amount", 0, 100, 30, step: 1, unit: "%", section: "Noise", visible: whenOn("dropouts")),
 
-        .toggle("scanlines", "Scanlines", true, section: "Scanlines"),
-        .slider("scanAmt", "Intensity", 0, 100, 18, step: 1, unit: "%", section: "Scanlines", visible: whenOn("scanlines")),
-        .slider("scanSpacing", "Spacing", 1, 12, 3, step: 0.5, section: "Scanlines", visible: whenOn("scanlines")),
+        .sectionSwitch("scanlines", section: "Scanlines"),
+        .slider("scanAmt", "Intensity", 0, 100, 18, step: 1, unit: "%", section: "Scanlines"),
+        .slider("scanSpacing", "Spacing", 1, 12, 3, step: 0.5, section: "Scanlines"),
 
-        .toggle("wobble", "Tape Wobble", true, section: "Wobble"),
-        .slider("wobbleAmt", "Amount", 0, 20, 1.5, step: 0.1, curve: 1.6, section: "Wobble", visible: whenOn("wobble")),
-        .slider("wobbleFreq", "Frequency", 0.5, 20, 3, step: 0.1, section: "Wobble", visible: whenOn("wobble")),
+        .sectionSwitch("wobble", section: "Wobble"),
+        .slider("wobbleAmt", "Amount", 0, 20, 1.5, step: 0.1, curve: 1.6, section: "Wobble"),
+        .slider("wobbleFreq", "Frequency", 0.5, 20, 3, step: 0.1, section: "Wobble"),
 
-        .toggle("vignette", "Vignette", true, section: "Lo-fi"),
-        .slider("vigAmt", "Vignette Amount", 0, 100, 30, step: 1, unit: "%", section: "Lo-fi", visible: whenOn("vignette")),
+        .sectionSwitch("vignette", section: "Vignette"),
+        .slider("vigAmt", "Amount", 0, 100, 30, step: 1, unit: "%", section: "Vignette"),
 
-        .toggle("osd", "On-Screen Display", true, section: "OSD"),
+        .sectionSwitch("osd", section: "OSD"),
         .choice("osdStyle", "OSD Style", [("vcr", "VCR (crisp)"), ("camcorder", "Camcorder (burned in)")], "vcr",
-                section: "OSD", visible: whenOn("osd")),
-        ParamDef(key: "osdTop", label: "Top Text", kind: .text(def: "PLAY ▶"), section: "OSD", visible: whenOn("osd")),
-        ParamDef(key: "osdBottom", label: "Bottom Text", kind: .text(def: "AM 10:24\nNOV. 24 1997"), section: "OSD", visible: whenOn("osd")),
-        .slider("osdSize", "Text Size", 10, 80, 30, step: 1, section: "OSD", visible: whenOn("osd")),
-        .color("osdColor", "Text Color", .white, section: "OSD", visible: whenOn("osd")),
+                section: "OSD"),
+        ParamDef(key: "osdTop", label: "Top Text", kind: .text(def: "PLAY ▶"), section: "OSD"),
+        ParamDef(key: "osdBottom", label: "Bottom Text", kind: .text(def: "AM 10:24\nNOV. 24 1997"), section: "OSD"),
+        .slider("osdSize", "Text Size", 10, 80, 30, step: 1, section: "OSD"),
+        .color("osdColor", "Text Color", .white, section: "OSD"),
         .seed(section: "OSD"),
     ]
 
@@ -312,16 +314,17 @@ struct VHSEffect: Effect {
             on("headSwitch"), p.f("headH", 2.5) / 100, lineH,
         ])
         let softOn = p.bool("soft", true)
+        let colorOn = p.bool("colorOn", true)
         let u: [Float] = [
-            seed, unit, softOn ? p.f("softAmt", 3) : 0.3, p.f("sharpen", 35) / 100,
-            on("chroma"), p.f("bleed", 10), p.f("shift", 3), p.f("chromaNoise", 25) / 100,
-            p.f("saturation", 85) / 100 * (1 - p.f("desat", 0) / 100),
+            seed, unit, softOn ? p.f("softAmt", 3) : 0.3, softOn ? p.f("sharpen", 35) / 100 : 0,
+            softOn ? on("chroma") : 0, p.f("bleed", 10), p.f("shift", 3), softOn ? p.f("chromaNoise", 25) / 100 : 0,
+            colorOn ? p.f("saturation", 85) / 100 * (1 - p.f("desat", 0) / 100) : 1,
             on("noise"), p.f("noiseAmt", 40) / 100, on("dropouts"), p.f("dropAmt", 30) / 100,
             on("scanlines"), p.f("scanAmt", 18) / 100, Float(max(2, ctx.px(p.num("scanSpacing", 3)).rounded())),
-            on("vignette"), p.f("vigAmt", 30) / 100, p.f("blackLift", 6) / 100, p.f("rolloff", 40) / 100,
-            p.f("warmth", 10) / 100, p.f("tint", 8) / 100,
+            on("vignette"), p.f("vigAmt", 30) / 100, colorOn ? p.f("blackLift", 6) / 100 : 0, colorOn ? p.f("rolloff", 40) / 100 : 0,
+            colorOn ? p.f("warmth", 10) / 100 : 0, colorOn ? p.f("tint", 8) / 100 : 0,
             on("tracking"), p.f("bandPos", 82) / 100, p.f("bandH", 5) / 100, p.f("trackAmt", 5),
-            on("headSwitch"), p.f("headH", 2.5) / 100, lineH, p.f("contrast", 92) / 100,
+            on("headSwitch"), p.f("headH", 2.5) / 100, lineH, colorOn ? p.f("contrast", 92) / 100 : 1,
         ]
         var out = ctx.apply("k_vhs", [geo, input], u)
         if osdOn && !burnIn {

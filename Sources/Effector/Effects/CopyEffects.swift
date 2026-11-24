@@ -83,6 +83,7 @@ struct PhotocopyEffect: Effect {
         .slider("contrast", "Contrast", -100, 100, 25, step: 1, section: "Toner"),
         .slider("blur", "Blur", 0, 6, 0.8, step: 0.05, curve: 1.6, section: "Toner"),
         .toggle("dither", "Dither", false, section: "Toner"),
+        .sectionSwitch("wearOn", section: "Wear"),
         .slider("noise", "Toner Noise", 0, 100, 35, step: 1, unit: "%", section: "Wear"),
         .slider("uneven", "Uneven Density", 0, 100, 40, step: 1, unit: "%", section: "Wear"),
         .slider("streaks", "Drum Streaks", 0, 100, 35, step: 1, unit: "%", section: "Wear"),
@@ -95,14 +96,15 @@ struct PhotocopyEffect: Effect {
     ]
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
         var img = ctx.apply("k_dither_pre", [input], [0, p.f("contrast", 25), 1, 1])
-        let gens = Int(p.num("generations", 1))
+        let wear: Float = p.bool("wearOn", true) ? 1 : 0
+        let gens = p.bool("wearOn", true) ? Int(p.num("generations", 1)) : 1
         for g in 0..<gens {
             img = ctx.blur(img, sigma: ctx.px(p.num("blur", 0.8)) * (g == 0 ? 1 : 0.7))
             img = ctx.apply("k_xerox", [img], [p.f("seed", 1) * 1.9 + Float(g) * 11, Float(ctx.scale), p.f("threshold", 62) / 100,
-                                               p.f("softness", 6) / 100, p.f("noise", 35) / 100, p.f("streaks", 35) / 100,
-                                               p.f("edge", 45) / 100 * 0.8, p.f("uneven", 40) / 100]
+                                               p.f("softness", 6) / 100, p.f("noise", 35) / 100 * wear, p.f("streaks", 35) / 100 * wear,
+                                               p.f("edge", 45) / 100 * 0.8 * wear, p.f("uneven", 40) / 100 * wear]
                             + p.color("toner", RGBA(hex: "#111111")).floats + p.color("paper", RGBA(hex: "#F2F2F2")).floats
-                            + [p.f("specks", 30) / 100, p.bool("dither") ? 1 : 0])
+                            + [p.f("specks", 30) / 100 * wear, p.bool("dither") ? 1 : 0])
         }
         return img
     }
@@ -120,6 +122,7 @@ struct ThermalPrintEffect: Effect {
                 section: "Print"),
         .slider("brightness", "Brightness", -100, 100, 10, step: 1, section: "Print"),
         .slider("contrast", "Contrast", -100, 100, 20, step: 1, section: "Print"),
+        .sectionSwitch("wearOn", section: "Wear"),
         .slider("fade", "Fade", 0, 100, 25, step: 1, unit: "%", section: "Wear"),
         .slider("banding", "Banding", 0, 100, 35, step: 1, unit: "%", section: "Wear"),
         .slider("gradient", "Fade Down the Roll", 0, 100, 15, step: 1, unit: "%", section: "Wear"),
@@ -141,6 +144,7 @@ struct ThermalPrintEffect: Effect {
         let d = DitherEffect().apply(input, dither, ctx)
         return ctx.apply("k_thermal", [d], [p.f("seed", 1) * 2.3, Float(ctx.scale)] + p.color("ink", RGBA(hex: "#232323")).floats
                          + p.color("paper", RGBA(hex: "#F4F4F4")).floats
-                         + [p.f("fade", 25) / 100, p.f("dead", 25) / 100, p.f("banding", 35) / 100, p.f("gradient", 15) / 100])
+                         + (p.bool("wearOn", true) ? [p.f("fade", 25) / 100, p.f("dead", 25) / 100, p.f("banding", 35) / 100, p.f("gradient", 15) / 100]
+                            : [0, 0, 0, 0]))
     }
 }

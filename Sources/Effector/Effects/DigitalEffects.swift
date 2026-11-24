@@ -79,28 +79,6 @@ extension RenderContext {
     }
 }
 
-struct JPEGEffect: Effect {
-    let id = "jpeg"
-    let name = "JPEG Artifacts"
-    let category = EffectCategory.glitch
-    var symbol: String { "square.grid.3x3.square" }
-    var summary: String { "Real JPEG re-compression: blocky 8×8 artifacts, ringing and colour smear." }
-    let params: [ParamDef] = [
-        .slider("quality", "Quality", 0, 100, 12, step: 1, unit: "%"),
-        .slider("block", "Block Size", 1, 12, 2, step: 0.5, curve: 1.4),
-        .slider("generations", "Generations", 1, 12, 1, step: 1),
-    ]
-    func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
-        // the block size is relative: compress a downscaled copy so blocks stay visible at any resolution
-        let f = max(1, ctx.px(p.num("block", 2)) / 1.0)
-        let w = max(8, Int(Double(input.width) / f)), h = max(8, Int(Double(input.height) / f))
-        let small = ctx.resize(input, w, h)
-        let jpg = ctx.jpegRoundtrip(small, quality: p.num("quality", 12) / 100, generations: Int(p.num("generations", 1)))
-        if w == input.width && h == input.height { return jpg }
-        return ctx.upscaleNearest(jpg, input.width, input.height)
-    }
-}
-
 struct DigicamEffect: Effect {
     let id = "digicam"
     let name = "Digicam 2003"
@@ -115,18 +93,22 @@ struct DigicamEffect: Effect {
         .slider("saturation", "Saturation", 0, 200, 115, step: 1, unit: "%", section: "Camera"),
         .slider("contrast", "Contrast", 50, 200, 118, step: 1, unit: "%", section: "Camera"),
         .slider("clip", "Highlight Clipping", 0, 100, 45, step: 1, unit: "%", section: "Camera"),
-        .slider("fringe", "Purple Fringing", 0, 100, 40, step: 1, unit: "%", section: "Camera"),
-        .slider("sharpen", "Over-sharpening", 0, 300, 120, step: 1, unit: "%", section: "Processing"),
-        .slider("noise", "Noise", 0, 100, 35, step: 1, unit: "%", section: "Processing"),
-        .slider("chromaNoise", "Chroma Noise", 0, 100, 40, step: 1, unit: "%", section: "Processing"),
-        .slider("quality", "JPEG Quality", 0, 100, 55, step: 1, unit: "%", section: "Processing"),
-        .toggle("date", "Date Stamp", true, section: "Date Stamp"),
-        ParamDef(key: "dateText", label: "Text", kind: .text(def: "'03 8 14"), section: "Date Stamp", visible: whenOn("date")),
-        .choice("datePos", "Position", [("br", "Bottom Right"), ("bl", "Bottom Left"), ("tr", "Top Right")], "br",
-                section: "Date Stamp", visible: whenOn("date")),
-        .slider("dateSize", "Size", 8, 80, 28, step: 1, section: "Date Stamp", visible: whenOn("date")),
-        .color("dateColor", "Color", RGBA(hex: "#FF8A1E"), section: "Date Stamp", visible: whenOn("date")),
-        .seed(section: "Date Stamp"),
+        .sectionSwitch("fringeOn", section: "Purple Fringing"),
+        .slider("fringe", "Amount", 0, 100, 40, step: 1, unit: "%", section: "Purple Fringing"),
+        .sectionSwitch("sharpOn", section: "Over-sharpening"),
+        .slider("sharpen", "Amount", 0, 300, 120, step: 1, unit: "%", section: "Over-sharpening"),
+        .sectionSwitch("noiseOn", section: "Sensor Noise"),
+        .slider("noise", "Noise", 0, 100, 35, step: 1, unit: "%", section: "Sensor Noise"),
+        .slider("chromaNoise", "Chroma Noise", 0, 100, 40, step: 1, unit: "%", section: "Sensor Noise"),
+        .seed(section: "Sensor Noise"),
+        .sectionSwitch("jpegOn", section: "JPEG"),
+        .slider("quality", "JPEG Quality", 0, 100, 55, step: 1, unit: "%", section: "JPEG"),
+        .sectionSwitch("date", section: "Date Stamp"),
+        ParamDef(key: "dateText", label: "Text", kind: .text(def: "'03 8 14"), section: "Date Stamp"),
+        .choice("datePos", "Position", [("br", "Bottom Right"), ("bl", "Bottom Left"), ("tr", "Top Right"), ("tl", "Top Left")], "br",
+                section: "Date Stamp"),
+        .slider("dateSize", "Size", 8, 80, 28, step: 1, section: "Date Stamp"),
+        .color("dateColor", "Color", RGBA(hex: "#FF8A1E"), section: "Date Stamp"),
     ]
     var looks: [EffectLook] {
         [
@@ -149,9 +131,11 @@ struct DigicamEffect: Effect {
         let unit = Float(ctx.scale * res)
         let bright = ctx.blur(ctx.apply("k_brightmask", [img]), sigma: max(1, Double(unit) * 3))
         img = ctx.apply("k_digicam", [img, bright], [p.f("seed", 1) * 4.1, unit, p.f("wb", -25) / 100, p.f("saturation", 115) / 100,
-                                                     p.f("contrast", 118) / 100, p.f("clip", 45) / 100, p.f("fringe", 40) / 100,
-                                                     p.f("noise", 35) / 100, p.f("chromaNoise", 40) / 100, p.f("exposure", 0.2)])
-        let sh = p.num("sharpen", 120) / 100
+                                                     p.f("contrast", 118) / 100, p.f("clip", 45) / 100,
+                                                     p.bool("fringeOn", true) ? p.f("fringe", 40) / 100 : 0,
+                                                     p.bool("noiseOn", true) ? p.f("noise", 35) / 100 : 0,
+                                                     p.bool("noiseOn", true) ? p.f("chromaNoise", 40) / 100 : 0, p.f("exposure", 0.2)])
+        let sh = p.bool("sharpOn", true) ? p.num("sharpen", 120) / 100 : 0
         if sh > 0.01 {
             let b = ctx.blur(img, sigma: max(0.6, Double(unit) * 1.2))
             img = ctx.apply("k_unsharp", [img, b], [Float(sh), 0.0, 1])
@@ -168,6 +152,7 @@ struct DigicamEffect: Effect {
             switch p.choice("datePos", "br") {
             case "bl": pos = CGPoint(x: margin, y: CGFloat(H) - margin - size)
             case "tr": pos = CGPoint(x: CGFloat(W) - margin - est, y: margin)
+            case "tl": pos = CGPoint(x: margin, y: margin)
             default: pos = CGPoint(x: CGFloat(W) - margin - est, y: CGFloat(H) - margin - size)
             }
             ov.text(text, at: pos, size: size, color: color, weight: .bold, fontName: "Menlo-Bold", kern: 0.06)
@@ -178,7 +163,7 @@ struct DigicamEffect: Effect {
             img = ctx.apply("k_over_pm_op", [img, ov.texture()], [0.95])
         }
         let q = p.num("quality", 55) / 100
-        if q < 0.99 {
+        if q < 0.99 && p.bool("jpegOn", true) {
             // compress at camera resolution so the blocks have the right size
             let small = ctx.resize(img, max(8, Int(Double(W) * res)), max(8, Int(Double(H) * res)))
             img = ctx.resize(ctx.jpegRoundtrip(small, quality: q), W, H, smooth: true)

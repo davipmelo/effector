@@ -8,9 +8,12 @@ struct CanvasContainer: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                Theme.canvasBG
+                (app.presenting ? Color.black : Theme.canvasBG)
                 if app.hasImage {
                     CanvasView(app: app)
+                    if app.compareSplit && !app.isCropping && !app.showOriginal {
+                        SplitDivider(width: geo.size.width)
+                    }
                     if app.isCropping {
                         CropOverlay(viewSize: geo.size)
                     }
@@ -112,6 +115,8 @@ struct CanvasView: NSViewRepresentable {
 
     func updateNSView(_ v: CanvasMTKView, context: Context) {
         v.texture = app.isCropping ? v.cropTexture(for: app) : (app.showOriginal ? app.original : app.output)
+        v.original = app.original
+        v.split = app.compareSplit && !app.isCropping && !app.showOriginal ? app.splitPos : nil
         v.needsDisplay = true
     }
 }
@@ -119,6 +124,9 @@ struct CanvasView: NSViewRepresentable {
 final class CanvasMTKView: MTKView, MTKViewDelegate {
     weak var app: AppState?
     var texture: MTLTexture?
+    var original: MTLTexture?
+    /// Split before/after: fraction of the view width showing the original on the left.
+    var split: Double?
     private var pipeline: MTLRenderPipelineState?
     private var cropTex: (UUID, MTLTexture)?
     private var lastDrag: NSPoint?
@@ -178,7 +186,7 @@ final class CanvasMTKView: MTKView, MTKViewDelegate {
     func draw(in view: MTKView) {
         guard let pipeline, let rpd = currentRenderPassDescriptor, let drawable = currentDrawable else { return }
         let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        let bg = dark ? 0.085 : 0.86
+        let bg = AppState.shared.presenting ? 0.0 : (dark ? 0.085 : 0.86)
         rpd.colorAttachments[0].clearColor = MTLClearColor(red: bg, green: bg, blue: bg, alpha: 1)
         rpd.colorAttachments[0].loadAction = .clear
         let cb = GPU.shared.queue.makeCommandBuffer()!
@@ -196,6 +204,16 @@ final class CanvasMTKView: MTKView, MTKViewDelegate {
             enc.setFragmentBytes(&u, length: u.count * 4, index: 0)
             enc.setFragmentTexture(tex, index: 0)
             enc.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+            if let split, let orig = original, orig.width == tex.width {
+                // draw the original again, clipped to the left of the divider
+                let w = Int(drawableSize.width), h = Int(drawableSize.height)
+                let x = max(0, min(w, Int(Double(w) * split)))
+                if x > 0 {
+                    enc.setScissorRect(MTLScissorRect(x: 0, y: 0, width: x, height: h))
+                    enc.setFragmentTexture(orig, index: 0)
+                    enc.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+                }
+            }
         }
         enc.endEncoding()
         cb.present(drawable)
@@ -251,5 +269,38 @@ final class CanvasMTKView: MTKView, MTKViewDelegate {
     override func mouseUp(with event: NSEvent) {
         if lastDrag != nil { NSCursor.pop() }
         lastDrag = nil
+    }
+}
+
+/// Draggable before/after divider (original on the left).
+struct SplitDivider: View {
+    let width: CGFloat
+    @ObservedObject var app = AppState.shared
+    var body: some View {
+        let x = width * app.splitPos
+        ZStack(alignment: .topLeading) {
+            GeometryReader { g in
+                Rectangle().fill(Color.white.opacity(0.9)).frame(width: 1.5, height: g.size.height)
+                    .shadow(color: .black.opacity(0.5), radius: 2)
+                    .offset(x: x - 0.75)
+                Circle().fill(Color.white).frame(width: 26, height: 26)
+                    .shadow(color: .black.opacity(0.4), radius: 3)
+                    .overlay(Image(systemName: "arrow.left.and.right").font(.system(size: 11, weight: .bold)).foregroundStyle(.black))
+                    .offset(x: x - 13, y: g.size.height / 2 - 13)
+                    .gesture(DragGesture(coordinateSpace: .named("canvasArea")).onChanged { v in
+                        app.splitPos = min(0.98, max(0.02, v.location.x / max(1, width)))
+                    })
+                    .help(tr("Drag to compare"))
+                Text(tr("BEFORE")).font(.system(size: 10, weight: .bold)).tracking(0.6)
+                    .padding(.horizontal, 7).padding(.vertical, 3)
+                    .background(Capsule().fill(.black.opacity(0.55))).foregroundStyle(.white)
+                    .offset(x: max(8, x - 70), y: 12)
+                Text(tr("AFTER")).font(.system(size: 10, weight: .bold)).tracking(0.6)
+                    .padding(.horizontal, 7).padding(.vertical, 3)
+                    .background(Capsule().fill(.black.opacity(0.55))).foregroundStyle(.white)
+                    .offset(x: min(width - 60, x + 10), y: 12)
+            }
+        }
+        .coordinateSpace(name: "canvasArea")
     }
 }

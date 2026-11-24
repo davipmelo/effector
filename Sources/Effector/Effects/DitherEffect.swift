@@ -93,7 +93,7 @@ struct DitherEffect: Effect {
             ("bluenoise", "Blue Noise"), ("random", "Random"), ("lines", "Lines"), ("threshold", "Threshold"),
         ], "floyd", section: "Dither"),
         .slider("pixelSize", "Pixel Size", 0.5, 24, 2, step: 0.1, unit: "", curve: 1.8, section: "Dither"),
-        .slider("strength", "Strength", 0, 100, 100, unit: "%", section: "Dither"),
+        .slider("strength", "Strength", 0, 100, 100, step: 1, unit: "%", section: "Dither"),
         .toggle("serpentine", "Serpentine", true, section: "Dither",
                 visible: { DitherEffect.diffusionKinds.contains($0.choice("algorithm")) }),
         .seed(section: "Dither"),
@@ -103,9 +103,9 @@ struct DitherEffect: Effect {
         .color("light", "Light", RGBA(hex: "#F2F2F2"), section: "Color", visible: when("mode", "mono")),
         ParamDef(key: "palette", label: "Palette", kind: .palette(def: PalettePresets.all[1]), section: "Color",
                  visible: when("mode", "palette")),
-        .slider("brightness", "Brightness", -100, 100, 0, section: "Tone"),
-        .slider("contrast", "Contrast", -100, 100, 0, section: "Tone"),
-        .slider("gamma", "Gamma", 0.2, 3, 1, section: "Tone"),
+        .slider("brightness", "Brightness", -100, 100, 0, step: 1, section: "Tone"),
+        .slider("contrast", "Contrast", -100, 100, 0, step: 1, section: "Tone"),
+        .slider("gamma", "Gamma", 0.2, 3, 1, step: 0.01, section: "Tone"),
     ]
 
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {

@@ -31,6 +31,12 @@ final class AppState: ObservableObject {
 
     // View
     @Published var showOriginal = false
+    /// Split before/after view with a draggable divider.
+    @Published var compareSplit = false { didSet { if compareSplit { showOriginal = false } } }
+    @Published var splitPos = 0.5
+    /// Full-screen image preview (F): hides every panel.
+    @Published private(set) var presenting = false
+    private var enteredFullScreen = false
     @Published var zoom: Double? = nil      // nil = fit; otherwise screen points per original pixel
     @Published var fitZoom: Double = 1      // computed by canvas
     @Published var pan: CGSize = .zero
@@ -609,6 +615,81 @@ final class AppState: ObservableObject {
 
     func setZoom(_ z: Double?) {
         if let z { zoom = min(32, max(0.02, z)) } else { zoom = nil; pan = .zero }
+        updatePreviewScale()
+    }
+
+    // MARK: Randomize / copy & paste layers
+
+    /// Rolls new random values for a layer's sliders, menus and seed (one undo step).
+    func randomizeParams(_ id: UUID) {
+        guard let n = state.layers.find(id), !n.isGroup, let eff = EffectRegistry.effect(n.effectID) else { return }
+        var p = n.params
+        for d in eff.params {
+            switch d.kind {
+            case .slider(let mn, let mx, _, let step, _, let curve):
+                var v = mn + (mx - mn) * pow(Double.random(in: 0...1), curve)
+                if step > 0 { v = (v / step).rounded() * step }
+                p[d.key] = .number(min(mx, max(mn, v)))
+            case .choice(let o, _), .segmented(let o, _):
+                if let r = o.randomElement() { p[d.key] = .choice(r.id) }
+            case .seed:
+                p[d.key] = .number(Double(Int.random(in: 1...9999)))
+            default: break
+            }
+        }
+        p["_look"] = nil
+        updateLayer(id) { $0.params = p }
+    }
+
+    static let layersPasteboardType = NSPasteboard.PasteboardType("com.davimelo.effector.layers")
+
+    func copyLayers() {
+        let nodes = selectionRoots.compactMap { state.layers.find($0) }
+        guard !nodes.isEmpty, let d = try? JSONEncoder().encode(nodes) else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setData(d, forType: AppState.layersPasteboardType)
+        flash(tr("%d layers copied", nodes.count))
+    }
+
+    func pasteLayers() {
+        guard hasImage, let d = NSPasteboard.general.data(forType: AppState.layersPasteboardType),
+              let nodes = try? JSONDecoder().decode([LayerNode].self, from: d) else { flash(tr("No layers to paste")); return }
+        let fresh = nodes.map { $0.reidentified() }
+        edit { s in
+            var index = 0
+            var parent: UUID? = nil
+            if let sel = selectedID, let loc = s.layers.location(of: sel) { parent = loc.parent; index = loc.index }
+            for (i, n) in fresh.enumerated() { s.layers.insert(n, parent: parent, index: index + i) }
+        }
+        extendingSelection = true
+        selectedIDs = Set(fresh.map(\.id))
+        selectedID = fresh.first?.id
+        extendingSelection = false
+        flash(tr("%d layers pasted", fresh.count))
+    }
+
+    func togglePresentation() {
+        guard hasImage || presenting else { return }
+        showEffectBrowser = false; showPresetBrowser = false; showCommandPalette = false
+        presenting.toggle()
+        let w = NSApp.windows.first { $0.identifier?.rawValue.hasPrefix("main") == true } ?? NSApp.mainWindow
+        if presenting {
+            zoom = nil; pan = .zero
+            if let w, !w.styleMask.contains(.fullScreen) { w.toggleFullScreen(nil); enteredFullScreen = true }
+            flash(tr("Full screen preview · F or ⎋ to go back"))
+        } else {
+            if enteredFullScreen, let w {
+                // the enter animation may still be running: retry until the window is really full screen
+                func leave(_ tries: Int) {
+                    guard !presenting else { return }
+                    if w.styleMask.contains(.fullScreen) { w.toggleFullScreen(nil) }
+                    else if tries > 0 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { leave(tries - 1) } }
+                }
+                leave(4)
+            }
+            enteredFullScreen = false
+            zoom = nil
+        }
         updatePreviewScale()
     }
 

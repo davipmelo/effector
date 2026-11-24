@@ -49,27 +49,6 @@ enum LensFilterShaders {
         o.write(float4(max(a.sample(sLin, uv).rgb - b.sample(sLin, uv).rgb * u[0], 0.0) * 2.5, 1.0), gid);
     }
 
-    // Diffusion filter. u: strength, glow, haze, lift, contrast, warmth, glowTint rgb (6..8)
-    kernel void k_diffuse(KIN, texture2d<float> base [[texture(1)]], texture2d<float> g1 [[texture(2)]],
-                          texture2d<float> g2 [[texture(3)]], texture2d<float> hz [[texture(4)]]) {
-        GUARD
-        float2 uv = UV;
-        float4 s = base.read(gid);
-        float3 c = clamp(s.rgb, 0.0, 1.0);
-        float k = u[0];
-        float w = u[5];
-        float3 tint = float3(u[6], u[7], u[8]) * float3(1.0 + 0.12 * w, 1.0 + 0.02 * w, 1.0 - 0.14 * w);
-        float3 g = (g1.sample(sLin, uv).rgb * 0.65 + g2.sample(sLin, uv).rgb * 0.5) * tint * u[1] * k;
-        c = 1.0 - (1.0 - c) * (1.0 - clamp(g, 0.0, 1.0));
-        float3 h = hz.sample(sLin, uv).rgb;
-        c = mix(c, max(c, h), clamp(u[2] * k, 0.0, 1.0));
-        c = mix(c, 0.5 * (c + h), clamp(u[2] * k * 0.35, 0.0, 1.0));
-        float lift = u[3] * k;
-        c = lift + c * (1.0 - lift);
-        c = (c - 0.5) * (1.0 - u[4] * k * 0.5) + 0.5;
-        o.write(float4(clamp(c, 0.0, 1.0), s.a), gid);
-    }
-
     // Prism. u: mode (0 side,1 ring,2 full), angle, offset(px), dispersion, intensity, coverage, feather, copies, blend
     kernel void k_prism(KIN, texture2d<float> a [[texture(1)]], texture2d<float> soft [[texture(2)]]) {
         GUARD
@@ -111,6 +90,58 @@ enum LensFilterShaders {
         o.write(float4(clamp(c, 0.0, 1.0), base.a), gid);
     }
 
+    constexpr sampler sMir(coord::normalized, filter::linear, address::mirrored_repeat);
+
+    // Kaleidoscope. u: segments, rotation, cx, cy, zoom, twist, mirror, dispersion, mix, rings, sx, sy
+    kernel void k_kaleido(KIN, texture2d<float> a [[texture(1)]], texture2d<float> soft [[texture(2)]]) {
+        GUARD
+        float2 size = OSIZE;
+        float asp = size.x / size.y;
+        float2 uv = UV;
+        float2 q = (uv - float2(u[2], u[3])) * float2(asp, 1.0);
+        float r = length(q) / max(0.05, u[4]);
+        float N = max(2.0, floor(u[0]));
+        float seg = 6.2831853 / N;
+        if (u[9] > 0.5) {
+            float k = r * u[9];
+            r = abs(fract(k * 0.5) * 2.0 - 1.0) * 0.5;
+        }
+        float3 col;
+        for (int ch = 0; ch < 3; ch++) {
+            float th = atan2(q.y, q.x) + u[1] + u[5] * r + (float(ch) - 1.0) * u[7] * seg * 0.12;
+            float k = floor(th / seg);
+            float tm = th - k * seg;
+            if (u[6] > 0.5 && fmod(abs(k), 2.0) > 0.5) tm = seg - tm;
+            float2 sp = float2(cos(tm), sin(tm)) * r;
+            float2 suv = float2(u[10], u[11]) + sp / float2(asp, 1.0);
+            col[ch] = soft.sample(sMir, suv)[ch];
+        }
+        float4 base = a.read(gid);
+        o.write(float4(mix(base.rgb, col, clamp(u[8], 0.0, 1.0)), base.a), gid);
+    }
+
+    // Crystal facets. u: unit, cell(ref px), refract(px), dispersion, edges, seed, mix, stretch
+    kernel void k_facets(KIN, texture2d<float> a [[texture(1)]], texture2d<float> soft [[texture(2)]]) {
+        GUARD
+        float2 size = OSIZE;
+        float2 p = float2(gid) + 0.5;
+        float2 q = p / max(u[0], 1e-3) / max(4.0, u[1]);
+        q *= float2(1.0 - u[7] * 0.7, 1.0 + u[7] * 0.7);
+        float4 v = voro(q, u[5]);
+        float2 dir = float2(v.z - 0.5, v.w - 0.5) * 2.0;
+        float2 off = dir * u[2] / size;
+        float3 col;
+        for (int ch = 0; ch < 3; ch++) {
+            float k = 1.0 + (float(ch) - 1.0) * u[3] * 0.5;
+            col[ch] = soft.sample(sMir, p / size + off * k)[ch];
+        }
+        float edge = 1.0 - smoothstep(0.0, 0.06, v.y - v.x);
+        col += edge * u[4] * 0.6 * (0.5 + v.z);
+        col *= 1.0 + (v.w - 0.5) * 0.12 * u[4];
+        float4 base = a.read(gid);
+        o.write(float4(clamp(mix(base.rgb, col, clamp(u[6], 0.0, 1.0)), 0.0, 1.0), base.a), gid);
+    }
+
     // Focus mix for lens blur. u: mode (0 tilt-shift band, 1 radial, 2 full), pos x, pos y, size, falloff, angle, saturation
     kernel void k_focusmix(KIN, texture2d<float> base [[texture(1)]], texture2d<float> b1 [[texture(2)]], texture2d<float> b2 [[texture(3)]]) {
         GUARD
@@ -143,30 +174,6 @@ enum LensFilterShaders {
         float3 c = clamp(s.rgb, 0.0, 1.0);
         float l = luma(c);
         o.write(float4(c * (1.0 + u[0] * 4.0 * smoothstep(0.7, 1.0, l)), s.a), gid);
-    }
-    // Fisheye / barrel distortion. u: amount, zoom, circle, chroma, center x, y
-    kernel void k_fisheye(KIN, texture2d<float> a [[texture(1)]]) {
-        GUARD
-        float2 size = OSIZE;
-        float2 uv = UV;
-        float asp = size.x / size.y;
-        float2 c = float2(u[4], u[5]);
-        float2 d = (uv - c) * float2(asp, 1.0);
-        float r2 = dot(d, d);
-        float k = u[0];
-        float3 col;
-        for (int ch = 0; ch < 3; ch++) {
-            float kk = k * (1.0 + (float(ch) - 1.0) * u[3]);
-            float2 dd = d * (1.0 + kk * r2 + kk * 0.5 * r2 * r2) / max(0.2, u[1]);
-            float2 suv = c + dd / float2(asp, 1.0);
-            col[ch] = a.sample(sLin, suv)[ch];
-            if (u[2] < 0.5 && (any(suv < 0.0) || any(suv > 1.0))) col[ch] = 0.0;
-        }
-        if (u[2] > 0.5) {
-            float lim = 0.5 * min(asp, 1.0);
-            col *= 1.0 - smoothstep(lim * 0.99, lim, sqrt(r2));
-        }
-        o.write(float4(col, a.read(gid).a), gid);
     }
     """
 }
@@ -207,64 +214,6 @@ enum LensFilterKit {
     }
 }
 
-// MARK: - Diffusion (Pro-Mist and friends)
-
-struct DiffusionEffect: Effect {
-    let id = "diffusion"
-    let name = "Diffusion Filter"
-    let category = EffectCategory.lens
-    var symbol: String { "camera.filters" }
-    var summary: String { "Pro-Mist, Black Pro-Mist, Glimmerglass, Soft FX and fog filters: soft highlight bloom and veil." }
-    let params: [ParamDef] = [
-        .slider("strength", "Strength", 0, 200, 50, step: 1, unit: "%", section: "Filter"),
-        .slider("glow", "Highlight Glow", 0, 200, 100, step: 1, unit: "%", section: "Filter"),
-        .slider("haze", "Veil / Haze", 0, 100, 30, step: 1, unit: "%", section: "Filter"),
-        .slider("threshold", "Glow Threshold", 0, 100, 55, step: 1, unit: "%", section: "Filter"),
-        .slider("radius", "Radius", 2, 150, 30, step: 1, curve: 1.8, section: "Filter"),
-        .slider("lift", "Black Lift", 0, 30, 5, step: 0.5, unit: "%", section: "Tone"),
-        .slider("contrast", "Contrast Reduction", 0, 100, 25, step: 1, unit: "%", section: "Tone"),
-        .slider("warmth", "Warmth", -100, 100, 10, step: 1, section: "Tone",
-                track: [RGBA(hex: "#3A7BFF"), RGBA(hex: "#9A9A9A"), RGBA(hex: "#FFB020")]),
-        .color("tint", "Glow Tint", .white, section: "Tone"),
-    ]
-    var looks: [EffectLook] {
-        [
-            EffectLook(id: "pm8", name: "Pro-Mist 1/8", group: "Pro-Mist", values: ["strength": 25.0]),
-            EffectLook(id: "pm4", name: "Pro-Mist 1/4", group: "Pro-Mist", values: ["strength": 50.0]),
-            EffectLook(id: "pm2", name: "Pro-Mist 1/2", group: "Pro-Mist", values: ["strength": 90.0]),
-            EffectLook(id: "pm1", name: "Pro-Mist 1", group: "Pro-Mist", values: ["strength": 150.0, "radius": 45.0]),
-            EffectLook(id: "bpm4", name: "Black Pro-Mist 1/4", group: "Black Pro-Mist", values: ["strength": 50.0, "haze": 8.0, "lift": 0.0,
-                                                                                               "contrast": 8.0, "threshold": 62.0]),
-            EffectLook(id: "bpm2", name: "Black Pro-Mist 1/2", group: "Black Pro-Mist", values: ["strength": 90.0, "haze": 10.0, "lift": 0.0,
-                                                                                               "contrast": 10.0, "threshold": 60.0]),
-            EffectLook(id: "glimmer", name: "Glimmerglass", group: "Other", values: ["strength": 80.0, "glow": 140.0, "haze": 4.0,
-                                                                                    "radius": 10.0, "threshold": 68.0, "lift": 0.0, "contrast": 5.0]),
-            EffectLook(id: "softfx", name: "Soft FX", group: "Other", values: ["strength": 70.0, "glow": 40.0, "haze": 70.0, "radius": 12.0,
-                                                                              "lift": 2.0, "contrast": 10.0]),
-            EffectLook(id: "cinebloom", name: "CineBloom", group: "Other", values: ["strength": 80.0, "glow": 160.0, "haze": 15.0,
-                                                                                   "radius": 60.0, "threshold": 50.0]),
-            EffectLook(id: "fog", name: "Fog Filter", group: "Other", values: ["strength": 100.0, "glow": 30.0, "haze": 85.0,
-                                                                              "radius": 80.0, "lift": 14.0, "contrast": 45.0]),
-        ]
-    }
-    func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
-        let r = max(1, ctx.px(p.num("radius", 30)))
-        let f = max(1, Int(r / 6))
-        let hl = brights(input, ctx, p, f)
-        let small = ctx.resize(input, max(1, input.width / f), max(1, input.height / f))
-        let sr = r / Double(f)
-        let g1 = ctx.blur(hl, sigma: sr * 0.5)
-        let g2 = ctx.blur(hl, sigma: sr * 2)
-        let hz = ctx.blur(small, sigma: sr * 1.5)
-        return ctx.apply("k_diffuse", [input, g1, g2, hz], [p.f("strength", 50) / 100, p.f("glow", 100) / 100, p.f("haze", 30) / 100,
-                                                            p.f("lift", 5) / 100, p.f("contrast", 25) / 100, p.f("warmth", 10) / 100]
-                         + p.color("tint", .white).floats)
-    }
-    private func brights(_ input: MTLTexture, _ ctx: RenderContext, _ p: Params, _ f: Int) -> MTLTexture {
-        LensFilterKit.brights(input, ctx, threshold: p.f("threshold", 55) / 100, knee: 0.25, factor: f)
-    }
-}
-
 // MARK: - Anamorphic flare
 
 struct AnamorphicEffect: Effect {
@@ -282,8 +231,9 @@ struct AnamorphicEffect: Effect {
         .color("color", "Color", RGBA(hex: "#3D7CFF"), section: "Color"),
         .slider("colorMix", "Color Amount", 0, 100, 85, step: 1, unit: "%", section: "Color"),
         .toggle("spectral", "Spectral Edges", false, section: "Color"),
+        .slider("smallLights", "Small Lights Only", 0, 100, 60, step: 1, unit: "%", section: "Streak"),
+        .sectionSwitch("glowOn", section: "Glow"),
         .slider("glow", "Wide Glow", 0, 100, 25, step: 1, unit: "%", section: "Glow"),
-        .slider("points", "Small Lights Only", 0, 100, 60, step: 1, unit: "%", section: "Glow"),
     ]
     var looks: [EffectLook] {
         [
@@ -298,7 +248,7 @@ struct AnamorphicEffect: Effect {
         let f = 4
         let mix = p.f("colorMix", 85) / 100
         var b = LensFilterKit.brights(input, ctx, threshold: p.f("threshold", 72) / 100, saturation: 1 - mix, factor: f)
-        b = LensFilterKit.pointsOnly(b, ctx, amount: p.f("points", 60) / 100)
+        b = LensFilterKit.pointsOnly(b, ctx, amount: p.f("smallLights", 60) / 100)
         let th = ctx.px(p.num("thickness", 1.5)) / Double(f)
         if th > 0.3 { b = ctx.blur(b, sigma: th) }
         let L = p.num("length", 60) / 100 * Double(b.width) * 0.35
@@ -312,7 +262,7 @@ struct AnamorphicEffect: Effect {
         } else {
             s = LensFilterKit.streak(b, ctx, angle: ang, length: L)
         }
-        let gw = p.f("glow", 25) / 100
+        let gw = p.bool("glowOn", true) ? p.f("glow", 25) / 100 : 0
         if gw > 0.001 { s = ctx.apply("k_addtex", [s, ctx.blur(b, sigma: Double(b.width) * 0.02)], [gw * 2]) }
         let c = p.color("color", RGBA(hex: "#3D7CFF"))
         let tint = RGBA(r: 1 + (c.r * 1.6 - 1) * Double(mix), g: 1 + (c.g * 1.6 - 1) * Double(mix), b: 1 + (c.b * 1.6 - 1) * Double(mix))
@@ -335,14 +285,14 @@ struct StarFilterEffect: Effect {
         .slider("threshold", "Threshold", 0, 100, 86, step: 1, unit: "%", section: "Stars"),
         .slider("angle", "Rotation", 0, 90, 45, step: 0.5, unit: "°", section: "Stars"),
         .slider("thickness", "Thickness", 0, 6, 0.6, step: 0.1, section: "Stars"),
-        .slider("points", "Small Lights Only", 0, 100, 85, step: 1, unit: "%", section: "Stars"),
+        .slider("smallLights", "Small Lights Only", 0, 100, 85, step: 1, unit: "%", section: "Stars"),
         .toggle("spectral", "Rainbow", false, section: "Color"),
         .color("tint", "Tint", .white, section: "Color"),
     ]
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
         let f = 4
         var b = LensFilterKit.brights(input, ctx, threshold: p.f("threshold", 86) / 100, knee: 0.08, factor: f)
-        b = LensFilterKit.pointsOnly(b, ctx, amount: p.f("points", 85) / 100)
+        b = LensFilterKit.pointsOnly(b, ctx, amount: p.f("smallLights", 85) / 100)
         let th = ctx.px(p.num("thickness", 0.6)) / Double(f)
         if th > 0.3 { b = ctx.blur(b, sigma: th) }
         let n = Int(p.choice("points", "4")) ?? 4
@@ -369,38 +319,89 @@ struct StarFilterEffect: Effect {
 
 struct PrismEffect: Effect {
     let id = "prism"
-    let name = "Prism"
+    let name = "Prism & Kaleidoscope"
     let category = EffectCategory.lens
     var symbol: String { "triangle.lefthalf.filled" }
-    var summary: String { "A prism held in front of the lens: refracted rainbow ghosts on one side or around the frame." }
+    var summary: String { "Prism ghosts, a full kaleidoscope or crystal facets — refract, mirror and spin the image." }
     let params: [ParamDef] = [
-        .choice("mode", "Placement", [("side", "One Side"), ("ring", "Around the Edges"), ("full", "Whole Frame")], "side", section: "Prism"),
-        .slider("angle", "Direction", -180, 180, 0, step: 1, unit: "°", section: "Prism"),
-        .slider("coverage", "Coverage", 5, 100, 40, step: 1, unit: "%", section: "Prism", visible: whenNot("mode", "full")),
-        .slider("feather", "Feather", 0, 50, 15, step: 1, unit: "%", section: "Prism", visible: whenNot("mode", "full")),
-        .slider("offset", "Offset", 0, 200, 40, step: 1, curve: 1.5, section: "Refraction"),
-        .slider("copies", "Copies", 1, 4, 2, step: 1, section: "Refraction"),
-        .slider("dispersion", "Rainbow Dispersion", 0, 100, 35, step: 1, unit: "%", section: "Refraction"),
-        .slider("softness", "Softness", 0, 30, 3, step: 0.5, section: "Refraction"),
-        .slider("intensity", "Intensity", 0, 150, 70, step: 1, unit: "%", section: "Refraction"),
-        .choice("blend", "Blend", [("screen", "Screen"), ("lighten", "Lighten"), ("normal", "Normal")], "screen", section: "Refraction"),
+        .segmented("type", "Type", [("ghosts", "Prism"), ("kaleido", "Kaleidoscope"), ("facets", "Crystal")], "ghosts", section: "Prism"),
+        // prism ghosts
+        .choice("mode", "Placement", [("side", "One Side"), ("ring", "Around the Edges"), ("full", "Whole Frame")], "side",
+                section: "Prism", visible: when("type", "ghosts")),
+        .slider("angle", "Direction", -180, 180, 0, step: 1, unit: "°", section: "Prism", visible: when("type", "ghosts")),
+        .slider("coverage", "Coverage", 5, 100, 40, step: 1, unit: "%", section: "Prism",
+                visible: { $0.choice("type", "ghosts") == "ghosts" && $0.choice("mode", "side") != "full" }),
+        .slider("feather", "Feather", 0, 50, 15, step: 1, unit: "%", section: "Prism",
+                visible: { $0.choice("type", "ghosts") == "ghosts" && $0.choice("mode", "side") != "full" }),
+        .slider("offset", "Offset", 0, 200, 40, step: 1, curve: 1.5, section: "Prism", visible: when("type", "ghosts")),
+        .slider("copies", "Copies", 1, 4, 2, step: 1, section: "Prism", visible: when("type", "ghosts")),
+        .choice("blend", "Blend", [("screen", "Screen"), ("lighten", "Lighten"), ("normal", "Normal")], "screen", section: "Prism",
+                visible: when("type", "ghosts")),
+        // kaleidoscope
+        .slider("segments", "Segments", 2, 32, 6, step: 1, section: "Kaleidoscope", visible: when("type", "kaleido")),
+        .toggle("mirror", "Mirror Segments", true, section: "Kaleidoscope", visible: when("type", "kaleido")),
+        .slider("rotation", "Rotation", -180, 180, 0, step: 1, unit: "°", section: "Kaleidoscope", visible: when("type", "kaleido")),
+        .slider("zoom", "Zoom", 10, 400, 100, step: 1, unit: "%", curve: 1.5, section: "Kaleidoscope", visible: when("type", "kaleido")),
+        .slider("twist", "Twist", -400, 400, 0, step: 1, unit: "°", section: "Kaleidoscope", visible: when("type", "kaleido")),
+        .slider("rings", "Rings", 0, 12, 0, step: 1, section: "Kaleidoscope", visible: when("type", "kaleido")),
+        .slider("cx", "Center X", 0, 100, 50, step: 1, unit: "%", section: "Kaleidoscope", visible: when("type", "kaleido")),
+        .slider("cy", "Center Y", 0, 100, 50, step: 1, unit: "%", section: "Kaleidoscope", visible: when("type", "kaleido")),
+        .slider("sx", "Source X", 0, 100, 50, step: 1, unit: "%", section: "Kaleidoscope", visible: when("type", "kaleido")),
+        .slider("sy", "Source Y", 0, 100, 50, step: 1, unit: "%", section: "Kaleidoscope", visible: when("type", "kaleido")),
+        // facets
+        .slider("cell", "Facet Size", 10, 400, 90, step: 1, curve: 1.6, section: "Crystal", visible: when("type", "facets")),
+        .slider("refract", "Refraction", 0, 200, 40, step: 1, curve: 1.4, section: "Crystal", visible: when("type", "facets")),
+        .slider("edges", "Edge Shine", 0, 100, 35, step: 1, unit: "%", section: "Crystal", visible: when("type", "facets")),
+        .slider("stretch", "Stretch", -90, 90, 0, step: 1, unit: "%", section: "Crystal", visible: when("type", "facets")),
+        .seed(section: "Crystal"),
+        // shared
+        .slider("dispersion", "Rainbow Dispersion", 0, 100, 35, step: 1, unit: "%", section: "Color & Mix"),
+        .slider("softness", "Softness", 0, 30, 3, step: 0.5, section: "Color & Mix"),
+        .slider("intensity", "Amount", 0, 150, 70, step: 1, unit: "%", section: "Color & Mix"),
     ]
     var looks: [EffectLook] {
         [
-            EffectLook(id: "side", name: "Rainbow Side", values: [:]),
-            EffectLook(id: "kaleido", name: "Edge Ghosts", values: ["mode": "ring", "coverage": 45.0, "copies": 3, "offset": 60.0]),
-            EffectLook(id: "double", name: "Double Exposure", values: ["mode": "full", "offset": 120.0, "copies": 1, "dispersion": 15.0,
-                                                                     "intensity": 50.0, "blend": "lighten"]),
-            EffectLook(id: "dreamy", name: "Dreamy Refraction", values: ["softness": 14.0, "dispersion": 70.0, "offset": 25.0, "copies": 3]),
+            EffectLook(id: "side", name: "Rainbow Side", group: "Prism", values: [:]),
+            EffectLook(id: "kaleido", name: "Edge Ghosts", group: "Prism", values: ["mode": "ring", "coverage": 45.0, "copies": 3, "offset": 60.0]),
+            EffectLook(id: "double", name: "Double Exposure", group: "Prism", values: ["mode": "full", "offset": 120.0, "copies": 1, "dispersion": 15.0,
+                                                                                    "intensity": 50.0, "blend": "lighten"]),
+            EffectLook(id: "dreamy", name: "Dreamy Refraction", group: "Prism", values: ["softness": 14.0, "dispersion": 70.0, "offset": 25.0, "copies": 3]),
+            EffectLook(id: "k6", name: "Classic Kaleidoscope", group: "Kaleidoscope", values: ["type": "kaleido", "segments": 6, "intensity": 100.0,
+                                                                                            "dispersion": 10.0]),
+            EffectLook(id: "mandala", name: "Mandala", group: "Kaleidoscope", values: ["type": "kaleido", "segments": 12, "rings": 3, "intensity": 100.0,
+                                                                                     "zoom": 140.0, "dispersion": 25.0]),
+            EffectLook(id: "vortex", name: "Vortex", group: "Kaleidoscope", values: ["type": "kaleido", "segments": 8, "twist": 220.0, "intensity": 100.0,
+                                                                                   "dispersion": 40.0]),
+            EffectLook(id: "mirror2", name: "Mirror World", group: "Kaleidoscope", values: ["type": "kaleido", "segments": 2, "intensity": 100.0,
+                                                                                          "dispersion": 0.0]),
+            EffectLook(id: "trip", name: "Psychedelic Trip", group: "Kaleidoscope", values: ["type": "kaleido", "segments": 16, "twist": -160.0,
+                                                                                           "rings": 5, "zoom": 70.0, "dispersion": 90.0, "intensity": 100.0]),
+            EffectLook(id: "crystal", name: "Crystal Lens", group: "Crystal", values: ["type": "facets", "intensity": 100.0]),
+            EffectLook(id: "shards", name: "Glass Shards", group: "Crystal", values: ["type": "facets", "cell": 160.0, "refract": 90.0, "edges": 60.0,
+                                                                                    "stretch": 60.0, "intensity": 100.0]),
+            EffectLook(id: "mosaic", name: "Fine Mosaic", group: "Crystal", values: ["type": "facets", "cell": 25.0, "refract": 15.0, "edges": 20.0,
+                                                                                   "intensity": 100.0, "dispersion": 10.0]),
         ]
     }
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
         let soft = ctx.blur(input, sigma: ctx.px(p.num("softness", 3)))
-        let mode: Float = ["side": 0, "ring": 1, "full": 2][p.choice("mode", "side")] ?? 0
-        let blend: Float = ["screen": 0, "lighten": 1, "normal": 2][p.choice("blend", "screen")] ?? 0
-        return ctx.apply("k_prism", [input, soft], [mode, p.f("angle"), Float(ctx.px(p.num("offset", 40))), p.f("dispersion", 35) / 100 * 0.6,
-                                                    p.f("intensity", 70) / 100, p.f("coverage", 40) / 100, p.f("feather", 15) / 100,
-                                                    p.f("copies", 2), blend])
+        let amt = p.f("intensity", 70) / 100
+        let disp = p.f("dispersion", 35) / 100
+        switch p.choice("type", "ghosts") {
+        case "kaleido":
+            return ctx.apply("k_kaleido", [input, soft], [p.f("segments", 6), p.f("rotation") * .pi / 180, p.f("cx", 50) / 100, p.f("cy", 50) / 100,
+                                                          p.f("zoom", 100) / 100, p.f("twist") * .pi / 180, p.bool("mirror", true) ? 1 : 0,
+                                                          disp, amt, p.f("rings"), p.f("sx", 50) / 100, p.f("sy", 50) / 100])
+        case "facets":
+            return ctx.apply("k_facets", [input, soft], [Float(ctx.scale), p.f("cell", 90), Float(ctx.px(p.num("refract", 40))),
+                                                         disp, p.f("edges", 35) / 100, p.f("seed", 1) * 3.7, amt, p.f("stretch") / 100])
+        default:
+            let mode: Float = ["side": 0, "ring": 1, "full": 2][p.choice("mode", "side")] ?? 0
+            let blend: Float = ["screen": 0, "lighten": 1, "normal": 2][p.choice("blend", "screen")] ?? 0
+            return ctx.apply("k_prism", [input, soft], [mode, p.f("angle"), Float(ctx.px(p.num("offset", 40))), disp * 0.6,
+                                                        amt, p.f("coverage", 40) / 100, p.f("feather", 15) / 100,
+                                                        p.f("copies", 2), blend])
+        }
     }
 }
 
@@ -473,47 +474,3 @@ struct LensBlurEffect: Effect {
     }
 }
 
-// MARK: - Fisheye
-
-struct FisheyeEffect: Effect {
-    let id = "fisheye"
-    let name = "Fisheye & Distortion"
-    let category = EffectCategory.lens
-    var symbol: String { "circle.dotted" }
-    var summary: String { "Barrel (fisheye) or pincushion distortion, with an optional circular frame — skate-video style." }
-    let params: [ParamDef] = [
-        .slider("amount", "Distortion", -100, 100, 45, step: 1),
-        .slider("zoom", "Zoom", 50, 200, 100, step: 1, unit: "%"),
-        .toggle("circle", "Circular Frame", false),
-        .slider("fringe", "Color Fringing", 0, 100, 10, step: 1, unit: "%"),
-        .slider("cx", "Center X", 0, 100, 50, step: 1, unit: "%"),
-        .slider("cy", "Center Y", 0, 100, 50, step: 1, unit: "%"),
-    ]
-    var looks: [EffectLook] {
-        [
-            EffectLook(id: "vx", name: "VX1000 Fisheye", values: ["amount": 70.0, "fringe": 15.0]),
-            EffectLook(id: "circle", name: "Full Circle", values: ["amount": 90.0, "circle": true]),
-            EffectLook(id: "mild", name: "Mild Barrel", values: ["amount": 20.0]),
-            EffectLook(id: "pincushion", name: "Pincushion", values: ["amount": -40.0, "zoom": 95.0]),
-        ]
-    }
-    func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
-        let k = Double(p.f("amount", 45) / 100 * 0.9)
-        let asp = Double(input.width) / Double(input.height)
-        func f(_ r: Double) -> Double { 1 + k * r * r + k * 0.5 * r * r * r * r }
-        var auto = 1.0
-        if p.bool("circle") {
-            // the circle's edge lands exactly on the image's short side
-            let lim = 0.5 * min(asp, 1)
-            auto = lim * f(lim) / (0.5 * min(asp, 1))
-        } else if k > 0 {
-            // barrel distortion pulls the corners inwards: zoom so the frame stays filled
-            let rc = (asp * asp / 4 + 0.25).squareRoot()
-            auto = f(rc)
-        }
-        let zoom = Float(p.num("zoom", 100) / 100 * auto)
-        return ctx.apply("k_fisheye", [input], [Float(k), zoom,
-                                                p.bool("circle") ? 1 : 0, p.f("fringe", 10) / 100 * 0.08,
-                                                p.f("cx", 50) / 100, p.f("cy", 50) / 100])
-    }
-}

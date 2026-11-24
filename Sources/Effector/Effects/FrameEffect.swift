@@ -32,118 +32,121 @@ enum FrameShaders {
 
 struct FrameEffect: Effect {
     let id = "frame"
-    let name = "Frame & Border"
+    let name = "Frame & Letterbox"
     let category = EffectCategory.overlay
     var symbol: String { "photo.artframe" }
-    var summary: String { "Polaroid, Instax, 35 mm film strip, slide mount or a simple border around the photo." }
+    var summary: String { "Cinema black bars (letterbox) in classic aspect ratios, Polaroid, a simple border or a rounded print." }
+
+    static let ratios: [(String, String, Double)] = [
+        ("1.33", "1.33:1 (Academy 4:3)", 4.0 / 3), ("1.66", "1.66:1 (European)", 1.66), ("1.78", "1.78:1 (16:9)", 16.0 / 9),
+        ("1.85", "1.85:1 (Flat)", 1.85), ("2.00", "2.00:1 (Univisium)", 2.0), ("2.20", "2.20:1 (70 mm)", 2.2),
+        ("2.39", "2.39:1 (Scope)", 2.39), ("2.76", "2.76:1 (Ultra Panavision)", 2.76), ("3.00", "3.00:1 (Ultra-wide)", 3.0),
+    ]
+
     let params: [ParamDef] = [
-        .choice("style", "Style", [("polaroid", "Polaroid"), ("instax", "Instax Mini"), ("film", "35mm Film Strip"),
-                                   ("slide", "Slide Mount"), ("border", "Simple Border"), ("rounded", "Rounded Print")],
-                "polaroid", section: "Frame"),
-        .slider("size", "Border Size", 30, 250, 100, step: 1, unit: "%", section: "Frame"),
+        .choice("style", "Style", [("letterbox", "Black Bars (Letterbox)"), ("polaroid", "Polaroid"), ("border", "Simple Border"),
+                                   ("rounded", "Rounded Print")], "letterbox", section: "Frame"),
+        .choice("ratio", "Aspect Ratio", options: FrameEffect.ratios.map { ChoiceOption(id: $0.0, label: $0.1) }, "2.39",
+                section: "Frame", visible: when("style", "letterbox")),
+        .slider("offset", "Reframe", -100, 100, 0, step: 1, unit: "%", section: "Frame", visible: when("style", "letterbox")),
+        .slider("size", "Border Size", 30, 250, 100, step: 1, unit: "%", section: "Frame", visible: whenNot("style", "letterbox")),
         .slider("radius", "Corner Radius", 0, 60, 0, step: 0.5, section: "Frame", visible: whenAny("style", ["border", "rounded"])),
-        .color("color", "Frame Color", RGBA(hex: "#F5F4F0"), section: "Frame", visible: whenNot("style", "film")),
-        .slider("texture", "Texture", 0, 100, 50, step: 1, unit: "%", section: "Frame"),
-        .slider("shadow", "Inner Shadow", 0, 100, 35, step: 1, unit: "%", section: "Frame"),
-        ParamDef(key: "caption", label: "Caption", kind: .text(def: ""), section: "Text",
-                 visible: whenAny("style", ["polaroid", "instax", "slide"])),
-        ParamDef(key: "edgeText", label: "Edge Print", kind: .text(def: "KODAK PORTRA 400"), section: "Text", visible: when("style", "film")),
-        .slider("frameNo", "Frame Number", 0, 40, 12, step: 1, section: "Text", visible: when("style", "film")),
+        .color("color", "Frame Color", RGBA(hex: "#F5F4F0"), section: "Frame", visible: whenNot("style", "letterbox")),
+        .color("barColor", "Bar Color", .black, section: "Frame", visible: when("style", "letterbox")),
+        .slider("texture", "Texture", 0, 100, 50, step: 1, unit: "%", section: "Frame", visible: whenNot("style", "letterbox")),
+        .slider("shadow", "Inner Shadow", 0, 100, 35, step: 1, unit: "%", section: "Frame", visible: whenNot("style", "letterbox")),
+        .sectionSwitch("textOn", section: "Text", false),
+        ParamDef(key: "caption", label: "Caption / Subtitle", kind: .text(def: "I've seen things you people wouldn't believe."), section: "Text"),
+        .color("textColor", "Text Color", RGBA(hex: "#F2E36B"), section: "Text"),
+        .slider("textSize", "Text Size", 8, 80, 26, step: 1, section: "Text"),
+        .segmented("textPlace", "Placement", [("bar", "In the Bar"), ("image", "On the Image")], "bar", section: "Text",
+                   visible: when("style", "letterbox")),
         .seed(section: "Text"),
     ]
+
+    var looks: [EffectLook] {
+        [
+            EffectLook(id: "scope", name: "Scope 2.39:1", group: "Letterbox", values: ["style": "letterbox", "ratio": "2.39"]),
+            EffectLook(id: "flat", name: "Flat 1.85:1", group: "Letterbox", values: ["style": "letterbox", "ratio": "1.85"]),
+            EffectLook(id: "ultra", name: "Ultra Panavision 2.76:1", group: "Letterbox", values: ["style": "letterbox", "ratio": "2.76"]),
+            EffectLook(id: "subtitle", name: "Movie Still with Subtitle", group: "Letterbox",
+                       values: ["style": "letterbox", "ratio": "2.39", "textOn": true]),
+            EffectLook(id: "academy", name: "Academy 4:3", group: "Letterbox", values: ["style": "letterbox", "ratio": "1.33"]),
+            EffectLook(id: "polaroid", name: "Polaroid", group: "Print", values: ["style": "polaroid"]),
+            EffectLook(id: "white", name: "White Border", group: "Print", values: ["style": "border", "color": RGBA(hex: "#F7F7F5")]),
+            EffectLook(id: "black", name: "Black Border", group: "Print", values: ["style": "border", "color": RGBA(hex: "#0B0B0B"), "texture": 0.0]),
+            EffectLook(id: "rounded", name: "Rounded Print", group: "Print", values: ["style": "rounded"]),
+        ]
+    }
 
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
         let W = CGFloat(input.width), H = CGFloat(input.height)
         let m = min(W, H)
         let k = CGFloat(p.num("size", 100) / 100)
-        let style = p.choice("style", "polaroid")
-        let vertical = H > W
+        let style = p.choice("style", "letterbox")
         var frameColor = p.color("color", RGBA(hex: "#F5F4F0"))
         var rect: CGRect
         var radius: CGFloat = CGFloat(ctx.px(p.num("radius", 0)))
+        var texture = p.f("texture", 50) / 100
+        var shadow = p.f("shadow", 35) / 100
+        var src = CGRect(x: 0, y: 0, width: 1, height: 1)
         switch style {
-        case "instax":
-            let s = m * 0.065 * k, t = m * 0.09 * k, b = m * 0.24 * k
-            rect = CGRect(x: s, y: t, width: W - 2 * s, height: H - t - b)
-            radius = m * 0.006
-        case "film":
-            frameColor = RGBA(hex: "#15110F")
-            let band = (vertical ? W : H) * 0.16 * k
-            let gap = (vertical ? H : W) * 0.035 * k
-            rect = vertical ? CGRect(x: band, y: gap, width: W - 2 * band, height: H - 2 * gap)
-                            : CGRect(x: gap, y: band, width: W - 2 * gap, height: H - 2 * band)
-            radius = m * 0.008
-        case "slide":
-            let s = m * 0.17 * k
-            rect = CGRect(x: s, y: s, width: W - 2 * s, height: H - 2 * s)
-            radius = m * 0.025
+        case "letterbox":
+            frameColor = p.color("barColor", .black)
+            texture = 0; shadow = 0; radius = 0
+            let a = CGFloat(FrameEffect.ratios.first { $0.0 == p.choice("ratio", "2.39") }?.2 ?? 2.39)
+            let canvas = W / H
+            if a >= canvas {
+                let h = (W / a).rounded()
+                rect = CGRect(x: 0, y: ((H - h) / 2).rounded(), width: W, height: h)
+            } else {
+                let w = (H * a).rounded()
+                rect = CGRect(x: ((W - w) / 2).rounded(), y: 0, width: w, height: H)
+            }
+            // the bars cover the image (same scale); Reframe slides the visible part
+            let slackY = 1 - rect.height / H, slackX = 1 - rect.width / W
+            let o = CGFloat(p.num("offset") / 100)
+            src = CGRect(x: slackX / 2 * (1 + o), y: slackY / 2 * (1 + o), width: rect.width / W, height: rect.height / H)
         case "border", "rounded":
             let s = m * 0.05 * k
-            rect = CGRect(x: s, y: s, width: W - 2 * s, height: H - 2 * s)
+            rect = CGRect(x: s, y: s, width: W - 2 * s, height: H - 2 * s).integral
             if style == "rounded" && radius == 0 { radius = m * 0.02 }
         default: // polaroid
             let s = m * 0.055 * k, b = m * 0.22 * k
-            rect = CGRect(x: s, y: s, width: W - 2 * s, height: H - s - b)
+            rect = CGRect(x: s, y: s, width: W - 2 * s, height: H - s - b).integral
             radius = m * 0.002
         }
-        rect = rect.integral
-        // cover-fit the image into the window
-        let ra = rect.width / max(1, rect.height), ia = W / H
-        var src = CGRect(x: 0, y: 0, width: 1, height: 1)
-        if ia > ra { let w = ra / ia; src = CGRect(x: (1 - w) / 2, y: 0, width: w, height: 1) }
-        else { let h = ia / ra; src = CGRect(x: 0, y: (1 - h) / 2, width: 1, height: h) }
-        let tex: Float = style == "film" ? 0.2 : 1
-        var out = ctx.apply("k_frame", [input], [Float(rect.minX), Float(rect.minY), Float(rect.width), Float(rect.height),
-                                                  Float(radius)] + frameColor.floats + [p.f("texture", 50) / 100 * tex,
-                                                  p.f("shadow", 35) / 100, p.f("seed", 1) * 3.3, Float(ctx.scale),
-                                                  Float(src.minX), Float(src.minY), Float(src.width), Float(src.height)])
-        // decorations
-        let ov = OverlayCanvas(input.width, input.height)
-        let g = ov.ctx
-        var hasOverlay = false
-        let caption = p.text("caption", "")
-        if style == "film" {
-            hasOverlay = true
-            let band = (vertical ? W : H) * 0.16 * k
-            let hole = band * 0.32, holeL = band * 0.24
-            let pitch = holeL * 1.9
-            g.setFillColor(CGColor(srgbRed: 0.95, green: 0.94, blue: 0.9, alpha: 1))
-            let length = vertical ? H : W
-            var t = pitch * 0.4
-            while t < length {
-                for side in 0..<2 {
-                    let off = side == 0 ? band * 0.2 : (vertical ? W : H) - band * 0.2 - hole
-                    let r = vertical ? CGRect(x: off, y: t, width: hole, height: holeL) : CGRect(x: t, y: off, width: holeL, height: hole)
-                    g.addPath(CGPath(roundedRect: r, cornerWidth: holeL * 0.18, cornerHeight: holeL * 0.18, transform: nil))
-                }
-                t += pitch
-            }
-            g.fillPath()
-            let orange = RGBA(hex: "#E39A3B")
-            let fs = band * 0.17
-            let edge = p.text("edgeText", "KODAK PORTRA 400")
-            let n = Int(p.num("frameNo", 12))
-            if !vertical {
-                ov.text(edge + "   ▸ \(n)", at: CGPoint(x: W * 0.08, y: band * 0.62), size: fs, color: orange, weight: .bold)
-                ov.text("\(n)A", at: CGPoint(x: W * 0.5, y: H - band * 0.62 - fs), size: fs, color: orange, weight: .bold)
-                ov.text(edge, at: CGPoint(x: W * 0.62, y: band * 0.62), size: fs, color: orange, weight: .bold)
-            } else {
-                ov.text("\(n)  \(n)A", at: CGPoint(x: band * 0.6, y: H * 0.02), size: fs, color: orange, weight: .bold)
-            }
-        } else if !caption.isEmpty && ["polaroid", "instax"].contains(style) {
-            hasOverlay = true
-            let bottom = H - rect.maxY
-            let fs = bottom * 0.3
-            ov.text(caption, at: CGPoint(x: rect.minX + rect.width * 0.06, y: rect.maxY + (bottom - fs) * 0.45), size: fs,
-                    color: RGBA(hex: "#1D2A5A"), weight: .regular, mono: false, fontName: "Noteworthy-Bold")
-        } else if style == "slide" {
-            hasOverlay = true
-            let s = rect.minY
-            let fs = s * 0.2
-            let label = caption.isEmpty ? "KODACHROME TRANSPARENCY" : caption
-            ov.text(label, at: CGPoint(x: rect.minX, y: (s - fs) * 0.5), size: fs, color: RGBA(hex: "#8E8A82"), weight: .bold, mono: false)
+        if style != "letterbox" {
+            // cover-fit the image into the window
+            let ra = rect.width / max(1, rect.height), ia = W / H
+            if ia > ra { let w = ra / ia; src = CGRect(x: (1 - w) / 2, y: 0, width: w, height: 1) }
+            else { let h = ia / ra; src = CGRect(x: 0, y: (1 - h) / 2, width: 1, height: h) }
         }
-        if hasOverlay { out = ctx.apply("k_over_pm", [out, ov.texture()]) }
+        var out = ctx.apply("k_frame", [input], [Float(rect.minX), Float(rect.minY), Float(rect.width), Float(rect.height),
+                                                  Float(radius)] + frameColor.floats + [texture, shadow, p.f("seed", 1) * 3.3,
+                                                  Float(ctx.scale), Float(src.minX), Float(src.minY), Float(src.width), Float(src.height)])
+        let caption = p.text("caption", "")
+        if p.bool("textOn", false) && !caption.isEmpty {
+            let ov = OverlayCanvas(input.width, input.height)
+            let fs = CGFloat(ctx.px(p.num("textSize", 26)))
+            let color = p.color("textColor", RGBA(hex: "#F2E36B"))
+            switch style {
+            case "letterbox":
+                let inBar = p.choice("textPlace", "bar") == "bar" && rect.minY > fs * 1.6
+                let y = inBar ? rect.maxY + (H - rect.maxY - fs) / 2 : rect.maxY - fs * 2.2
+                let est = CGFloat(caption.count) * fs * 0.5
+                ov.text(caption, at: CGPoint(x: (W - est) / 2, y: y), size: fs, color: color, weight: .medium, mono: false,
+                        shadow: !inBar)
+            case "polaroid":
+                let bottom = H - rect.maxY
+                ov.text(caption, at: CGPoint(x: rect.minX + rect.width * 0.06, y: rect.maxY + (bottom - fs) * 0.45), size: fs,
+                        color: color, weight: .regular, mono: false, fontName: "Noteworthy-Bold")
+            default:
+                ov.text(caption, at: CGPoint(x: rect.minX, y: rect.maxY + max(2, (H - rect.maxY - fs) / 2)), size: fs,
+                        color: color, weight: .medium, mono: false)
+            }
+            out = ctx.apply("k_over_pm", [out, ov.texture()])
+        }
         return out
     }
 }

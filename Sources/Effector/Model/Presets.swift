@@ -212,7 +212,7 @@ enum FactoryPresets {
         ]),
         make("Kodachrome Slide", "Film", [
             fx("film", ["stock": "kodachrome64", "grain": 20.0]),
-            fx("frame", ["style": "slide"]),
+            fx("vignette", ["amount": 30.0]),
         ]),
         make("Polaroid", "Film", [
             fx("film", ["stock": "polaroid600", "grain": 20.0]),
@@ -222,7 +222,7 @@ enum FactoryPresets {
         make("Instax Party", "Film", [
             fx("film", ["stock": "instax", "exposure": 0.3]),
             fx("bloom", opacity: 0.5, ["threshold": 70.0, "radius": 30.0]),
-            fx("frame", ["style": "instax"]),
+            fx("frame", ["style": "polaroid", "color": RGBA(hex: "#FBFBF8")]),
         ]),
         make("Cross Process", "Film", [
             fx("film", ["stock": "crossprocess", "grain": 40.0]),
@@ -247,9 +247,20 @@ enum FactoryPresets {
             fx("film", ["stock": "delta3200", "grain": 38.0, "grainSize": 1.2]),
             fx("basic", ["contrast": 25.0]),
         ]),
-        make("Contact Sheet", "Film", [
+        make("Darkroom Print", "Film", [
             fx("film", ["stock": "hp5", "grain": 45.0]),
-            fx("frame", ["style": "film", "edgeText": ParamValue.text("ILFORD HP5 PLUS")]),
+            look("dust", "print", ["opacity": 50.0]),
+            look("frame", "white", ["size": 70.0]),
+        ]),
+        make("Cinemascope", "Film", [
+            fx("film", ["stock": "vision500t", "grain": 30.0, "halation": 50.0]),
+            look("anamorphic", "subtle"),
+            look("frame", "scope"),
+        ]),
+        make("Movie Still", "Film", [
+            fx("film", ["stock": "vision250d", "grain": 25.0]),
+            fx("vignette", ["amount": 25.0]),
+            look("frame", "subtitle"),
         ]),
 
         // MARK: Y2K & digital
@@ -293,7 +304,7 @@ enum FactoryPresets {
         make("Deep Fried", "Y2K & Digital", [
             fx("basic", ["saturation": 80.0, "contrast": 60.0]),
             fx("sharpen", ["amount": 400.0, "radius": 2.5]),
-            fx("jpeg", ["quality": 4.0, "generations": 4, "block": 3.0]),
+            look("digicam", "phone", ["quality": 3.0, "saturation": 160.0]),
         ]),
 
         // MARK: Analog video
@@ -392,12 +403,13 @@ enum FactoryPresets {
             look("leak", "end"),
         ]),
         make("Pro-Mist Portrait", "Light & Mood", [
-            fx("film", ["stock": "portra400", "grain": 25.0]),
-            look("diffusion", "pm4"),
+            fx("film", ["stock": "portra400", "grain": 25.0, "halation": 45.0]),
+            fx("glow", opacity: 0.55, ["intensity": 45.0, "radius": 35.0, "threshold": 45.0, "tint": RGBA(hex: "#FFF1E0")]),
+            fx("basic", ["contrast": -12.0, "blacks": 10.0]),
         ]),
         make("Black Mist Cinema", "Light & Mood", [
-            fx("film", ["stock": "vision500t", "grain": 30.0]),
-            look("diffusion", "bpm2"),
+            fx("film", ["stock": "vision500t", "grain": 30.0, "halation": 60.0]),
+            fx("bloom", opacity: 0.7, ["threshold": 62.0, "intensity": 70.0, "radius": 45.0]),
             fx("vignette", ["amount": 25.0]),
         ]),
         make("Anamorphic Night", "Light & Mood", [
@@ -415,7 +427,7 @@ enum FactoryPresets {
         ]),
         make("Halo Glow", "Light & Mood", [
             fx("halo"),
-            look("diffusion", "pm8"),
+            fx("glow", opacity: 0.5, ["intensity": 40.0, "radius": 30.0, "threshold": 50.0]),
         ]),
         make("Miniature World", "Light & Mood", [
             look("lensblur", "mini"),
@@ -437,7 +449,7 @@ enum FactoryPresets {
         make("Thermal Cam", "Tracking", [
             fx("blur", ["radius": 3.0]),
             fx("gradientmap", ["gradient": gradient("Thermal · Iron")]),
-            fx("blob", ["detect": "brightness", "threshold": 72.0, "shape": "cross", "label": "coords", "connect": "none",
+            fx("blob", ["detect": "brightness", "threshold": 72.0, "shape": "cross", "label": "coords", "connectOn": false,
                         "color": RGBA(hex: "#FFFFFF"), "maxBlobs": 6.0]),
         ]),
         make("Target Lock", "Tracking", [

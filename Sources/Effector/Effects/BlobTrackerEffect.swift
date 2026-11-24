@@ -105,36 +105,40 @@ struct BlobTrackerEffect: Effect {
     let params: [ParamDef] = [
         .choice("detect", "Detect By", [("brightness", "Brightness"), ("darkness", "Darkness"), ("color", "Color"),
                                         ("contours", "Contours (Vision)"), ("saliency", "Objects (Vision)")], "brightness", section: "Detection"),
-        .slider("threshold", "Threshold", 0, 100, 65, unit: "%", section: "Detection",
+        .slider("threshold", "Threshold", 0, 100, 65, step: 1, unit: "%", section: "Detection",
                 visible: whenAny("detect", ["brightness", "darkness"])),
         .color("target", "Target Color", RGBA(hex: "#E03020"), section: "Detection", visible: when("detect", "color")),
-        .slider("tolerance", "Tolerance", 1, 100, 25, unit: "%", section: "Detection", visible: when("detect", "color")),
+        .slider("tolerance", "Tolerance", 1, 100, 25, step: 1, unit: "%", section: "Detection", visible: when("detect", "color")),
         .slider("maxBlobs", "Max Blobs", 1, 60, 14, step: 1, section: "Detection"),
-        .slider("minSize", "Min Size", 0, 20, 0.3, unit: "%", curve: 3, section: "Detection"),
-        .slider("maxSize", "Max Size", 1, 100, 40, unit: "%", curve: 2, section: "Detection"),
+        .slider("minSize", "Min Size", 0, 20, 0.3, step: 0.1, unit: "%", curve: 3, section: "Detection"),
+        .slider("maxSize", "Max Size", 1, 100, 40, step: 1, unit: "%", curve: 2, section: "Detection"),
         .slider("detail", "Detail", 40, 400, 160, step: 10, section: "Detection"),
+        .sectionSwitch("markersOn", section: "Markers"),
         .choice("shape", "Marker", [("box", "Box"), ("corners", "Corners"), ("circle", "Circle"), ("cross", "Crosshair"),
-                                    ("brackets", "Brackets")], "box", section: "Style"),
-        .segmented("boxMode", "Box Size", [("fit", "Fit Blob"), ("fixed", "Fixed")], "fit", section: "Style"),
-        .slider("boxScale", "Box Scale", 10, 200, 100, step: 1, unit: "%", section: "Style", visible: whenNot("boxMode", "fixed")),
-        .slider("boxSize", "Box Size", 4, 200, 30, step: 1, curve: 1.8, section: "Style", visible: when("boxMode", "fixed")),
-        .slider("padding", "Padding", -20, 40, 4, step: 0.5, section: "Style", visible: whenNot("boxMode", "fixed")),
-        .color("color", "Color", RGBA(hex: "#FFFFFF"), section: "Style"),
-        .slider("lineWidth", "Line Width", 0.25, 8, 1.6, step: 0.05, curve: 1.8, section: "Style"),
-        .toggle("centerDot", "Center Dot", true, section: "Style"),
-        .slider("fill", "Fill", 0, 100, 0, unit: "%", section: "Style"),
-        .slider("invertInside", "Invert Inside", 0, 100, 0, unit: "%", section: "Style"),
-        .slider("dimOutside", "Dim Outside", 0, 100, 0, unit: "%", section: "Style"),
-        .choice("label", "Label", [("none", "None"), ("id", "ID"), ("coords", "Coordinates"), ("size", "Size"),
+                                    ("brackets", "Brackets")], "box", section: "Markers"),
+        .segmented("boxMode", "Box Size", [("fit", "Fit Blob"), ("fixed", "Fixed")], "fit", section: "Markers"),
+        .slider("boxScale", "Box Scale", 10, 200, 100, step: 1, unit: "%", section: "Markers", visible: whenNot("boxMode", "fixed")),
+        .slider("boxSize", "Box Size", 4, 200, 30, step: 1, curve: 1.8, section: "Markers", visible: when("boxMode", "fixed")),
+        .slider("padding", "Padding", -20, 40, 4, step: 0.5, section: "Markers", visible: whenNot("boxMode", "fixed")),
+        .color("color", "Color", RGBA(hex: "#FFFFFF"), section: "Markers"),
+        .slider("lineWidth", "Line Width", 0.25, 8, 1.6, step: 0.05, curve: 1.8, section: "Markers"),
+        .toggle("centerDot", "Center Dot", true, section: "Markers"),
+        .slider("fill", "Fill", 0, 100, 0, step: 1, unit: "%", section: "Markers"),
+        .sectionSwitch("highlightOn", section: "Highlight"),
+        .slider("invertInside", "Invert Inside", 0, 100, 0, step: 1, unit: "%", section: "Highlight"),
+        .slider("dimOutside", "Dim Outside", 0, 100, 0, step: 1, unit: "%", section: "Highlight"),
+        .sectionSwitch("labelsOn", section: "Labels"),
+        .choice("label", "Label", [("id", "ID"), ("coords", "Coordinates"), ("size", "Size"),
                                    ("hex", "Hex ID"), ("custom", "Custom Text")], "id", section: "Labels"),
         ParamDef(key: "labelText", label: "Text", kind: .text(def: "TARGET"), section: "Labels", visible: when("label", "custom")),
-        .slider("labelSize", "Label Size", 4, 60, 16, step: 0.5, curve: 1.5, section: "Labels", visible: whenNot("label", "none")),
-        .toggle("labelBG", "Label Background", true, section: "Labels", visible: whenNot("label", "none")),
-        .choice("connect", "Connections", [("none", "None"), ("sequence", "Sequence"), ("nearest", "Nearest"), ("center", "To Center"),
-                                           ("all", "All")], "nearest", section: "Connections"),
-        .slider("connectWidth", "Line Width", 0.25, 6, 1.0, step: 0.05, curve: 1.8, section: "Connections", visible: whenNot("connect", "none")),
-        .toggle("dashed", "Dashed", false, section: "Connections", visible: whenNot("connect", "none")),
-        .slider("connectOpacity", "Opacity", 0, 100, 70, unit: "%", section: "Connections", visible: whenNot("connect", "none")),
+        .slider("labelSize", "Label Size", 4, 60, 16, step: 0.5, curve: 1.5, section: "Labels"),
+        .toggle("labelBG", "Label Background", true, section: "Labels"),
+        .sectionSwitch("connectOn", section: "Connections"),
+        .choice("connect", "Style", [("sequence", "Sequence"), ("nearest", "Nearest"), ("center", "To Center"),
+                                     ("all", "All")], "nearest", section: "Connections"),
+        .slider("connectWidth", "Line Width", 0.25, 6, 1.0, step: 0.05, curve: 1.8, section: "Connections"),
+        .toggle("dashed", "Dashed", false, section: "Connections"),
+        .slider("connectOpacity", "Opacity", 0, 100, 70, step: 1, unit: "%", section: "Connections"),
     ]
 
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
@@ -192,7 +196,8 @@ struct BlobTrackerEffect: Effect {
         }
         let g = ov.ctx
         // connections (under markers)
-        let conn = p.choice("connect", "nearest")
+        // "none" is kept for older projects (before the on/off switches)
+        let conn = p.bool("connectOn", true) ? p.choice("connect", "nearest") : "none"
         if conn != "none" && rects.count > 1 {
             g.setStrokeColor(ov.cg(color, alpha: p.num("connectOpacity", 70) / 100))
             g.setLineWidth(CGFloat(max(0.5, ctx.px(p.num("connectWidth", 1.0)))))
@@ -224,9 +229,11 @@ struct BlobTrackerEffect: Effect {
         g.setFillColor(ov.cg(color, alpha: p.num("fill") / 100))
         g.setLineWidth(lw)
         let shape = p.choice("shape", "box")
+        let markersOn = p.bool("markersOn", true)
         for r in rects {
             mask.ctx.setFillColor(CGColor(gray: 1, alpha: 1))
             mask.ctx.fill(r)
+            guard markersOn else { continue }
             if p.num("fill") > 0 { g.fill(r) }
             switch shape {
             case "corners", "brackets":
@@ -264,7 +271,7 @@ struct BlobTrackerEffect: Effect {
             }
         }
         // labels
-        let labelMode = p.choice("label", "id")
+        let labelMode = p.bool("labelsOn", true) ? p.choice("label", "id") : "none"
         if labelMode != "none" {
             let size = CGFloat(ctx.px(p.num("labelSize", 16)))
             let inv = color.luma > 0.5 ? RGBA.black : RGBA.white
@@ -284,6 +291,6 @@ struct BlobTrackerEffect: Effect {
             }
         }
         return ctx.apply("k_blob", [input, ov.texture(), mask.texture()],
-                         [p.f("invertInside") / 100, p.f("dimOutside") / 100 * 0.85])
+                         p.bool("highlightOn", true) ? [p.f("invertInside") / 100, p.f("dimOutside") / 100 * 0.85] : [0, 0])
     }
 }

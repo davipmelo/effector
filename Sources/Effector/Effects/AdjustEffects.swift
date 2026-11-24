@@ -179,16 +179,16 @@ struct BasicAdjustEffect: Effect {
     var symbol: String { "slider.horizontal.3" }
     var summary: String { "Exposure, contrast, highlights, shadows, white balance and saturation." }
     let params: [ParamDef] = [
-        .slider("exposure", "Exposure", -4, 4, 0, unit: " EV", section: "Tone"),
-        .slider("contrast", "Contrast", -100, 100, 0, section: "Tone"),
-        .slider("highlights", "Highlights", -100, 100, 0, section: "Tone"),
-        .slider("shadows", "Shadows", -100, 100, 0, section: "Tone"),
-        .slider("whites", "Whites", -100, 100, 0, section: "Tone"),
-        .slider("blacks", "Blacks", -100, 100, 0, section: "Tone"),
-        .slider("temperature", "Temperature", -100, 100, 0, section: "Color", track: [RGBA(hex: "#3A7BFF"), RGBA(hex: "#9A9A9A"), RGBA(hex: "#FFB020")]),
-        .slider("tint", "Tint", -100, 100, 0, section: "Color", track: [RGBA(hex: "#2FBF5A"), RGBA(hex: "#9A9A9A"), RGBA(hex: "#E040C0")]),
-        .slider("vibrance", "Vibrance", -100, 100, 0, section: "Color"),
-        .slider("saturation", "Saturation", -100, 100, 0, section: "Color"),
+        .slider("exposure", "Exposure", -4, 4, 0, step: 0.05, unit: " EV", section: "Tone"),
+        .slider("contrast", "Contrast", -100, 100, 0, step: 1, section: "Tone"),
+        .slider("highlights", "Highlights", -100, 100, 0, step: 1, section: "Tone"),
+        .slider("shadows", "Shadows", -100, 100, 0, step: 1, section: "Tone"),
+        .slider("whites", "Whites", -100, 100, 0, step: 1, section: "Tone"),
+        .slider("blacks", "Blacks", -100, 100, 0, step: 1, section: "Tone"),
+        .slider("temperature", "Temperature", -100, 100, 0, step: 1, section: "Color", track: [RGBA(hex: "#3A7BFF"), RGBA(hex: "#9A9A9A"), RGBA(hex: "#FFB020")]),
+        .slider("tint", "Tint", -100, 100, 0, step: 1, section: "Color", track: [RGBA(hex: "#2FBF5A"), RGBA(hex: "#9A9A9A"), RGBA(hex: "#E040C0")]),
+        .slider("vibrance", "Vibrance", -100, 100, 0, step: 1, section: "Color"),
+        .slider("saturation", "Saturation", -100, 100, 0, step: 1, section: "Color"),
     ]
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
         ctx.apply("k_basic", [input], ["exposure", "contrast", "highlights", "shadows", "whites", "blacks",
@@ -229,9 +229,9 @@ struct HSLEffect: Effect {
             let dark = RGBA(r: c.r * 0.25, g: c.g * 0.25, b: c.b * 0.25)
             let light = RGBA(r: 0.5 + c.r * 0.5, g: 0.5 + c.g * 0.5, b: 0.5 + c.b * 0.5)
             return [
-                .slider("\(k)_h", "Hue", -100, 100, 0, section: b, track: [prev, c, next]),
-                .slider("\(k)_s", "Saturation", -100, 100, 0, section: b, track: [gray, c]),
-                .slider("\(k)_l", "Luminance", -100, 100, 0, section: b, track: [dark, c, light]),
+                .slider("\(k)_h", "Hue", -100, 100, 0, step: 1, section: b, track: [prev, c, next]),
+                .slider("\(k)_s", "Saturation", -100, 100, 0, step: 1, section: b, track: [gray, c]),
+                .slider("\(k)_l", "Luminance", -100, 100, 0, step: 1, section: b, track: [dark, c, light]),
             ]
         }
     }
@@ -252,14 +252,14 @@ struct HueSatEffect: Effect {
     var symbol: String { "drop.halffull" }
     var summary: String { "Rotate hue, change saturation and lightness, or colorize." }
     let params: [ParamDef] = [
-        .slider("hue", "Hue", -180, 180, 0, unit: "°", track: [RGBA(hex: "#00FFFF"), RGBA(hex: "#0000FF"), RGBA(hex: "#FF00FF"), RGBA(hex: "#FF0000"), RGBA(hex: "#FFFF00"), RGBA(hex: "#00FF00"), RGBA(hex: "#00FFFF")]),
-        .slider("saturation", "Saturation", -100, 100, 0, track: [RGBA(hex: "#808080"), RGBA(hex: "#FF3B30")]),
-        .slider("lightness", "Lightness", -100, 100, 0, track: [.black, RGBA(hex: "#808080"), .white]),
+        .slider("hue", "Hue", -180, 180, 0, step: 1, unit: "°", track: [RGBA(hex: "#00FFFF"), RGBA(hex: "#0000FF"), RGBA(hex: "#FF00FF"), RGBA(hex: "#FF0000"), RGBA(hex: "#FFFF00"), RGBA(hex: "#00FF00"), RGBA(hex: "#00FFFF")]),
+        .slider("saturation", "Saturation", -100, 100, 0, step: 1, track: [RGBA(hex: "#808080"), RGBA(hex: "#FF3B30")]),
+        .slider("lightness", "Lightness", -100, 100, 0, step: 1, track: [.black, RGBA(hex: "#808080"), .white]),
         .toggle("colorize", "Colorize", false),
-        .slider("colorHue", "Color Hue", 0, 360, 30, unit: "°",
+        .slider("colorHue", "Color Hue", 0, 360, 30, step: 1, unit: "°",
                 track: [RGBA(hex: "#FF0000"), RGBA(hex: "#FFFF00"), RGBA(hex: "#00FF00"), RGBA(hex: "#00FFFF"), RGBA(hex: "#0000FF"), RGBA(hex: "#FF00FF"), RGBA(hex: "#FF0000")],
                 visible: whenOn("colorize")),
-        .slider("colorSat", "Color Saturation", 0, 100, 40, visible: whenOn("colorize")),
+        .slider("colorSat", "Color Saturation", 0, 100, 40, step: 1, visible: whenOn("colorize")),
     ]
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
         ctx.apply("k_huesat", [input], [p.f("hue"), p.f("saturation"), p.f("lightness"),
@@ -274,13 +274,13 @@ struct BlackWhiteEffect: Effect {
     var symbol: String { "circle.lefthalf.filled" }
     var summary: String { "Black & white with per-colour mixing. Always perfectly neutral." }
     let params: [ParamDef] = [
-        .slider("reds", "Reds", -200, 300, 40, unit: "%"),
-        .slider("yellows", "Yellows", -200, 300, 60, unit: "%"),
-        .slider("greens", "Greens", -200, 300, 40, unit: "%"),
-        .slider("cyans", "Cyans", -200, 300, 60, unit: "%"),
-        .slider("blues", "Blues", -200, 300, 20, unit: "%"),
-        .slider("magentas", "Magentas", -200, 300, 80, unit: "%"),
-        .slider("contrast", "Contrast", -100, 100, 0),
+        .slider("reds", "Reds", -200, 300, 40, step: 1, unit: "%"),
+        .slider("yellows", "Yellows", -200, 300, 60, step: 1, unit: "%"),
+        .slider("greens", "Greens", -200, 300, 40, step: 1, unit: "%"),
+        .slider("cyans", "Cyans", -200, 300, 60, step: 1, unit: "%"),
+        .slider("blues", "Blues", -200, 300, 20, step: 1, unit: "%"),
+        .slider("magentas", "Magentas", -200, 300, 80, step: 1, unit: "%"),
+        .slider("contrast", "Contrast", -100, 100, 0, step: 1),
     ]
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
         ctx.apply("k_bw", [input], ["reds", "yellows", "greens", "cyans", "blues", "magentas", "contrast"].map { p.f($0) })
@@ -318,8 +318,8 @@ struct ThresholdEffect: Effect {
     var symbol: String { "circle.and.line.horizontal" }
     var summary: String { "Two-colour cut at a brightness level." }
     let params: [ParamDef] = [
-        .slider("level", "Level", 0, 100, 50, unit: "%"),
-        .slider("softness", "Softness", 0, 50, 0, unit: "%"),
+        .slider("level", "Level", 0, 100, 50, step: 1, unit: "%"),
+        .slider("softness", "Softness", 0, 50, 0, step: 1, unit: "%"),
         .color("dark", "Dark", .black),
         .color("light", "Light", .white),
     ]
@@ -335,7 +335,7 @@ struct BlurEffect: Effect {
     let category = EffectCategory.lens
     var symbol: String { "aqi.medium" }
     var summary: String { "Gaussian blur." }
-    let params: [ParamDef] = [.slider("radius", "Radius", 0, 200, 8, unit: "", curve: 2.2)]
+    let params: [ParamDef] = [.slider("radius", "Radius", 0, 200, 8, step: 1, unit: "", curve: 2.2)]
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
         ctx.blur(input, sigma: ctx.px(p.num("radius", 8)) / 2)
     }

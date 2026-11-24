@@ -21,7 +21,9 @@
 - Arraste o slider; segure **⌥** para ajuste fino.
 - **Duplo clique** no slider volta ao valor padrão.
 - Clique no número para digitar um valor exato.
-- O botão ↺ no topo do inspector redefine todos os parâmetros do layer.
+- O botão ↺ no topo do inspector redefine todos os parâmetros do layer. O **dado** (ou **R**) sorteia novos valores para explorar.
+- **Interruptores nas seções:** cada parte de um efeito (grão, halation, rótulos do blob tracker, borda preta do CRT, ruído, data…) tem um liga/desliga no título da seção.
+- **Copiar / colar layers:** ⌥⌘C e ⌥⌘V (funciona entre imagens diferentes).
 - **Duplo clique** em qualquer slider (ou no nome dele) volta ao valor padrão.
 - **Menus suspensos** (filmes, degradês, paletas, mesclagem, formatos, LUTs, Looks): clique e use **↑ ↓** ou **W / S** para ir passando com prévia ao vivo. **↩** mantém, **⎋** volta ao que estava antes. Com o menu fechado mas selecionado, ↑ ↓ também trocam a opção. A estrela ★ favorita: os favoritos aparecem no topo.
 - **Look**: vários efeitos (VHS, CRT, Papel, Poeira, Vazamento de Luz, Digicam) têm um seletor de Look no topo com pontos de partida prontos.
@@ -33,6 +35,9 @@
 - Menu ⋯: salvar a pilha atual, importar e exportar (`.effectorpreset`), mostrar ou ocultar os presets do app.
 
 ## Janela
+- No topo fica o nome do app e a versão. Na **barra fina embaixo da imagem** ficam o nome do arquivo, o tamanho, a proporção, os megapixels, o tipo, o número de layers, se há alterações não salvas e o **controle de zoom** (− % +, ajustar e tela cheia).
+- **F** abre a imagem em **tela cheia**, sem painéis. **F** ou **⎋** volta.
+- **/** liga a comparação **Antes / Depois dividida**: arraste a divisória para comparar.
 - As duas barras laterais são **redimensionáveis**: arraste a divisória. Duplo clique na divisória volta à largura padrão.
 - Passe o mouse sobre qualquer botão para ver o nome e o atalho.
 - O app **reabre a última imagem com todos os layers** ao ser aberto de novo (dá para desligar em Configurações). Configurações, atalhos, favoritos, presets, paletas, degradês e LUTs são sempre salvos.
@@ -76,6 +81,10 @@
 | Ajustar à janela / 100% | Z (ou ⌘0) / ⌘1 |
 | Fechar painéis / Presets | L / P |
 | Selecionar todos os layers | ⌥⌘A |
+| Tela cheia | F |
+| Antes / Depois dividido | / |
+| Aleatorizar layer | R |
+| Copiar / colar layers | ⌥⌘C / ⌥⌘V |
 
 ## Glow × Bloom × Halation
 - **Glow**: difusão suave da imagem inteira acima de um limiar baixo. Dá aquela névoa sonhadora (filtro de difusão).
@@ -83,11 +92,16 @@
 - **Halation**: um halo **vermelho-alaranjado** em volta das luzes, que imita a luz rebatendo na base do filme.
 
 ## Filtros de lente
-- **Difusão**: Pro-Mist, Black Pro-Mist, Glimmerglass, Soft FX, CineBloom e Neblina (no seletor de Look), com controle de brilho, véu, pretos e contraste.
+- **Prisma & Caleidoscópio**: três tipos — Prisma (fantasmas com arco-íris), Caleidoscópio (segmentos, espelho, rotação, zoom, torção, anéis, origem) e Cristal (facetas). Veja os Looks: Mandala, Vórtice, Viagem Psicodélica, Cacos de Vidro…
 - **Flare Anamórfico**: riscos horizontais nas luzes (azul clássico, âmbar, espectral).
 - **Filtro Estrela**: estrelas de 4, 6 ou 8 pontas.
 - **Prisma**: reflexos com arco-íris de um lado, nas bordas ou no quadro todo.
 - **Halo**: anéis de luz em volta das luzes.
 - **Desfoque de Lente & Tilt-Shift**: faixa ou centro nítido com bokeh.
-- **Olho de Peixe & Distorção**: barril, almofada ou círculo completo.
+
+## Distorção
+- **Olho de Peixe** (barril ou olho de peixe real até 340°), **Redemoinho**, **Pinçar & Inflar**, **Ondas & Ondulações**, **Mini Planeta & Túnel**, **Líquido & Vidro**, **Espelho & Mosaico** e **Esticar Pixels**. As bordas são preenchidas espelhando, sem buracos pretos.
+
+## Molduras
+- **Faixas pretas (letterbox)** em proporções de cinema (1.33 a 3.00:1), com **Reenquadrar** e legenda opcional; Polaroid, borda simples e foto arredondada.
 - O controle **Só Luzes Pequenas** (Anamórfico e Estrela) evita que áreas claras grandes estourem.

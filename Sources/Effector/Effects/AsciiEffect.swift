@@ -121,7 +121,7 @@ struct AsciiEffect: Effect {
         ParamDef(key: "customChars", label: "Your Characters (dark → light order is automatic)", kind: .text(def: " .oO@"),
                  section: "Characters", visible: when("charset", "custom")),
         .slider("cell", "Cell Size", 2, 40, 8, step: 0.5, curve: 1.6, section: "Characters"),
-        .slider("aspect", "Cell Height", 100, 250, 180, unit: "%", section: "Characters"),
+        .slider("aspect", "Cell Height", 100, 250, 180, step: 1, unit: "%", section: "Characters"),
         .toggle("bold", "Bold", false, section: "Characters"),
         .segmented("mode", "Color", [("mono", "Mono"), ("palette", "Palette"), ("original", "Original")], "mono", section: "Color"),
         .color("fg", "Characters", RGBA(hex: "#F2F2F2"), section: "Color", visible: when("mode", "mono")),
@@ -129,8 +129,8 @@ struct AsciiEffect: Effect {
         ParamDef(key: "palette", label: "Palette", kind: .palette(def: PalettePresets.all.first { $0.name == "Thermal Iron" } ?? PalettePresets.oneBit),
                  section: "Color", visible: when("mode", "palette")),
         .toggle("invert", "Invert", false, section: "Tone"),
-        .slider("contrast", "Contrast", -100, 100, 0, section: "Tone"),
-        .slider("brightness", "Brightness", -100, 100, 0, section: "Tone"),
+        .slider("contrast", "Contrast", -100, 100, 0, step: 1, section: "Tone"),
+        .slider("brightness", "Brightness", -100, 100, 0, step: 1, section: "Tone"),
     ]
 
     var looks: [EffectLook] {

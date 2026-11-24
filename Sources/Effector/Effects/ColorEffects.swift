@@ -37,9 +37,9 @@ struct GradientMapEffect: Effect {
     var summary: String { "Maps brightness to a gradient: duotones, thermal, night vision." }
     let params: [ParamDef] = [
         ParamDef(key: "gradient", label: "Gradient", kind: .gradient(def: GradientPresets.thermalIron), section: "Gradient"),
-        .slider("amount", "Amount", 0, 100, 100, unit: "%", section: "Gradient"),
-        .slider("black", "Input Black", 0, 100, 0, unit: "%", section: "Range"),
-        .slider("white", "Input White", 0, 100, 100, unit: "%", section: "Range"),
+        .slider("amount", "Amount", 0, 100, 100, step: 1, unit: "%", section: "Gradient"),
+        .slider("black", "Input Black", 0, 100, 0, step: 1, unit: "%", section: "Range"),
+        .slider("white", "Input White", 0, 100, 100, step: 1, unit: "%", section: "Range"),
         .toggle("reverse", "Reverse", false, section: "Range"),
     ]
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
@@ -93,7 +93,7 @@ struct LUTEffect: Effect {
     var summary: String { "Apply a .cube colour LUT. Drop .cube files on the layer or the canvas." }
     let params: [ParamDef] = [
         ParamDef(key: "lut", label: "LUT", kind: .lut),
-        .slider("amount", "Amount", 0, 100, 100, unit: "%"),
+        .slider("amount", "Amount", 0, 100, 100, step: 1, unit: "%"),
     ]
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
         guard let lut = p.lut("lut"), !lut.isEmpty else { return input }

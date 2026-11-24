@@ -61,10 +61,10 @@ struct GlowEffect: Effect {
     var symbol: String { "sun.max" }
     var summary: String { "Soft diffusion: the whole image (above a low threshold) gets a dreamy haze." }
     let params: [ParamDef] = [
-        .slider("intensity", "Intensity", 0, 200, 60, unit: "%"),
-        .slider("radius", "Radius", 1, 200, 20, curve: 2),
-        .slider("threshold", "Threshold", 0, 100, 30, unit: "%"),
-        .slider("saturation", "Saturation", 0, 200, 100, unit: "%"),
+        .slider("intensity", "Intensity", 0, 200, 60, step: 1, unit: "%"),
+        .slider("radius", "Radius", 1, 200, 20, step: 1, curve: 2),
+        .slider("threshold", "Threshold", 0, 100, 30, step: 1, unit: "%"),
+        .slider("saturation", "Saturation", 0, 200, 100, step: 1, unit: "%"),
         .choice("mode", "Blend", [("screen", "Screen"), ("add", "Add"), ("soft", "Soft Light")], "screen"),
         .color("tint", "Tint", .white),
     ]
@@ -83,11 +83,11 @@ struct BloomEffect: Effect {
     var symbol: String { "sparkles" }
     var summary: String { "Only the brightest highlights spill light, in several sizes, like a lens." }
     let params: [ParamDef] = [
-        .slider("intensity", "Intensity", 0, 300, 100, unit: "%"),
-        .slider("radius", "Radius", 1, 200, 30, curve: 2),
-        .slider("threshold", "Threshold", 0, 100, 70, unit: "%"),
-        .slider("knee", "Softness", 0, 50, 15, unit: "%"),
-        .slider("saturation", "Saturation", 0, 200, 100, unit: "%"),
+        .slider("intensity", "Intensity", 0, 300, 100, step: 1, unit: "%"),
+        .slider("radius", "Radius", 1, 200, 30, step: 1, curve: 2),
+        .slider("threshold", "Threshold", 0, 100, 70, step: 1, unit: "%"),
+        .slider("knee", "Softness", 0, 50, 15, step: 1, unit: "%"),
+        .slider("saturation", "Saturation", 0, 200, 100, step: 1, unit: "%"),
         .color("tint", "Tint", .white),
     ]
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
@@ -104,9 +104,9 @@ struct HalationEffect: Effect {
     var symbol: String { "circle.dotted.and.circle" }
     var summary: String { "Red-orange fringe around highlights, from light bouncing in the film base." }
     let params: [ParamDef] = [
-        .slider("intensity", "Intensity", 0, 200, 70, unit: "%"),
-        .slider("radius", "Radius", 1, 100, 10, curve: 2),
-        .slider("threshold", "Threshold", 0, 100, 65, unit: "%"),
+        .slider("intensity", "Intensity", 0, 200, 70, step: 1, unit: "%"),
+        .slider("radius", "Radius", 1, 100, 10, step: 1, curve: 2),
+        .slider("threshold", "Threshold", 0, 100, 65, step: 1, unit: "%"),
         .color("color", "Color", RGBA(hex: "#FF3D14")),
     ]
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
@@ -216,16 +216,16 @@ struct TrailEffect: Effect {
         .segmented("style", "Style", [("copies", "Copies"), ("smooth", "Smooth")], "copies", section: "Trail"),
         .segmented("mode", "Mode", [("dir", "Directional"), ("zoom", "Zoom"), ("spin", "Spin")], "dir", section: "Trail"),
         .toggle("centered", "Both Directions (Motion Blur)", false, section: "Trail", visible: when("style", "smooth")),
-        .slider("angle", "Angle", -180, 180, 0, unit: "°", section: "Trail"),
-        .slider("distance", "Distance", 0, 400, 60, curve: 1.8, section: "Trail"),
+        .slider("angle", "Angle", -180, 180, 0, step: 1, unit: "°", section: "Trail"),
+        .slider("distance", "Distance", 0, 400, 60, step: 1, curve: 1.8, section: "Trail"),
         .slider("copies", "Copies", 1, 48, 8, step: 1, section: "Trail", visible: whenNot("style", "smooth")),
-        .slider("decay", "Decay", 0, 100, 75, unit: "%", section: "Trail"),
-        .slider("opacity", "Ghost Opacity", 0, 100, 60, unit: "%", section: "Trail"),
+        .slider("decay", "Decay", 0, 100, 75, step: 1, unit: "%", section: "Trail"),
+        .slider("opacity", "Ghost Opacity", 0, 100, 60, step: 1, unit: "%", section: "Trail"),
         .choice("blend", "Ghost Blend", [("lighten", "Lighten"), ("screen", "Screen"), ("normal", "Normal"),
                                          ("difference", "Difference"), ("darken", "Darken")], "lighten", section: "Trail"),
-        .slider("rgbShift", "RGB Split", 0, 100, 0, unit: "%", section: "Trail"),
-        .slider("cx", "Center X", 0, 100, 50, unit: "%", section: "Center", visible: whenNot("mode", "dir")),
-        .slider("cy", "Center Y", 0, 100, 50, unit: "%", section: "Center", visible: whenNot("mode", "dir")),
+        .slider("rgbShift", "RGB Split", 0, 100, 0, step: 1, unit: "%", section: "Trail"),
+        .slider("cx", "Center X", 0, 100, 50, step: 1, unit: "%", section: "Center", visible: whenNot("mode", "dir")),
+        .slider("cy", "Center Y", 0, 100, 50, step: 1, unit: "%", section: "Center", visible: whenNot("mode", "dir")),
     ]
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
         let mode: Float = ["dir": 0, "zoom": 1, "spin": 2][p.choice("mode", "dir")] ?? 0

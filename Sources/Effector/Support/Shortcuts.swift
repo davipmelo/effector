@@ -72,7 +72,7 @@ enum ShortcutAction: String, CaseIterable, Codable {
     case open, save, saveAs, export, copyResult, paste, undo, redo
     case commandPalette, addEffect, beforeAfter, crop
     case group, ungroup, duplicate, delete, toggleVisibility, moveUp, moveDown
-    case zoomIn, zoomOut, zoomFit, zoom100, showLayers, showPresets
+    case zoomIn, zoomOut, zoomFit, zoom100, present, compare, randomize, copyLayers, pasteLayers, showLayers, showPresets
 
     var label: String {
         switch self {
@@ -99,6 +99,11 @@ enum ShortcutAction: String, CaseIterable, Codable {
         case .zoomOut: return "Zoom Out"
         case .zoomFit: return "Fit to Window"
         case .zoom100: return "Actual Size (100%)"
+        case .present: return "Full Screen Preview"
+        case .compare: return "Split Before / After"
+        case .randomize: return "Randomize Layer Settings"
+        case .copyLayers: return "Copy Layers"
+        case .pasteLayers: return "Paste Layers"
         case .showLayers: return "Close Panels"
         case .showPresets: return "Presets…"
         }
@@ -129,6 +134,11 @@ enum ShortcutAction: String, CaseIterable, Codable {
         case .zoomOut: return KeyCombo(key: "-", cmd: true)
         case .zoomFit: return KeyCombo(key: "z")
         case .zoom100: return KeyCombo(key: "1", cmd: true)
+        case .present: return KeyCombo(key: "f")
+        case .compare: return KeyCombo(key: "/")
+        case .randomize: return KeyCombo(key: "r")
+        case .copyLayers: return KeyCombo(key: "c", cmd: true, opt: true)
+        case .pasteLayers: return KeyCombo(key: "v", cmd: true, opt: true)
         case .showLayers: return KeyCombo(key: "l")
         case .showPresets: return KeyCombo(key: "p")
         }
@@ -205,6 +215,10 @@ final class ShortcutStore: ObservableObject {
         // Ignore when a non-main panel (popover, settings) is key.
         if NSApp.keyWindow != nil && NSApp.keyWindow != w { return false }
         let editing = isEditingText(w)
+        if combo.key == "escape" && !combo.hasModifier && AppState.shared.presenting && !isEditingText(w) {
+            DispatchQueue.main.async { AppState.shared.togglePresentation() }
+            return true
+        }
         guard let action = ShortcutAction.allCases.first(where: { self.combo($0) == pressed }) else { return false }
         if editing && (!combo.hasModifier || action.isTextEditingStandard) { return false }
         // while a browser panel is open, plain letters belong to its search field
@@ -244,6 +258,11 @@ enum Actions {
         case .zoomOut: app.zoomOut()
         case .zoomFit: app.setZoom(nil)
         case .zoom100: app.zoomActual()
+        case .present: app.togglePresentation()
+        case .compare: if app.hasImage { app.compareSplit.toggle() }
+        case .randomize: if let id = app.selectedID, !app.isMultiSelection { app.randomizeParams(id) }
+        case .copyLayers: app.copyLayers()
+        case .pasteLayers: app.pasteLayers()
         case .showLayers: app.showEffectBrowser = false; app.showPresetBrowser = false
         case .showPresets: if app.hasImage { app.showPresetBrowser.toggle() }
         }

@@ -68,11 +68,12 @@ enum LensShaders {
         float2 dc = cc * (1.0 + k * float2(cc.y * cc.y, cc.x * cc.x) * 0.25);
         float2 suv = dc * 0.5 + 0.5;
         float inside = step(0.0, suv.x) * step(suv.x, 1.0) * step(0.0, suv.y) * step(suv.y, 1.0);
+        if (u[11] < 0.5) { inside = 1.0; }
         // rounded screen corners
         float2 e = abs(dc);
         float cr = u[9];
         float2 qq = max(e - (1.0 - cr), 0.0);
-        float corner = 1.0 - smoothstep(cr - 0.01, cr + 0.005, length(qq));
+        float corner = u[11] < 0.5 ? 1.0 : 1.0 - smoothstep(cr - 0.01, cr + 0.005, length(qq));
         float3 c = a.sample(sLin, suv).rgb;
         c += glow.sample(sLin, suv).rgb * u[6];
         float2 px = float2(gid);
@@ -178,18 +179,24 @@ struct CRTEffect: Effect {
     var summary: String { "Old tube monitor: phosphor mask, scanlines, glow and curved glass." }
     let params: [ParamDef] = [
         .slider("curvature", "Curvature", 0, 100, 30, step: 1, unit: "%", section: "Screen"),
-        .slider("corner", "Corner Radius", 0, 30, 8, step: 0.5, unit: "%", section: "Screen"),
-        .slider("vignette", "Vignette", 0, 100, 35, step: 1, unit: "%", section: "Screen"),
+        .toggle("bezel", "Black Border", true, section: "Screen"),
+        .slider("corner", "Corner Radius", 0, 30, 8, step: 0.5, unit: "%", section: "Screen", visible: whenOn("bezel")),
         .slider("brightness", "Brightness", 50, 200, 125, step: 1, unit: "%", section: "Screen"),
-        .choice("mask", "Phosphor Mask", [("none", "None"), ("aperture", "Aperture Grille"), ("shadow", "Shadow Mask"),
-                                          ("slot", "Slot Mask")], "aperture", section: "Phosphors"),
-        .slider("maskSize", "Mask Size", 1, 8, 1.5, step: 0.25, section: "Phosphors", visible: whenNot("mask", "none")),
-        .slider("maskAmt", "Mask Strength", 0, 100, 55, step: 1, unit: "%", section: "Phosphors", visible: whenNot("mask", "none")),
-        .slider("scan", "Scanlines", 0, 100, 55, step: 1, unit: "%", section: "Scanlines"),
+        .sectionSwitch("maskOn", section: "Phosphors"),
+        .choice("mask", "Phosphor Mask", [("aperture", "Aperture Grille"), ("shadow", "Shadow Mask"), ("slot", "Slot Mask")],
+                "aperture", section: "Phosphors"),
+        .slider("maskSize", "Mask Size", 1, 8, 1.5, step: 0.25, section: "Phosphors"),
+        .slider("maskAmt", "Mask Strength", 0, 100, 55, step: 1, unit: "%", section: "Phosphors"),
+        .sectionSwitch("scanOn", section: "Scanlines"),
+        .slider("scan", "Intensity", 0, 100, 55, step: 1, unit: "%", section: "Scanlines"),
         .slider("scanSize", "Line Spacing", 2, 16, 4, step: 0.5, section: "Scanlines"),
+        .sectionSwitch("glowOn", section: "Glow"),
         .slider("glow", "Glow", 0, 100, 35, step: 1, unit: "%", section: "Glow"),
         .slider("glowRadius", "Glow Radius", 1, 40, 8, step: 0.5, curve: 1.6, section: "Glow"),
-        .slider("noise", "Noise", 0, 100, 10, step: 1, unit: "%", section: "Glow"),
+        .sectionSwitch("vigOn", section: "Vignette"),
+        .slider("vignette", "Amount", 0, 100, 35, step: 1, unit: "%", section: "Vignette"),
+        .sectionSwitch("noiseOn", section: "Noise"),
+        .slider("noise", "Amount", 0, 100, 10, step: 1, unit: "%", section: "Noise"),
     ]
     var looks: [EffectLook] {
         [
@@ -202,12 +209,16 @@ struct CRTEffect: Effect {
         ]
     }
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
-        let mask: Float = ["none": 0, "aperture": 1, "shadow": 2, "slot": 3][p.choice("mask", "aperture")] ?? 1
-        let glow = ctx.blur(input, sigma: ctx.px(p.num("glowRadius", 8)))
+        func on(_ k: String) -> Float { p.bool(k, true) ? 1 : 0 }
+        let maskOn = p.bool("maskOn", true) && p.choice("mask", "aperture") != "none"
+        let mask: Float = maskOn ? (["aperture": 1, "shadow": 2, "slot": 3][p.choice("mask", "aperture")] ?? 1) : 0
+        let glowOn = p.bool("glowOn", true)
+        let glow = glowOn ? ctx.blur(input, sigma: ctx.px(p.num("glowRadius", 8))) : input
         return ctx.apply("k_crt", [input, glow], [
             p.f("curvature", 30) / 100, mask, Float(max(1, ctx.px(p.num("maskSize", 1.5)).rounded())), p.f("maskAmt", 55) / 100,
-            p.f("scan", 55) / 100, Float(max(2, ctx.px(p.num("scanSize", 4)).rounded())), p.f("glow", 35) / 100 * 0.8,
-            p.f("brightness", 125) / 100, p.f("vignette", 35) / 100, p.f("corner", 8) / 100, p.f("noise", 10) / 100,
+            p.f("scan", 55) / 100 * on("scanOn"), Float(max(2, ctx.px(p.num("scanSize", 4)).rounded())), glowOn ? p.f("glow", 35) / 100 * 0.8 : 0,
+            p.f("brightness", 125) / 100, p.f("vignette", 35) / 100 * on("vigOn"), p.f("corner", 8) / 100,
+            p.f("noise", 10) / 100 * on("noiseOn"), on("bezel"),
         ])
     }
 }

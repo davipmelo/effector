@@ -224,6 +224,8 @@ struct ParamDef {
     var visible: ((Params) -> Bool)? = nil
     /// Optional colours drawn on the slider track (e.g. hue ramps).
     var track: [RGBA]? = nil
+    /// A boolean shown as an on/off switch in its section header (turns that whole part of the effect on or off).
+    var isSectionSwitch = false
 
     var defaultValue: ParamValue? {
         switch kind {
@@ -272,6 +274,12 @@ extension ParamDef {
     static func color(_ key: String, _ label: String, _ def: RGBA, section: String? = nil,
                       visible: ((Params) -> Bool)? = nil) -> ParamDef {
         ParamDef(key: key, label: label, kind: .color(def: def), section: section, visible: visible)
+    }
+    /// On/off switch for a whole section, drawn in the section header.
+    static func sectionSwitch(_ key: String, section: String, _ def: Bool = true) -> ParamDef {
+        var d = ParamDef(key: key, label: section, kind: .toggle(def: def), section: section)
+        d.isSectionSwitch = true
+        return d
     }
     static func seed(_ key: String = "seed", section: String? = nil) -> ParamDef {
         ParamDef(key: key, label: "Seed", kind: .seed, section: section)

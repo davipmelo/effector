@@ -6,6 +6,38 @@ import CoreText
 /// Headless rendering used for automated checks:
 /// Effector --render-test <image> <outdir> [effectID[:key=value,...] ...]
 enum RenderTest {
+    /// Consistency checks for every effect definition, look and factory preset.
+    static func lint() {
+        var problems: [String] = []
+        for e in EffectRegistry.all {
+            var keys = Set<String>()
+            for d in e.params {
+                if !keys.insert(d.key).inserted { problems.append("\(e.id): duplicate key \(d.key)") }
+                switch d.kind {
+                case .slider(let mn, let mx, let def, _, _, _):
+                    if def < mn || def > mx { problems.append("\(e.id).\(d.key): default \(def) outside \(mn)…\(mx)") }
+                case .choice(let o, let def), .segmented(let o, let def):
+                    if !o.contains(where: { $0.id == def }) { problems.append("\(e.id).\(d.key): default \(def) not an option") }
+                default: break
+                }
+            }
+            for l in e.looks {
+                for k in l.values.keys where !keys.contains(k) { problems.append("\(e.id) look \(l.id): unknown key \(k)") }
+            }
+        }
+        func check(_ nodes: [LayerNode], _ where_: String) {
+            for n in nodes {
+                if n.isGroup { check(n.children, where_); continue }
+                guard let e = EffectRegistry.effect(n.effectID) else { problems.append("\(where_): missing effect \(n.effectID)"); continue }
+                let keys = Set(e.params.map(\.key))
+                for k in n.params.values.keys where !keys.contains(k) && k != "_look" { problems.append("\(where_) / \(e.id): unknown key \(k)") }
+            }
+        }
+        for p in FactoryPresets.all { check(p.layers, "preset \(p.name)") }
+        print(problems.isEmpty ? "lint: OK" : problems.joined(separator: "\n"))
+        print("effects: \(EffectRegistry.all.count), presets: \(FactoryPresets.all.count)")
+    }
+
     static func run(_ args: [String]) {
         guard let i = args.firstIndex(of: "--render-test"), args.count > i + 2 else {
             print("usage: --render-test <image> <outdir> [effect[:k=v,...]]"); return
@@ -13,6 +45,7 @@ enum RenderTest {
         let input = URL(fileURLWithPath: args[i + 1])
         let outDir = URL(fileURLWithPath: args[i + 2])
         try? FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
+        if args.contains("--lint") { lint(); return }
         if args.contains("--project-roundtrip") {
             let app = AppState.shared
             do {

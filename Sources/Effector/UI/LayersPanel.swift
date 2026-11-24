@@ -60,18 +60,6 @@ struct LayersPanel: View {
                     .allowsHitTesting(false)
                 }
             }
-            if let src = app.source {
-                HStack(spacing: 8) {
-                    Image(systemName: "photo").font(.system(size: 11)).foregroundStyle(Theme.textFaint).frame(width: 18)
-                    Text(src.fileName).font(.system(size: 12)).foregroundStyle(Theme.textDim).lineLimit(1).truncationMode(.middle)
-                    Spacer()
-                    Image(systemName: "lock.fill").font(.system(size: 9)).foregroundStyle(Theme.textFaint)
-                }
-                .padding(.horizontal, 14)
-                .frame(height: 34)
-                .overlay(alignment: .top) { Rectangle().fill(Theme.separator).frame(height: 1) }
-                .help(tr("Original image (always at the bottom)"))
-            }
         }
     }
 

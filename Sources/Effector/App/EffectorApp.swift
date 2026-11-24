@@ -43,7 +43,7 @@ struct EffectorApp: App {
             MainView()
                 .frame(minWidth: 1000, minHeight: 640)
         }
-        .windowToolbarStyle(.unified(showsTitle: true))
+        .windowToolbarStyle(.unified(showsTitle: false))
         .defaultSize(width: 1440, height: 900)
         .commands { menus }
 
@@ -87,6 +87,7 @@ struct EffectorApp: App {
         CommandMenu(tr("Image")) {
             item(.crop, disabled: !app.hasImage)
             item(.beforeAfter, disabled: !app.hasImage)
+            item(.compare, disabled: !app.hasImage)
         }
         CommandMenu(tr("Layer")) {
             item(.commandPalette, disabled: !app.hasImage)
@@ -97,11 +98,15 @@ struct EffectorApp: App {
             item(.duplicate, disabled: app.selectedID == nil)
             item(.delete, disabled: app.selectedIDs.isEmpty)
             item(.toggleVisibility, disabled: app.selectedIDs.isEmpty)
+            item(.randomize, disabled: app.selectedLayer == nil || app.selectedLayer?.isGroup == true)
             Divider()
             item(.moveUp, disabled: app.selectedID == nil)
             item(.moveDown, disabled: app.selectedID == nil)
         }
         CommandGroup(after: .pasteboard) {
+            Divider()
+            item(.copyLayers, disabled: app.selectedIDs.isEmpty)
+            item(.pasteLayers, disabled: !app.hasImage)
             Button(tr("Select All Layers")) { AppState.shared.selectAllLayers() }
                 .keyboardShortcut("a", modifiers: [.command, .option])
                 .disabled(!app.hasImage)
@@ -111,6 +116,7 @@ struct EffectorApp: App {
             // ⌘0 always fits; the single-key shortcut (Z by default) is handled by the key monitor
             Button(tr(ShortcutAction.zoomFit.label)) { Actions.perform(.zoomFit) }.keyboardShortcut("0", modifiers: .command)
             item(.zoom100)
+            Button(tr(ShortcutAction.present.label)) { Actions.perform(.present) }.disabled(!app.hasImage)
             Divider()
             item(.showLayers); item(.showPresets)
             Divider()

@@ -43,13 +43,13 @@ struct GrainEffect: Effect {
     let params: [ParamDef] = [
         .slider("amount", "Amount", 0, 100, 35, step: 1, unit: "%", curve: 1.4, section: "Grain"),
         .slider("size", "Size", 0.25, 6, 1.0, step: 0.05, unit: "", curve: 2.2, section: "Grain"),
-        .slider("roughness", "Roughness", 0, 100, 45, unit: "%", section: "Grain"),
+        .slider("roughness", "Roughness", 0, 100, 45, step: 1, unit: "%", section: "Grain"),
         .toggle("color", "Color Grain", false, section: "Grain"),
-        .slider("colorAmount", "Color Amount", 0, 100, 50, unit: "%", section: "Grain", visible: whenOn("color")),
+        .slider("colorAmount", "Color Amount", 0, 100, 50, step: 1, unit: "%", section: "Grain", visible: whenOn("color")),
         .seed(section: "Grain"),
-        .slider("shadows", "Shadows", 0, 100, 70, unit: "%", section: "Response"),
-        .slider("midtones", "Midtones", 0, 100, 100, unit: "%", section: "Response"),
-        .slider("highlights", "Highlights", 0, 100, 40, unit: "%", section: "Response"),
+        .slider("shadows", "Shadows", 0, 100, 70, step: 1, unit: "%", section: "Response"),
+        .slider("midtones", "Midtones", 0, 100, 100, step: 1, unit: "%", section: "Response"),
+        .slider("highlights", "Highlights", 0, 100, 40, step: 1, unit: "%", section: "Response"),
     ]
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
         ctx.apply("k_grain", [input], GrainEffect.uniforms(p, ctx))

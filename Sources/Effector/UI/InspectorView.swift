@@ -133,6 +133,7 @@ struct LayerInspector: View {
                     .onAppear { name = layer.name }
                 Spacer()
                 if !layer.isGroup {
+                    IconButton(symbol: "dice", help: "Randomize settings (R)") { app.randomizeParams(layer.id) }
                     IconButton(symbol: "arrow.counterclockwise", help: "Reset to defaults") { app.resetParams(layer.id) }
                 }
                 IconButton(symbol: layer.enabled ? "eye" : "eye.slash", help: "Show / Hide") { app.toggleVisibility(layer.id) }
@@ -207,10 +208,18 @@ struct ParamSections: View {
         let visible = defs.filter { $0.visible?(layer.params) ?? true }
         let sections = orderedSections(visible)
         ForEach(sections, id: \.0) { title, items in
-            PanelSection(title: title, dot: colors[title]?.color) {
-                ForEach(items, id: \.key) { def in
+            let sw = items.first { $0.isSectionSwitch }
+            let on = sw.map { d -> Bool in
+                if case .toggle(let def) = d.kind { return layer.params.bool(d.key, def) }
+                return true
+            } ?? true
+            PanelSection(title: title, dot: colors[title]?.color,
+                         trailing: sw.map { d in AnyView(SectionSwitch(layer: layer, def: d, on: on)) }) {
+                ForEach(items.filter { !$0.isSectionSwitch }, id: \.key) { def in
                     ParamControl(layer: layer, def: def)
                 }
+                .opacity(on ? 1 : 0.38)
+                .allowsHitTesting(on)
             }
         }
     }
@@ -265,6 +274,22 @@ struct ParamControl: View {
         case .seed:
             SeedRow(value: p.num(def.key, 1)) { set(.number($0), coalesce: false) }
         }
+    }
+}
+
+/// The mini switch in a section header.
+struct SectionSwitch: View {
+    let layer: LayerNode
+    let def: ParamDef
+    let on: Bool
+    @ObservedObject var app = AppState.shared
+    var body: some View {
+        Toggle("", isOn: Binding(get: { on }, set: { app.setParam(layer.id, def.key, .bool($0), coalesce: false) }))
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            .tint(Theme.accent)
+            .labelsHidden()
+            .help(on ? tr("Turn this part off") : tr("Turn this part on"))
     }
 }
 
