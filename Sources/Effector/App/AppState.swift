@@ -12,7 +12,17 @@ extension UTType {
 final class AppState: ObservableObject {
     static let shared = AppState()
 
-    // Document
+    // Documents
+    @Published private(set) var docs: [DocSlot] = []
+    @Published private(set) var activeID: UUID?
+    /// Images selected in the filmstrip (for sync / batch export).
+    @Published var stripSelection: Set<UUID> = []
+    @Published var showSync = false
+    @Published var showFilmstrip = UserDefaults.standard.object(forKey: "showFilmstrip") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(showFilmstrip, forKey: "showFilmstrip") }
+    }
+
+    // Active document (working copy)
     @Published private(set) var source: SourceImage?
     @Published var state = DocumentState() { didSet { if state != oldValue { stateChanged(old: oldValue) } } }
     @Published var projectURL: URL?
@@ -42,8 +52,8 @@ final class AppState: ObservableObject {
     @Published var pan: CGSize = .zero
     @Published var viewportSize: CGSize = .zero { didSet { updatePreviewScale() } }
     @Published var backingScale: Double = 2
-    @Published private(set) var output: MTLTexture?
-    @Published private(set) var original: MTLTexture?
+    @Published var output: MTLTexture?
+    @Published var original: MTLTexture?
     @Published private(set) var isRendering = false
     @Published var isCropping = false
     @Published var cropDraft = CropRect.full
@@ -79,35 +89,244 @@ final class AppState: ObservableObject {
 
     private init() {}
 
-    // MARK: - Document lifecycle
+    // MARK: - Documents (several images, one active)
 
     var hasImage: Bool { source != nil }
+    var activeDoc: DocSlot? { docs.first { $0.id == activeID } }
+    var activeIndex: Int? { docs.firstIndex { $0.id == activeID } }
 
-    func openImage(_ img: SourceImage) {
-        source = img
+    /// Adds an image as a new document and makes it active.
+    @discardableResult
+    func openImage(_ img: SourceImage, url: URL? = nil, state initial: DocumentState = DocumentState(),
+                   projectURL purl: URL? = nil, activate: Bool = true) -> DocSlot {
+        let slot = DocSlot(source: img, fileURL: url)
+        slot.state = initial
+        slot.projectURL = purl
+        docs.append(slot)
+        if !restoringSession && sessionEnabled { writeSessionOriginal(slot) }
+        if activate { self.activate(slot.id) }
+        makeStripThumb(slot)
+        scheduleSessionSave()
+        return slot
+    }
+
+    /// Saves the working copy of the active document back into its slot.
+    private func stash() {
+        guard let s = activeDoc else { return }
+        s.state = state; s.undo = undoStack; s.redo = redoStack
+        s.projectURL = projectURL; s.isDirty = isDirty; s.selectedID = selectedID
+        s.zoom = zoom; s.pan = pan
+    }
+
+    /// Switches the editor to another image.
+    func activate(_ id: UUID) {
+        guard let slot = docs.first(where: { $0.id == id }) else { return }
+        if id == activeID && source != nil { return }
+        if isCropping { cancelCrop() }
+        stash()
+        let src: SourceImage
+        do { src = try slot.loadSource() } catch { alert(tr("Could not open file"), error.localizedDescription); return }
+        activeID = id
+        slot.lastUsed = Date()
+        loadingDoc = true
+        source = src
         previewLayers = nil
-        if !restoringSession && AppSettings.shared.reopenLastSession { writeSessionOriginal(img) }
-        suppressUndo = true
-        state = DocumentState()
-        suppressUndo = false
-        undoStack.removeAll(); redoStack.removeAll()
-        projectURL = nil
-        isDirty = false
-        selectedID = nil
         soloID = nil
-        zoom = nil
-        pan = .zero
+        suppressUndo = true
+        state = slot.state
+        suppressUndo = false
+        undoStack = slot.undo; redoStack = slot.redo
+        lastCoalesceKey = nil
+        projectURL = slot.projectURL
+        isDirty = slot.isDirty
+        selectedID = slot.selectedID.flatMap { state.layers.find($0) == nil ? nil : $0 }
+        zoom = slot.zoom; pan = slot.pan
+        loadingDoc = false
         sourceTexCache = nil
         renderer.clearCache()
         updatePreviewScale(force: true)
+        requestRender()
         regenerateThumbnails()
+        unloadInactiveSources()
+        if !stripSelection.contains(id) { stripSelection = [id] }
         objectWillChange.send()
+        scheduleSessionSave()
+    }
+
+    /// Keeps decoded pixels only for the active image and the two most recently used ones.
+    private func unloadInactiveSources() {
+        let keep = Set(docs.filter { $0.source != nil }.sorted { $0.lastUsed > $1.lastUsed }.prefix(3).map(\.id))
+        for d in docs where d.id != activeID && !keep.contains(d.id) { d.source = nil }
+    }
+
+    func activateNext(_ delta: Int) {
+        guard let i = activeIndex, !docs.isEmpty else { return }
+        let n = min(docs.count - 1, max(0, i + delta))
+        if n != i { activate(docs[n].id) }
+    }
+
+    /// Closes images (their edits are lost unless saved as a project).
+    func closeDocuments(_ ids: Set<UUID>) {
+        guard !ids.isEmpty else { return }
+        let edited = docs.filter { ids.contains($0.id) && ($0.id == activeID ? !state.layers.isEmpty : !$0.state.layers.isEmpty) }
+        if !edited.isEmpty {
+            let a = NSAlert()
+            a.messageText = ids.count == 1 ? tr("Close this image?") : tr("Close %d images?", ids.count)
+            a.informativeText = tr("Their effects will be removed from the workspace. Saved projects are not affected.")
+            a.addButton(withTitle: tr("Close"))
+            a.addButton(withTitle: tr("Cancel"))
+            if a.runModal() != .alertFirstButtonReturn { return }
+        }
+        let wasActive = activeID.map { ids.contains($0) } ?? false
+        let oldIndex = activeIndex ?? 0
+        for d in docs where ids.contains(d.id) { removeSessionOriginal(d) }
+        docs.removeAll { ids.contains($0.id) }
+        stripSelection.subtract(ids)
+        if wasActive {
+            activeID = nil
+            if docs.isEmpty {
+                source = nil
+                loadingDoc = true
+                suppressUndo = true; state = DocumentState(); suppressUndo = false
+                loadingDoc = false
+                undoStack = []; redoStack = []; projectURL = nil; isDirty = false; selectedID = nil
+                output = nil; original = nil
+            } else {
+                activate(docs[min(oldIndex, docs.count - 1)].id)
+            }
+        }
+        scheduleSessionSave()
+    }
+
+    // MARK: Filmstrip helpers
+
+    /// Thumbnail of an image with its own effects (for the filmstrip).
+    func makeStripThumb(_ slot: DocSlot) {
+        let st = slot.id == activeID ? state : slot.state
+        let src = slot.source
+        let data = slot.data, name = slot.fileName, hint = slot.typeHint
+        DispatchQueue.global(qos: .utility).async {
+            guard let s = src ?? (try? SourceImage.load(data: data, fileName: name, typeHint: hint)) else { return }
+            let (cw, ch) = s.croppedSize(st.crop)
+            let scale = 180.0 / Double(max(cw, ch))
+            let tex = s.makeTexture(crop: st.crop, scale: scale)
+            let out = Renderer(useCache: false).render(layers: st.layers, source: tex, sourceKey: 0, canvas: st.activeCanvas)
+            let cg = ImageExport.cgImage(out)
+            DispatchQueue.main.async { slot.thumb = cg }
+        }
+    }
+
+    private var thumbWork: DispatchWorkItem?
+    private func scheduleActiveThumb() {
+        thumbWork?.cancel()
+        let w = DispatchWorkItem { [weak self] in
+            guard let self, let s = self.activeDoc else { return }
+            self.stash()
+            self.makeStripThumb(s)
+        }
+        thumbWork = w
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7, execute: w)
+    }
+
+    /// Filmstrip click: plain = open, ⌘ = toggle in selection, ⇧ = range.
+    func stripClick(_ id: UUID) {
+        let f = NSEvent.modifierFlags
+        if f.contains(.command) {
+            if stripSelection.contains(id) && stripSelection.count > 1 { stripSelection.remove(id) } else { stripSelection.insert(id) }
+            return
+        }
+        if f.contains(.shift), let a = activeIndex, let b = docs.firstIndex(where: { $0.id == id }) {
+            stripSelection = Set(docs[min(a, b)...max(a, b)].map(\.id))
+            return
+        }
+        stripSelection = [id]
+        activate(id)
+    }
+
+    /// Which parts of the active image's settings to copy to other images.
+    struct SyncOptions: OptionSet {
+        let rawValue: Int
+        static let layers = SyncOptions(rawValue: 1)
+        static let crop = SyncOptions(rawValue: 2)
+        static let canvas = SyncOptions(rawValue: 4)
+        static let addOnTop = SyncOptions(rawValue: 8)
+    }
+
+    /// Copies the active image's settings to other images (each gets its own undo step).
+    func syncSettings(to ids: Set<UUID>, _ opt: SyncOptions) {
+        stash()
+        let targets = docs.filter { ids.contains($0.id) && $0.id != activeID }
+        guard !targets.isEmpty else { return }
+        for t in targets {
+            t.undo.append(t.state)
+            t.redo.removeAll()
+            if opt.contains(.layers) {
+                let copy = state.layers.map { $0.reidentified() }
+                t.state.layers = opt.contains(.addOnTop) ? copy + t.state.layers : copy
+            }
+            if opt.contains(.crop) { t.state.crop = state.crop }
+            if opt.contains(.canvas) { t.state.canvas = state.canvas }
+            t.isDirty = true
+            makeStripThumb(t)
+        }
+        flash(tr("Settings synced to %d images", targets.count))
+        scheduleSessionSave()
+    }
+
+    @Published private var copiedSettings: DocumentState?
+    var hasCopiedSettings: Bool { copiedSettings != nil }
+
+    func copySettings() {
+        stash()
+        copiedSettings = state
+        flash(tr("Settings copied"))
+    }
+
+    /// Pastes copied settings (layers, crop and canvas) onto the selected images.
+    func pasteSettings(to ids: Set<UUID>) {
+        guard let c = copiedSettings else { return }
+        stash()
+        for t in docs where ids.contains(t.id) {
+            if t.id == activeID {
+                edit { s in s.layers = c.layers.map { $0.reidentified() }; s.crop = c.crop; s.canvas = c.canvas }
+            } else {
+                t.undo.append(t.state); t.redo.removeAll()
+                t.state.layers = c.layers.map { $0.reidentified() }
+                t.state.crop = c.crop; t.state.canvas = c.canvas
+                t.isDirty = true
+                makeStripThumb(t)
+            }
+        }
+        flash(tr("Settings pasted to %d images", ids.count))
+        scheduleSessionSave()
+    }
+
+    func resetSettings(of ids: Set<UUID>) {
+        stash()
+        for t in docs where ids.contains(t.id) {
+            if t.id == activeID { edit { $0 = DocumentState() } }
+            else { t.undo.append(t.state); t.redo.removeAll(); t.state = DocumentState(); t.isDirty = true; makeStripThumb(t) }
+        }
         scheduleSessionSave()
     }
 
     // MARK: - Session (reopened on next launch)
 
+    private struct SessionDoc: Codable {
+        var fileName: String
+        var originalFile: String
+        var state: DocumentState
+        var projectPath: String?
+        var dirty: Bool
+        var filePath: String?
+    }
     private struct SessionFile: Codable {
+        var version = 2
+        var active: Int
+        var docs: [SessionDoc]
+    }
+    /// Version 1 (single image) format, still readable.
+    private struct SessionFileV1: Codable {
         var fileName: String
         var originalFile: String
         var state: DocumentState
@@ -115,6 +334,10 @@ final class AppState: ObservableObject {
         var dirty: Bool
     }
     private var restoringSession = false
+    private var loadingDoc = false
+    /// Headless tests must never touch the user's real session.
+    static var headless = false
+    private var sessionEnabled: Bool { !AppState.headless && AppSettings.shared.reopenLastSession }
     private var sessionWork: DispatchWorkItem?
     private let sessionQueue = DispatchQueue(label: "effector.session", qos: .utility)
 
@@ -125,19 +348,23 @@ final class AppState: ObservableObject {
         return d
     }
 
-    private func writeSessionOriginal(_ src: SourceImage) {
-        let dir = sessionDir
-        let ext = (src.fileName as NSString).pathExtension.isEmpty ? "png" : (src.fileName as NSString).pathExtension.lowercased()
-        let data = src.data
-        sessionQueue.async {
-            let fm = FileManager.default
-            for f in (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? [] { try? fm.removeItem(at: f) }
-            try? data.write(to: dir.appendingPathComponent("original." + ext), options: .atomic)
-        }
+    private func writeSessionOriginal(_ slot: DocSlot) {
+        let ext = (slot.fileName as NSString).pathExtension.isEmpty ? "png" : (slot.fileName as NSString).pathExtension.lowercased()
+        let name = "img-" + slot.id.uuidString + "." + ext
+        slot.sessionFile = name
+        let url = sessionDir.appendingPathComponent(name)
+        let data = slot.data
+        sessionQueue.async { try? data.write(to: url, options: .atomic) }
+    }
+
+    private func removeSessionOriginal(_ slot: DocSlot) {
+        guard let f = slot.sessionFile else { return }
+        let url = sessionDir.appendingPathComponent(f)
+        sessionQueue.async { try? FileManager.default.removeItem(at: url) }
     }
 
     func scheduleSessionSave() {
-        guard !restoringSession, AppSettings.shared.reopenLastSession else { return }
+        guard !restoringSession, sessionEnabled else { return }
         sessionWork?.cancel()
         let w = DispatchWorkItem { [weak self] in self?.saveSession() }
         sessionWork = w
@@ -145,58 +372,91 @@ final class AppState: ObservableObject {
     }
 
     func saveSession(sync: Bool = false) {
-        guard let src = source else { return }
-        let ext = (src.fileName as NSString).pathExtension.isEmpty ? "png" : (src.fileName as NSString).pathExtension.lowercased()
-        let f = SessionFile(fileName: src.fileName, originalFile: "original." + ext, state: state,
-                            projectPath: projectURL?.path, dirty: isDirty)
-        let url = sessionDir.appendingPathComponent("session.json")
-        let work = { if let d = try? JSONEncoder().encode(f) { try? d.write(to: url, options: .atomic) } }
+        guard !restoringSession, sessionEnabled else { return }
+        stash()
+        let list = docs.compactMap { d -> SessionDoc? in
+            guard let f = d.sessionFile else { return nil }
+            return SessionDoc(fileName: d.fileName, originalFile: f, state: d.state, projectPath: d.projectURL?.path,
+                              dirty: d.isDirty, filePath: d.fileURL?.path)
+        }
+        let file = SessionFile(active: activeIndex ?? 0, docs: list)
+        let dir = sessionDir
+        let keep = Set(list.map(\.originalFile) + ["session.json"])
+        let work = {
+            if let d = try? JSONEncoder().encode(file) { try? d.write(to: dir.appendingPathComponent("session.json"), options: .atomic) }
+            // remove images that are no longer open
+            for f in (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? [] where !keep.contains(f) {
+                try? FileManager.default.removeItem(at: dir.appendingPathComponent(f))
+            }
+        }
         if sync { sessionQueue.sync(execute: work) } else { sessionQueue.async(execute: work) }
     }
 
-    /// Reopens the image and layers that were open when the app last quit.
+    /// Reopens the images and layers that were open when the app last quit.
     @discardableResult
     func restoreSession() -> Bool {
-        guard AppSettings.shared.reopenLastSession, !hasImage else { return false }
+        guard sessionEnabled, !hasImage else { return false }
         let dir = sessionDir
-        guard let d = try? Data(contentsOf: dir.appendingPathComponent("session.json")),
-              let f = try? JSONDecoder().decode(SessionFile.self, from: d),
-              let data = try? Data(contentsOf: dir.appendingPathComponent(f.originalFile)),
-              let img = try? SourceImage.load(data: data, fileName: f.fileName,
-                                              typeHint: UTType(filenameExtension: (f.originalFile as NSString).pathExtension)) else { return false }
+        guard let d = try? Data(contentsOf: dir.appendingPathComponent("session.json")) else { return false }
+        var entries: [SessionDoc] = []
+        var active = 0
+        if let f = try? JSONDecoder().decode(SessionFile.self, from: d) {
+            entries = f.docs; active = f.active
+        } else if let f = try? JSONDecoder().decode(SessionFileV1.self, from: d) {
+            entries = [SessionDoc(fileName: f.fileName, originalFile: f.originalFile, state: f.state, projectPath: f.projectPath, dirty: f.dirty)]
+        }
+        guard !entries.isEmpty else { return false }
         restoringSession = true
-        openImage(img)
-        suppressUndo = true
-        state = f.state
-        suppressUndo = false
-        projectURL = f.projectPath.map { URL(fileURLWithPath: $0) }
-        isDirty = f.dirty
-        sourceTexCache = nil
-        updatePreviewScale(force: true)
-        regenerateThumbnails()
+        for (i, e) in entries.enumerated() {
+            guard let data = try? Data(contentsOf: dir.appendingPathComponent(e.originalFile)) else { continue }
+            let hint = UTType(filenameExtension: (e.originalFile as NSString).pathExtension)
+            let slot = DocSlot(data: data, fileName: e.fileName, typeHint: hint, fileURL: e.filePath.map { URL(fileURLWithPath: $0) })
+            slot.state = e.state
+            slot.projectURL = e.projectPath.map { URL(fileURLWithPath: $0) }
+            slot.isDirty = e.dirty
+            slot.sessionFile = e.originalFile
+            if i == active { _ = try? slot.loadSource() }
+            docs.append(slot)
+        }
+        let target = docs.indices.contains(active) ? docs[active] : docs.first
+        if let t = target { activate(t.id) }
+        for s in docs { makeStripThumb(s) }
         restoringSession = false
-        return true
+        // a v1 session used a different file name: rewrite in the new format
+        saveSession()
+        return hasImage
     }
 
-    func open(url: URL) {
-        do {
-            if url.pathExtension.lowercased() == "effector" {
-                try openProject(url)
-            } else {
-                openImage(try SourceImage.load(url: url))
+    func open(url: URL) { open(urls: [url]) }
+
+    /// Opens images and/or projects; each becomes a new image in the filmstrip.
+    func open(urls: [URL]) {
+        var failed: [String] = []
+        var first: DocSlot?
+        for url in urls {
+            do {
+                if url.pathExtension.lowercased() == "effector" {
+                    let slot = try openProject(url, activate: first == nil)
+                    first = first ?? slot
+                } else {
+                    let slot = openImage(try SourceImage.load(url: url), url: url, activate: first == nil)
+                    first = first ?? slot
+                }
+                NSDocumentController.shared.noteNewRecentDocumentURL(url)
+            } catch {
+                failed.append(url.lastPathComponent)
             }
-            NSDocumentController.shared.noteNewRecentDocumentURL(url)
-        } catch {
-            alert(tr("Could not open file"), error.localizedDescription)
         }
+        if !failed.isEmpty { alert(tr("Could not open file"), failed.joined(separator: "\n")) }
+        if urls.count > 1, first != nil { flash(tr("%d images opened", urls.count - failed.count)) }
     }
 
     func openPanel() {
         let p = NSOpenPanel()
         p.allowedContentTypes = [.image, .rawImage, .effectorProject]
-        p.allowsMultipleSelection = false
+        p.allowsMultipleSelection = true
         p.treatsFilePackagesAsDirectories = false
-        if p.runModal() == .OK, let u = p.url { open(url: u) }
+        if p.runModal() == .OK { open(urls: p.urls) }
     }
 
     func pasteImage() {
@@ -251,9 +511,10 @@ final class AppState: ObservableObject {
     }
 
     private func stateChanged(old: DocumentState) {
-        isDirty = true
+        if !loadingDoc { isDirty = true; scheduleActiveThumb() }
         scheduleSessionSave()
         if old.crop != state.crop { sourceTexCache = nil; updatePreviewScale(force: true) }
+        if old.canvas != state.canvas { updatePreviewScale(force: true) }
         requestRender()
     }
 
@@ -567,12 +828,13 @@ final class AppState: ObservableObject {
         if let solo = soloID, let n = layers.find(solo) { var n = n; n.enabled = true; n.opacity = 1; n.blend = .normal; layers = [n] }
         if let pv = previewLayers { layers = pv + layers }
         let crop = state.crop
+        let canvas = state.activeCanvas
         let scale = currentScale()
         renderQueue.async { [weak self] in
             guard let self else { return }
             let srcTex = self.sourceTexture(src, crop: crop, scale: scale)
             var h = Hasher(); h.combine(src.id); h.combine(crop)
-            let out = self.renderer.render(layers: layers, source: srcTex, sourceKey: h.finalize())
+            let out = self.renderer.render(layers: layers, source: srcTex, sourceKey: h.finalize(), canvas: canvas)
             DispatchQueue.main.async {
                 self.original = srcTex
                 self.output = out
@@ -593,9 +855,18 @@ final class AppState: ObservableObject {
     }
 
     /// Picks a preview resolution matching what is on screen (quantized to avoid churn).
+    /// Size of the final picture in original pixels (the canvas when one is set).
+    func outputSize() -> (Int, Int) {
+        guard let src = source else { return (0, 0) }
+        let (w, h) = src.croppedSize(state.crop)
+        guard let c = state.activeCanvas else { return (w, h) }
+        let s = c.layout(Double(w), Double(h)).size
+        return (Int(s.width), Int(s.height))
+    }
+
     func updatePreviewScale(force: Bool = false) {
-        guard let src = source, viewportSize.width > 10 else { return }
-        let (cw, ch) = src.croppedSize(state.crop)
+        guard source != nil, viewportSize.width > 10 else { return }
+        let (cw, ch) = outputSize()
         let longSide = Double(max(cw, ch))
         let fit = min(Double(viewportSize.width) / Double(cw), Double(viewportSize.height) / Double(ch))
         fitZoom = fit
@@ -673,6 +944,14 @@ final class AppState: ObservableObject {
         showEffectBrowser = false; showPresetBrowser = false; showCommandPalette = false
         presenting.toggle()
         let w = NSApp.windows.first { $0.identifier?.rawValue.hasPrefix("main") == true } ?? NSApp.mainWindow
+        if let w {
+            // remove the title bar / toolbar strip so the image really covers the screen
+            w.toolbar?.isVisible = !presenting
+            w.titlebarAppearsTransparent = presenting
+            w.titleVisibility = .hidden
+            if presenting { w.styleMask.insert(.fullSizeContentView) } else { w.styleMask.remove(.fullSizeContentView) }
+            w.standardWindowButton(.closeButton)?.superview?.isHidden = presenting
+        }
         if presenting {
             zoom = nil; pan = .zero
             if let w, !w.styleMask.contains(.fullScreen) { w.toggleFullScreen(nil); enteredFullScreen = true }
@@ -731,15 +1010,15 @@ final class AppState: ObservableObject {
     // MARK: - Export
 
     func exportSize(scale: Int) -> (Int, Int) {
-        guard let src = source else { return (0, 0) }
-        let (w, h) = src.croppedSize(state.crop)
+        guard source != nil else { return (0, 0) }
+        let (w, h) = outputSize()
         return (w * scale, h * scale)
     }
 
     func renderFull(scale: Int) -> MTLTexture? {
         guard let src = source else { return nil }
         let tex = src.makeTexture(crop: state.crop, scale: Double(scale))
-        return Renderer(useCache: false).render(layers: state.layers, source: tex, sourceKey: 0, isExport: true)
+        return Renderer(useCache: false).render(layers: state.layers, source: tex, sourceKey: 0, isExport: true, canvas: state.activeCanvas)
     }
 
     func export(format: ImageExport.Format, quality: Double, scale: Int) {
@@ -765,6 +1044,55 @@ final class AppState: ObservableObject {
                 self.showExport = false
                 if let err { self.alert(tr("Export failed"), err.localizedDescription) }
                 else { self.flash(tr("Exported %@", url.lastPathComponent)) }
+            }
+        }
+    }
+
+    @Published var exportProgress: String?
+
+    /// Exports several images (each with its own effects) into a folder.
+    func exportBatch(_ ids: Set<UUID>, format: ImageExport.Format, quality: Double, scale: Int, suffix: String) {
+        stash()
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.prompt = tr("Export Here")
+        panel.message = tr("Choose a folder for %d images", ids.count)
+        guard panel.runModal() == .OK, let dir = panel.url else { return }
+        let jobs = docs.filter { ids.contains($0.id) }.map { ($0, $0.state) }
+        isExporting = true
+        exportProgress = "0 / \(jobs.count)"
+        DispatchQueue.global(qos: .userInitiated).async {
+            var done = 0
+            var failed: [String] = []
+            for (slot, st) in jobs {
+                autoreleasepool {
+                    guard let src = slot.source ?? (try? SourceImage.load(data: slot.data, fileName: slot.fileName, typeHint: slot.typeHint)) else {
+                        failed.append(slot.fileName); return
+                    }
+                    let tex = src.makeTexture(crop: st.crop, scale: Double(scale))
+                    let out = Renderer(useCache: false).render(layers: st.layers, source: tex, sourceKey: 0, isExport: true, canvas: st.activeCanvas)
+                    let base = (slot.fileName as NSString).deletingPathExtension + suffix + (scale > 1 ? "@\(scale)x" : "")
+                    var url = dir.appendingPathComponent(base + "." + format.rawValue)
+                    var n = 2
+                    while FileManager.default.fileExists(atPath: url.path) {
+                        url = dir.appendingPathComponent(base + "-\(n)." + format.rawValue); n += 1
+                    }
+                    do { try ImageExport.write(out, to: url, format: format, quality: quality, keepAlpha: src.hasAlpha && st.activeCanvas == nil) }
+                    catch { failed.append(slot.fileName) }
+                }
+                done += 1
+                let d = done
+                DispatchQueue.main.async { self.exportProgress = "\(d) / \(jobs.count)" }
+            }
+            DispatchQueue.main.async {
+                self.isExporting = false
+                self.exportProgress = nil
+                self.showExport = false
+                if !failed.isEmpty { self.alert(tr("Export failed"), failed.joined(separator: "\n")) }
+                self.flash(tr("Exported %d images", jobs.count - failed.count))
+                NSWorkspace.shared.activateFileViewerSelecting([dir])
             }
         }
     }
@@ -834,7 +1162,8 @@ final class AppState: ObservableObject {
         try wrapper.write(to: url, options: .atomic, originalContentsURL: nil)
     }
 
-    func openProject(_ url: URL) throws {
+    @discardableResult
+    func openProject(_ url: URL, activate: Bool = true) throws -> DocSlot {
         let w = try FileWrapper(url: url, options: .immediate)
         guard let files = w.fileWrappers,
               let json = files["document.json"]?.regularFileContents,
@@ -843,14 +1172,7 @@ final class AppState: ObservableObject {
         let manifest = try JSONDecoder().decode(ProjectManifest.self, from: json)
         let img = try SourceImage.load(data: data, fileName: manifest.originalFileName,
                                        typeHint: UTType(filenameExtension: (name as NSString).pathExtension))
-        openImage(img)
-        suppressUndo = true
-        state = manifest.state
-        suppressUndo = false
-        projectURL = url
-        isDirty = false
-        sourceTexCache = nil
-        updatePreviewScale(force: true)
+        return openImage(img, state: manifest.state, projectURL: url, activate: activate)
     }
 
     // MARK: - Crop
@@ -907,3 +1229,4 @@ final class AppState: ObservableObject {
         }
     }
 }
+

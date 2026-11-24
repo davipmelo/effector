@@ -3,7 +3,7 @@ import Foundation
 /// Translates an English UI string. English text is the key.
 func tr(_ s: String) -> String {
     guard L10nState.isPortuguese else { return s }
-    return PT.dict[s] ?? PT.v2[s] ?? PT.v3[s] ?? PT.v4[s] ?? s
+    return PT.dict[s] ?? PT.v2[s] ?? PT.v3[s] ?? PT.v4[s] ?? PT.v5[s] ?? s
 }
 
 /// Translate with format arguments, e.g. tr("%d layers", n)

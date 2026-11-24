@@ -328,15 +328,3 @@ struct ThresholdEffect: Effect {
                   + p.color("dark").floats + p.color("light", .white).floats)
     }
 }
-
-struct BlurEffect: Effect {
-    let id = "blur"
-    let name = "Blur"
-    let category = EffectCategory.lens
-    var symbol: String { "aqi.medium" }
-    var summary: String { "Gaussian blur." }
-    let params: [ParamDef] = [.slider("radius", "Radius", 0, 200, 8, step: 1, unit: "", curve: 2.2)]
-    func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
-        ctx.blur(input, sigma: ctx.px(p.num("radius", 8)) / 2)
-    }
-}

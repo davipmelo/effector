@@ -50,102 +50,62 @@ enum DistortShaders {
         o.write(float4(col, a.read(gid).a), gid);
     }
 
-    // Twirl. u: angle(rad), radius, cx, cy, fringe
-    kernel void k_twirl(KIN, texture2d<float> a [[texture(1)]]) {
+    // Edge distortion: the centre stays untouched, the warp grows towards the borders.
+    // u: mode, strength, protect, softness, shape(0 round,1 frame), cx, cy, fringe, seed, unit, scale(ref px), edgeBlur, darken
+    kernel void k_edgewarp(KIN, texture2d<float> a [[texture(1)]], texture2d<float> blurred [[texture(2)]]) {
         GUARD
         float2 size = OSIZE;
         float asp = size.x / size.y;
-        float2 c = float2(u[2], u[3]);
-        float2 d = (UV - c) * float2(asp, 1.0);
-        float r = length(d);
-        float R = max(0.01, u[1]);
-        float t = clamp(1.0 - r / R, 0.0, 1.0);
-        t = t * t * (3.0 - 2.0 * t);
-        float an = u[0] * t;
-        float cs = cos(an), sn = sin(an);
-        float2 rd = float2(cs * d.x - sn * d.y, sn * d.x + cs * d.y);
-        o.write(float4(sampleSplit(a, c, rd, u[4] * t, asp), a.read(gid).a), gid);
-    }
-
-    // Pinch / bulge. u: amount(-1..1), radius, cx, cy, fringe
-    kernel void k_bulge(KIN, texture2d<float> a [[texture(1)]]) {
-        GUARD
-        float2 size = OSIZE;
-        float asp = size.x / size.y;
-        float2 c = float2(u[2], u[3]);
-        float2 d = (UV - c) * float2(asp, 1.0);
-        float r = length(d);
-        float R = max(0.01, u[1]);
-        float2 nd = d;
-        float w = 0.0;
-        if (r < R && r > 1e-6) {
-            float t = r / R;
-            float e = exp(u[0] * 1.6);
-            nd = d / r * R * pow(t, e);
-            w = 1.0 - t;
-        }
-        o.write(float4(sampleSplit(a, c, nd, u[4] * w, asp), a.read(gid).a), gid);
-    }
-
-    // Waves & ripples. u: mode, amp(px), wavelength(px), phase, fringe, cx, cy, damping, angle(rad)
-    kernel void k_waves(KIN, texture2d<float> a [[texture(1)]]) {
-        GUARD
-        float2 size = OSIZE;
-        float2 p = float2(gid) + 0.5;
+        float2 uv = UV;
+        float2 c = float2(u[5], u[6]);
+        float2 q = (uv - c) * float2(asp, 1.0);
+        float r = length(q);
+        float2 dir = r > 1e-6 ? q / r : float2(0.0);
+        // 0 at the centre, 1 at the corners (round) or the frame edge (frame)
+        float d = u[4] < 0.5 ? r / length(float2(asp, 1.0) * 0.5)
+                             : max(abs(q.x) / (asp * 0.5), abs(q.y) / 0.5);
+        float m = smoothstep(u[2], min(1.2, u[2] + max(0.02, u[3])), d);
+        float k = u[1] * m;
         int mode = int(u[0]);
-        float wl = max(2.0, u[2]);
-        float2 disp = float2(0.0);
-        float ca = cos(u[8]), sa = sin(u[8]);
-        float2 rp = float2(ca * p.x + sa * p.y, -sa * p.x + ca * p.y);
-        if (mode == 0) disp = float2(ca, sa) * u[1] * sin(6.2831853 * rp.y / wl + u[3]);
-        else if (mode == 1) disp = float2(-sa, ca) * u[1] * sin(6.2831853 * rp.x / wl + u[3]);
-        else if (mode == 2) disp = float2(sin(6.2831853 * p.y / wl + u[3]), sin(6.2831853 * p.x / wl + u[3] * 1.3)) * u[1];
-        else {
-            float2 c = float2(u[5], u[6]) * size;
-            float2 d = p - c;
-            float r = length(d);
-            float damp = exp(-r / max(size.x, size.y) * u[7] * 6.0);
-            disp = (r > 1e-3 ? d / r : float2(0.0)) * u[1] * sin(6.2831853 * r / wl - u[3]) * damp;
-        }
-        float3 col;
-        for (int ch = 0; ch < 3; ch++) {
-            float k = 1.0 + (float(ch) - 1.0) * u[4];
-            col[ch] = a.sample(sMirD, (p + disp * k) / size)[ch];
-        }
-        o.write(float4(col, a.read(gid).a), gid);
-    }
-
-    // Polar warp. u: mode (0 tiny planet, 1 tunnel), rotation, zoom, twist, cx, cy
-    kernel void k_polar(KIN, texture2d<float> a [[texture(1)]]) {
-        GUARD
-        float2 size = OSIZE;
-        float asp = size.x / size.y;
-        float2 q = (UV - float2(u[4], u[5])) * float2(asp, 1.0);
-        float lim = 0.5 * min(asp, 1.0);
-        float r = length(q) / lim / max(0.05, u[2]);
-        float th = atan2(q.x, -q.y) + u[1] + u[3] * r;
-        float x = fract(th / 6.2831853 + 0.5);
-        if (u[6] > 0.5) x = 1.0 - abs(x * 2.0 - 1.0);      // seamless: mirror instead of a hard seam
-        float y = u[0] < 0.5 ? 1.0 - r : r;
-        o.write(float4(a.sample(sMirD, float2(x, y)).rgb, a.read(gid).a), gid);
-    }
-
-    // Liquid glass. u: unit, scale(ref px), strength(px), detail, fringe, seed, frosted
-    kernel void k_liquid(KIN, texture2d<float> a [[texture(1)]]) {
-        GUARD
-        float2 size = OSIZE;
         float2 p = float2(gid) + 0.5;
-        float2 q = p / max(u[0], 1e-3) / max(2.0, u[1]);
-        int oct = int(clamp(u[3], 1.0, 6.0));
-        float2 n = float2(fbm(q, u[5], oct), fbm(q + 5.2, u[5] + 3.0, oct)) - 0.5;
-        float2 disp = n * 2.0 * u[2];
-        if (u[6] > 0.5) disp += (float2(hash12(p + u[5]), hash12(p.yx + u[5] * 1.7)) - 0.5) * u[2] * 0.8;
-        float3 col;
+        float3 col = float3(0.0);
+        float unit = max(u[9], 1e-3);
         for (int ch = 0; ch < 3; ch++) {
-            float k = 1.0 + (float(ch) - 1.0) * u[4];
-            col[ch] = a.sample(sMirD, (p + disp * k) / size)[ch];
+            float spread = 1.0 + (float(ch) - 1.0) * u[7] * m;
+            float kk = k * spread;
+            float2 nq = q;
+            float3 acc;
+            if (mode == 0) {                       // bend: fisheye-like bulge on the borders
+                nq = dir * r * (1.0 - kk * 0.45 * m);
+            } else if (mode == 2) {                // swirl
+                float an = kk * 3.1416 * m;
+                float cs = cos(an), sn = sin(an);
+                nq = float2(cs * q.x - sn * q.y, sn * q.x + cs * q.y);
+            } else if (mode == 3) {                // ripple
+                float wl = max(2.0, u[10] * unit) / size.y;
+                nq = q + dir * sin(6.2831853 * r / wl) * kk * 0.03;
+            } else if (mode == 4) {                // liquid
+                float2 nn = float2(fbm(p / unit / max(2.0, u[10]), u[8], 3), fbm(p / unit / max(2.0, u[10]) + 5.2, u[8] + 3.0, 3)) - 0.5;
+                nq = q + nn * kk * 0.12;
+            } else if (mode == 5) {                // squeeze: compress the borders (shows more of the scene)
+                nq = dir * r * (1.0 + kk * 0.6 * m);
+            }
+            if (mode == 1) {                       // stretch: radial smear outward (warp speed)
+                float3 sum = float3(0.0);
+                for (int i = 0; i < 24; i++) {
+                    float t = (float(i) + hash12(p + float(i))) / 24.0;
+                    float2 sq = q * (1.0 - kk * 0.35 * t);
+                    sum += a.sample(sMirD, c + sq / float2(asp, 1.0)).rgb;
+                }
+                acc = sum / 24.0;
+            } else {
+                acc = a.sample(sMirD, c + nq / float2(asp, 1.0)).rgb;
+            }
+            col[ch] = acc[ch];
         }
-        o.write(float4(col, a.read(gid).a), gid);
+        if (u[11] > 0.0) col = mix(col, blurred.sample(sLin, uv).rgb, clamp(u[11] * m, 0.0, 1.0));
+        col *= 1.0 - u[12] * m * m;
+        o.write(float4(clamp(col, 0.0, 1.0), a.read(gid).a), gid);
     }
 
     // Mirror & tile. u: mode, tiles, position
@@ -214,6 +174,10 @@ struct FisheyeEffect: Effect {
         .sectionSwitch("circle", section: "Circular Frame", false),
         .sectionSwitch("fringeOn", section: "Color Fringing"),
         .slider("fringe", "Amount", 0, 100, 10, step: 1, unit: "%", section: "Color Fringing"),
+        .sectionSwitch("edgeBlurOn", section: "Edge Blur", false),
+        .slider("edgeBlur", "Amount", 0, 100, 70, step: 1, unit: "%", section: "Edge Blur"),
+        .slider("edgeBlurRadius", "Radius", 1, 80, 14, step: 0.5, curve: 1.6, section: "Edge Blur"),
+        .slider("edgeBlurCenter", "Sharp Center Size", 0, 90, 40, step: 1, unit: "%", section: "Edge Blur"),
     ]
     var looks: [EffectLook] {
         [
@@ -241,133 +205,67 @@ struct FisheyeEffect: Effect {
         }
         let zoom = Float(p.num("zoom", 100) / 100 * auto)
         let fringe = p.bool("fringeOn", true) ? p.f("fringe", 10) / 100 * 0.08 : 0
-        return ctx.apply("k_fisheye", [input], [Float(k), zoom, p.bool("circle", false) ? 1 : 0, fringe,
-                                                p.f("cx", 50) / 100, p.f("cy", 50) / 100, trueFish ? 1 : 0,
-                                                p.f("fov", 180) * .pi / 180, p.choice("edge", "mirror") == "mirror" ? 1 : 0])
+        let out = ctx.apply("k_fisheye", [input], [Float(k), zoom, p.bool("circle", false) ? 1 : 0, fringe,
+                                                   p.f("cx", 50) / 100, p.f("cy", 50) / 100, trueFish ? 1 : 0,
+                                                   p.f("fov", 180) * .pi / 180, p.choice("edge", "mirror") == "mirror" ? 1 : 0])
+        guard p.bool("edgeBlurOn", false) else { return out }
+        let b = ctx.blur(out, sigma: ctx.px(p.num("edgeBlurRadius", 14)))
+        return ctx.apply("k_maskmix", [out, b], [1, p.f("edgeBlurCenter", 40) / 100, 0.5, 0, p.f("cx", 50) / 100, p.f("cy", 50) / 100,
+                                                 p.f("edgeBlur", 70) / 100])
     }
 }
 
-// MARK: - Twirl
+// MARK: - Edge distort
 
-struct TwirlEffect: Effect {
-    let id = "twirl"
-    let name = "Twirl"
+struct EdgeDistortEffect: Effect {
+    let id = "edgewarp"
+    let name = "Edge Distort"
     let category = EffectCategory.distort
-    var symbol: String { "tornado" }
-    var summary: String { "Spins the image around a point, like water going down a drain." }
+    var symbol: String { "circle.dashed.inset.filled" }
+    var summary: String { "Keeps the centre intact and warps only the borders: bend, stretch, swirl, ripple, liquid or squeeze." }
     let params: [ParamDef] = [
-        .slider("angle", "Angle", -1080, 1080, 180, step: 1, unit: "°", curve: 1),
-        .slider("radius", "Radius", 5, 150, 60, step: 1, unit: "%"),
-        .slider("cx", "Center X", 0, 100, 50, step: 1, unit: "%"),
-        .slider("cy", "Center Y", 0, 100, 50, step: 1, unit: "%"),
-        .slider("fringe", "Color Fringing", 0, 100, 0, step: 1, unit: "%"),
-    ]
-    func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
-        ctx.apply("k_twirl", [input], [p.f("angle", 180) * .pi / 180, p.f("radius", 60) / 100, p.f("cx", 50) / 100,
-                                       p.f("cy", 50) / 100, p.f("fringe") / 100 * 0.1])
-    }
-}
-
-// MARK: - Pinch & bulge
-
-struct BulgeEffect: Effect {
-    let id = "bulge"
-    let name = "Pinch & Bulge"
-    let category = EffectCategory.distort
-    var symbol: String { "circle.circle.fill" }
-    var summary: String { "Inflates (bulge) or sucks in (pinch) a round area of the image." }
-    let params: [ParamDef] = [
-        .slider("amount", "Amount", -100, 100, 50, step: 1, unit: "%"),
-        .slider("radius", "Radius", 5, 150, 45, step: 1, unit: "%"),
-        .slider("cx", "Center X", 0, 100, 50, step: 1, unit: "%"),
-        .slider("cy", "Center Y", 0, 100, 50, step: 1, unit: "%"),
-        .slider("fringe", "Color Fringing", 0, 100, 0, step: 1, unit: "%"),
-    ]
-    func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
-        ctx.apply("k_bulge", [input], [p.f("amount", 50) / 100, p.f("radius", 45) / 100, p.f("cx", 50) / 100,
-                                       p.f("cy", 50) / 100, p.f("fringe") / 100 * 0.15])
-    }
-}
-
-// MARK: - Waves
-
-struct WavesEffect: Effect {
-    let id = "waves"
-    let name = "Waves & Ripples"
-    let category = EffectCategory.distort
-    var symbol: String { "water.waves" }
-    var summary: String { "Sine waves, wobbly water or circular ripples, with optional rainbow edges." }
-    let params: [ParamDef] = [
-        .choice("mode", "Type", [("h", "Horizontal Waves"), ("v", "Vertical Waves"), ("both", "Wobble (Both)"), ("ripple", "Ripples")],
-                "h"),
-        .slider("amp", "Amplitude", 0, 100, 12, step: 0.5, curve: 1.5),
-        .slider("wavelength", "Wavelength", 4, 600, 90, step: 1, curve: 1.6),
-        .slider("phase", "Phase", 0, 360, 0, step: 1, unit: "°"),
-        .slider("angle", "Angle", -90, 90, 0, step: 1, unit: "°", visible: whenAny("mode", ["h", "v"])),
-        .slider("cx", "Center X", 0, 100, 50, step: 1, unit: "%", visible: when("mode", "ripple")),
-        .slider("cy", "Center Y", 0, 100, 50, step: 1, unit: "%", visible: when("mode", "ripple")),
-        .slider("damping", "Damping", 0, 100, 30, step: 1, unit: "%", visible: when("mode", "ripple")),
-        .slider("fringe", "Color Fringing", 0, 100, 0, step: 1, unit: "%"),
-    ]
-    func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
-        let mode: Float = ["h": 0, "v": 1, "both": 2, "ripple": 3][p.choice("mode", "h")] ?? 0
-        return ctx.apply("k_waves", [input], [mode, Float(ctx.px(p.num("amp", 12))), Float(ctx.px(p.num("wavelength", 90))),
-                                              p.f("phase") * .pi / 180, p.f("fringe") / 100 * 0.5, p.f("cx", 50) / 100,
-                                              p.f("cy", 50) / 100, p.f("damping", 30) / 100, p.f("angle") * .pi / 180])
-    }
-}
-
-// MARK: - Polar
-
-struct PolarEffect: Effect {
-    let id = "polar"
-    let name = "Tiny Planet & Tunnel"
-    let category = EffectCategory.distort
-    var symbol: String { "globe.americas" }
-    var summary: String { "Wraps the image into a circle: a tiny planet (ground in the middle) or a tunnel (sky in the middle)." }
-    let params: [ParamDef] = [
-        .segmented("mode", "Mode", [("planet", "Tiny Planet"), ("tunnel", "Tunnel")], "planet"),
-        .slider("rotation", "Rotation", -180, 180, 0, step: 1, unit: "°"),
-        .slider("zoom", "Zoom", 20, 300, 100, step: 1, unit: "%", curve: 1.3),
-        .slider("twist", "Twist", -360, 360, 0, step: 1, unit: "°"),
-        .slider("cx", "Center X", 0, 100, 50, step: 1, unit: "%"),
-        .slider("cy", "Center Y", 0, 100, 50, step: 1, unit: "%"),
-        .toggle("seamless", "Seamless (Mirror)", true),
-    ]
-    func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
-        ctx.apply("k_polar", [input], [p.choice("mode", "planet") == "planet" ? 0 : 1, p.f("rotation") * .pi / 180,
-                                       p.f("zoom", 100) / 100, p.f("twist") * .pi / 180, p.f("cx", 50) / 100, p.f("cy", 50) / 100,
-                                       p.bool("seamless", true) ? 1 : 0])
-    }
-}
-
-// MARK: - Liquid glass
-
-struct LiquidEffect: Effect {
-    let id = "liquid"
-    let name = "Liquid & Glass"
-    let category = EffectCategory.distort
-    var symbol: String { "drop" }
-    var summary: String { "Organic displacement: melting liquid, rippled glass or a frosted shower door." }
-    let params: [ParamDef] = [
-        .slider("scale", "Scale", 4, 600, 120, step: 1, curve: 1.6),
-        .slider("strength", "Strength", 0, 200, 30, step: 0.5, curve: 1.5),
-        .slider("detail", "Detail", 1, 6, 3, step: 1),
-        .toggle("frosted", "Frosted Glass", false),
-        .slider("fringe", "Color Fringing", 0, 100, 0, step: 1, unit: "%"),
-        .seed(),
+        .choice("mode", "Warp", [("bend", "Bend (Fisheye Edges)"), ("stretch", "Stretch (Warp Speed)"), ("swirl", "Swirl"),
+                                 ("ripple", "Ripple"), ("liquid", "Liquid"), ("squeeze", "Squeeze")], "bend", section: "Warp"),
+        .slider("strength", "Strength", -100, 200, 50, step: 1, unit: "%", section: "Warp"),
+        .slider("scale", "Pattern Size", 4, 400, 60, step: 1, curve: 1.6, section: "Warp", visible: whenAny("mode", ["ripple", "liquid"])),
+        .seed(section: "Warp"),
+        .segmented("shape", "Shape", [("round", "Round"), ("frame", "Frame")], "round", section: "Protected Center"),
+        .slider("protect", "Center Size", 0, 90, 35, step: 1, unit: "%", section: "Protected Center"),
+        .slider("softness", "Transition", 2, 100, 45, step: 1, unit: "%", section: "Protected Center"),
+        .slider("cx", "Center X", 0, 100, 50, step: 1, unit: "%", section: "Protected Center"),
+        .slider("cy", "Center Y", 0, 100, 50, step: 1, unit: "%", section: "Protected Center"),
+        .sectionSwitch("fringeOn", section: "Color Fringing"),
+        .slider("fringe", "Amount", 0, 100, 30, step: 1, unit: "%", section: "Color Fringing"),
+        .sectionSwitch("blurOn", section: "Edge Blur", false),
+        .slider("blur", "Amount", 0, 100, 50, step: 1, unit: "%", section: "Edge Blur"),
+        .slider("blurRadius", "Radius", 1, 80, 12, step: 0.5, curve: 1.6, section: "Edge Blur"),
+        .sectionSwitch("darkOn", section: "Edge Darkening", false),
+        .slider("darken", "Amount", 0, 100, 35, step: 1, unit: "%", section: "Edge Darkening"),
     ]
     var looks: [EffectLook] {
         [
-            EffectLook(id: "melt", name: "Melting", values: ["scale": 220.0, "strength": 60.0, "detail": 2]),
-            EffectLook(id: "glass", name: "Rippled Glass", values: ["scale": 25.0, "strength": 14.0, "detail": 1, "fringe": 20.0]),
-            EffectLook(id: "frosted", name: "Frosted Shower Door", values: ["scale": 60.0, "strength": 10.0, "frosted": true]),
-            EffectLook(id: "acid", name: "Acid Trip", values: ["scale": 160.0, "strength": 110.0, "detail": 5, "fringe": 80.0]),
+            EffectLook(id: "fishedges", name: "Fisheye Edges", values: ["mode": "bend", "strength": 90.0, "protect": 30.0]),
+            EffectLook(id: "warp", name: "Warp Speed", values: ["mode": "stretch", "strength": 120.0, "protect": 40.0, "fringeOn": true,
+                                                              "fringe": 50.0]),
+            EffectLook(id: "vortex", name: "Edge Vortex", values: ["mode": "swirl", "strength": 80.0, "protect": 35.0]),
+            EffectLook(id: "dream", name: "Dream Edges", values: ["mode": "liquid", "strength": 120.0, "scale": 120.0, "blurOn": true, "blur": 40.0]),
+            EffectLook(id: "tunnel", name: "Tunnel Vision", values: ["mode": "stretch", "strength": 80.0, "protect": 25.0, "blurOn": true,
+                                                                   "darkOn": true, "darken": 50.0]),
+            EffectLook(id: "ripple", name: "Rippled Frame", values: ["mode": "ripple", "shape": "frame", "strength": 100.0, "scale": 40.0,
+                                                                   "protect": 55.0]),
+            EffectLook(id: "squeeze", name: "Wide Squeeze", values: ["mode": "squeeze", "strength": 100.0, "protect": 30.0]),
         ]
     }
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
-        ctx.apply("k_liquid", [input], [Float(ctx.scale), p.f("scale", 120), Float(ctx.px(p.num("strength", 30))), p.f("detail", 3),
-                                        p.f("fringe") / 100 * 0.5, p.f("seed", 1) * 4.3, p.bool("frosted") ? 1 : 0])
+        let mode: Float = ["bend": 0, "stretch": 1, "swirl": 2, "ripple": 3, "liquid": 4, "squeeze": 5][p.choice("mode", "bend")] ?? 0
+        let blurOn = p.bool("blurOn", false)
+        let blurred = blurOn ? ctx.blur(input, sigma: ctx.px(p.num("blurRadius", 12))) : input
+        return ctx.apply("k_edgewarp", [input, blurred], [
+            mode, p.f("strength", 50) / 100, p.f("protect", 35) / 100, p.f("softness", 45) / 100,
+            p.choice("shape", "round") == "frame" ? 1 : 0, p.f("cx", 50) / 100, p.f("cy", 50) / 100,
+            p.bool("fringeOn", true) ? p.f("fringe", 30) / 100 * 0.08 : 0, p.f("seed", 1) * 3.1, Float(ctx.scale), p.f("scale", 60),
+            blurOn ? p.f("blur", 50) / 100 : 0, p.bool("darkOn", false) ? p.f("darken", 35) / 100 : 0,
+        ])
     }
 }
 

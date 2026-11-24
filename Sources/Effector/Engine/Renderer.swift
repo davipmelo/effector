@@ -18,13 +18,14 @@ final class Renderer {
     static let referenceSize = 1000.0
 
     /// `sourceKey` must change whenever the source texture content changes.
-    func render(layers: [LayerNode], source: MTLTexture, sourceKey: Int, isExport: Bool = false) -> MTLTexture {
+    func render(layers: [LayerNode], source: MTLTexture, sourceKey: Int, isExport: Bool = false, canvas: CanvasSpec? = nil) -> MTLTexture {
         let scale = Double(max(source.width, source.height)) / Renderer.referenceSize
         let ctx = RenderContext(scale: scale, source: source, isExport: isExport)
         var newCache: [Int: MTLTexture] = [:]
         var h = Hasher()
         h.combine(sourceKey); h.combine(scale); h.combine(source.width); h.combine(source.height)
-        let (out, _) = renderStack(layers, input: source, inputHash: h.finalize(), ctx: ctx, newCache: &newCache)
+        var (out, _) = renderStack(layers, input: source, inputHash: h.finalize(), ctx: ctx, newCache: &newCache)
+        if let canvas { out = CanvasCompose.apply(out, canvas, ctx) }
         ctx.flush()
         if useCache { cache = newCache }
         return out

@@ -1,7 +1,10 @@
 # EFFECTOR: Guia Rápido
 
-## Abrir uma imagem
-- **⌘O**, arrastar o arquivo para a janela ou **⌘V** para colar da área de transferência.
+## Abrir imagens
+- **⌘O** (pode escolher várias), arrastar arquivos para a janela ou **⌘V** para colar. Cada imagem entra na **filmstrip** embaixo da tela, com os próprios efeitos, recorte, canvas e histórico de desfazer.
+- **← / →** trocam de imagem. **B** mostra ou esconde a filmstrip. **⌥⌘W** fecha a imagem atual.
+- Na filmstrip: clique abre; **⌘-clique** ou **⇧-clique** seleciona várias. O botão **⟳** (ou **⌥⌘S**) **sincroniza** os ajustes da imagem ativa nas selecionadas (layers — substituindo ou por cima —, recorte e canvas). Clique direito: copiar/colar ajustes, limpar, mostrar no Finder, fechar.
+- **Exportar** com várias imagens: escolha "Esta imagem", "Selecionadas" ou "Todas"; cada uma sai com os próprios efeitos numa pasta, com sufixo no nome.
 - Formatos aceitos: JPG, PNG, HEIC, TIFF, RAW (CR3, ARW, NEF, DNG…) e projetos `.effector`.
 
 ## Layers
@@ -47,6 +50,9 @@
 - Pinça ou **⌘ + rolagem** para zoom. Arraste ou role para mover a imagem.
 - Duplo clique na imagem ajusta à janela.
 - **Z** (ou **⌘0**) ajusta à janela e **⌘1** mostra em 100%.
+
+## Canvas & Bordas (Instagram)
+- Botão **Canvas** na barra de cima (ou no painel direito sem layer selecionado): encaixa a imagem numa proporção — 4:5, 1:1, 9:16, 3:4, 1.91:1, 16:9, impressão, A4 ou personalizada — com borda mínima, fundo de **cor**, **degradê** ou a **própria foto desfocada**, posição, cantos arredondados e sombra. O export sai no tamanho do canvas.
 
 ## Recorte
 - **C** ou o botão ✂︎ abre o recorte. Escolha a proporção (Livre, 1:1, 4:5, 16:9…) e clique em **Aplicar**.
@@ -105,3 +111,7 @@
 ## Molduras
 - **Faixas pretas (letterbox)** em proporções de cinema (1.33 a 3.00:1), com **Reenquadrar** e legenda opcional; Polaroid, borda simples e foto arredondada.
 - O controle **Só Luzes Pequenas** (Anamórfico e Estrela) evita que áreas claras grandes estourem.
+
+## Desfoque
+- **Desfoque** (gaussiano ou "superfície", que preserva bordas), **Desfoque Radial** (zoom/giro com centro nítido, como no Resolve), **Desfoque de Movimento** e **Desfoque de Lente & Tilt-Shift**. Desfoque e Movimento podem atuar em tudo, só nas bordas ou só no centro. Olho de Peixe e Vinheta também têm desfoque de borda.
+- **Distorção de Borda**: mantém o centro intacto e distorce só as bordas (curvar, esticar, redemoinho, ondulação, líquido, comprimir).

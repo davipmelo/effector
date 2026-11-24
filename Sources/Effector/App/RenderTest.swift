@@ -39,6 +39,7 @@ enum RenderTest {
     }
 
     static func run(_ args: [String]) {
+        AppState.headless = true
         guard let i = args.firstIndex(of: "--render-test"), args.count > i + 2 else {
             print("usage: --render-test <image> <outdir> [effect[:k=v,...]]"); return
         }
@@ -46,6 +47,30 @@ enum RenderTest {
         let outDir = URL(fileURLWithPath: args[i + 2])
         try? FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
         if args.contains("--lint") { lint(); return }
+        if args.contains("--multidoc") {
+            let app = AppState.shared
+            app.viewportSize = CGSize(width: 800, height: 600)
+            func spin(_ t: Double) { RunLoop.main.run(until: Date().addingTimeInterval(t)) }
+            let a = try! SourceImage.load(url: URL(fileURLWithPath: args[i + 1]))
+            app.openImage(a); spin(1.5)
+            print("doc1 output:", app.output?.width ?? -1, app.output?.height ?? -1)
+            let b = try! SourceImage.load(url: URL(fileURLWithPath: args[i + 2]))
+            app.openImage(b); spin(1.5)
+            print("doc2 output:", app.output?.width ?? -1, app.output?.height ?? -1, "source:", app.source?.width ?? -1)
+            app.activateNext(-1); spin(1.5)
+            print("back to doc1:", app.output?.width ?? -1, app.output?.height ?? -1, "source:", app.source?.width ?? -1)
+            app.addEffect("film")
+            app.edit { $0.canvas = CanvasSpec(ratio: "1:1", fill: "blur") }
+            spin(1)
+            print("doc1 output with canvas:", app.output?.width ?? -1, app.output?.height ?? -1)
+            let other = Set(app.docs.map(\.id)).subtracting([app.activeID!])
+            app.syncSettings(to: other, [.layers, .canvas])
+            app.activateNext(1); spin(1.5)
+            print("doc2 after sync: layers", app.state.layers.count, "canvas", app.state.canvas?.ratio ?? "-", "output", app.output?.width ?? -1, app.output?.height ?? -1, "dirty", app.isDirty)
+            app.undo(); spin(1)
+            print("doc2 after undo: layers", app.state.layers.count)
+            return
+        }
         if args.contains("--project-roundtrip") {
             let app = AppState.shared
             do {

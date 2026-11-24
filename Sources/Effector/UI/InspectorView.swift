@@ -69,6 +69,10 @@ struct MultiInspector: View {
 struct DocumentInspector: View {
     @ObservedObject var app = AppState.shared
     var body: some View {
+        ScrollView { content }
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
             header(tr("Image"))
             if let src = app.source {
@@ -81,6 +85,7 @@ struct DocumentInspector: View {
                 }
                 .padding(14)
                 Rectangle().fill(Theme.separator).frame(height: 1)
+                PanelSection(title: "Canvas & Borders") { CanvasControls() }
                 VStack(alignment: .leading, spacing: 8) {
                     Text(tr("Select a layer to edit its settings, or add an effect with the + button."))
                         .font(.system(size: 11.5)).foregroundStyle(Theme.textFaint)

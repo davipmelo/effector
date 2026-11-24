@@ -146,10 +146,19 @@ struct VignetteEffect: Effect {
         .slider("feather", "Feather", 5, 100, 55, step: 1, unit: "%"),
         .slider("protect", "Protect Highlights", 0, 100, 0, step: 1, unit: "%"),
         .color("color", "Color", RGBA(hex: "#000000")),
+        .sectionSwitch("blurOn", section: "Edge Blur", false),
+        .slider("blur", "Radius", 1, 80, 12, step: 0.5, curve: 1.6, section: "Edge Blur"),
+        .slider("blurAmount", "Amount", 0, 100, 80, step: 1, unit: "%", section: "Edge Blur"),
     ]
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
-        ctx.apply("k_vignette", [input], [p.f("amount", 45) / 100, p.f("midpoint", 50) / 100, p.f("roundness", 50) / 100,
-                                          p.f("feather", 55) / 100] + p.color("color", .black).floats + [p.f("protect") / 100])
+        var img = input
+        if p.bool("blurOn", false) {
+            let b = ctx.blur(input, sigma: ctx.px(p.num("blur", 12)))
+            img = ctx.apply("k_maskmix", [input, b], [1, p.f("midpoint", 50) / 100 * 0.8, p.f("feather", 55) / 100,
+                                                      0, 0.5, 0.5, p.f("blurAmount", 80) / 100])
+        }
+        return ctx.apply("k_vignette", [img], [p.f("amount", 45) / 100, p.f("midpoint", 50) / 100, p.f("roundness", 50) / 100,
+                                               p.f("feather", 55) / 100] + p.color("color", .black).floats + [p.f("protect") / 100])
     }
 }
 

@@ -4,7 +4,7 @@ enum ShaderLibrary {
          AdjustShaders.source, DitherShaders.source, HalftoneShaders.source, AsciiShaders.source,
          GradientShaders.source, GrainShaders.source, GlowShaders.source, FilmShaders.source,
          TrailShaders.source, VHSShaders.source, BlobShaders.source,
-         TextureShaders.source, LensShaders.source, LensFilterShaders.source, DistortShaders.source, DigitalShaders.source, CopyShaders.source, FrameShaders.source].joined(separator: "\n")
+         TextureShaders.source, LensShaders.source, LensFilterShaders.source, DistortShaders.source, BlurShaders.source, CanvasShaders.source, DigitalShaders.source, CopyShaders.source, FrameShaders.source].joined(separator: "\n")
     }
 
     static let common = """

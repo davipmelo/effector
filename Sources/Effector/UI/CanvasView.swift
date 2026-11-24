@@ -52,17 +52,7 @@ struct CanvasContainer: View {
             .onChange(of: geo.size) { _, s in app.viewportSize = s }
         }
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
-            guard let p = providers.first else { return false }
-            _ = p.loadObject(ofClass: URL.self) { url, _ in
-                guard let url else { return }
-                DispatchQueue.main.async {
-                    if url.pathExtension.lowercased() == "cube" {
-                        // a LUT dropped on the canvas: save it and add a LUT layer
-                        if app.hasImage, let l = LUTLibrary.shared.add(urls: [url]) { app.addLUTLayer(l) }
-                    } else if app.confirmDiscardChanges() { app.open(url: url) }
-                }
-            }
-            return true
+            dropFiles(providers)
         }
     }
 
@@ -169,7 +159,7 @@ final class CanvasMTKView: MTKView, MTKViewDelegate {
     /// Image rect in view points.
     func imageRect() -> CGRect {
         guard let app, let src = app.source else { return .zero }
-        let (w, h): (Int, Int) = app.isCropping ? (src.width, src.height) : src.croppedSize(app.state.crop)
+        let (w, h): (Int, Int) = app.isCropping ? (src.width, src.height) : app.outputSize()
         var z = app.displayZoom
         var pan = app.pan
         if app.isCropping {
@@ -303,4 +293,26 @@ struct SplitDivider: View {
         }
         .coordinateSpace(name: "canvasArea")
     }
+}
+
+/// Files dropped on the window: .cube files become LUT layers, images / projects are added to the filmstrip.
+func dropFiles(_ providers: [NSItemProvider]) -> Bool {
+    let app = AppState.shared
+    let group = DispatchGroup()
+    var urls: [URL] = []
+    let lock = NSLock()
+    for p in providers {
+        group.enter()
+        _ = p.loadObject(ofClass: URL.self) { url, _ in
+            if let url { lock.lock(); urls.append(url); lock.unlock() }
+            group.leave()
+        }
+    }
+    group.notify(queue: .main) {
+        let luts = urls.filter { $0.pathExtension.lowercased() == "cube" }
+        let others = urls.filter { $0.pathExtension.lowercased() != "cube" }
+        if app.hasImage, !luts.isEmpty, let l = LUTLibrary.shared.add(urls: luts) { app.addLUTLayer(l) }
+        if !others.isEmpty { app.open(urls: others.sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }) }
+    }
+    return true
 }

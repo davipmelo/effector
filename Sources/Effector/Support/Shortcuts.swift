@@ -72,6 +72,7 @@ enum ShortcutAction: String, CaseIterable, Codable {
     case open, save, saveAs, export, copyResult, paste, undo, redo
     case commandPalette, addEffect, beforeAfter, crop
     case group, ungroup, duplicate, delete, toggleVisibility, moveUp, moveDown
+    case prevImage, nextImage, filmstrip, syncSettings, closeImage
     case zoomIn, zoomOut, zoomFit, zoom100, present, compare, randomize, copyLayers, pasteLayers, showLayers, showPresets
 
     var label: String {
@@ -100,6 +101,11 @@ enum ShortcutAction: String, CaseIterable, Codable {
         case .zoomFit: return "Fit to Window"
         case .zoom100: return "Actual Size (100%)"
         case .present: return "Full Screen Preview"
+        case .prevImage: return "Previous Image"
+        case .nextImage: return "Next Image"
+        case .filmstrip: return "Show / Hide Filmstrip"
+        case .syncSettings: return "Sync Settings to Selected Images"
+        case .closeImage: return "Close Image"
         case .compare: return "Split Before / After"
         case .randomize: return "Randomize Layer Settings"
         case .copyLayers: return "Copy Layers"
@@ -135,6 +141,11 @@ enum ShortcutAction: String, CaseIterable, Codable {
         case .zoomFit: return KeyCombo(key: "z")
         case .zoom100: return KeyCombo(key: "1", cmd: true)
         case .present: return KeyCombo(key: "f")
+        case .prevImage: return KeyCombo(key: "left")
+        case .nextImage: return KeyCombo(key: "right")
+        case .filmstrip: return KeyCombo(key: "b")
+        case .syncSettings: return KeyCombo(key: "s", cmd: true, opt: true)
+        case .closeImage: return KeyCombo(key: "w", cmd: true, opt: true)
         case .compare: return KeyCombo(key: "/")
         case .randomize: return KeyCombo(key: "r")
         case .copyLayers: return KeyCombo(key: "c", cmd: true, opt: true)
@@ -235,12 +246,12 @@ enum Actions {
     static func perform(_ a: ShortcutAction) {
         let app = AppState.shared
         switch a {
-        case .open: if app.confirmDiscardChanges() { app.openPanel() }
+        case .open: app.openPanel()
         case .save: app.save()
         case .saveAs: app.save(as: true)
         case .export: if app.hasImage { app.showExport = true }
         case .copyResult: app.copyResult()
-        case .paste: if app.confirmDiscardChanges() { app.pasteImage() }
+        case .paste: app.pasteImage()
         case .undo: app.undo()
         case .redo: app.redo()
         case .commandPalette: if app.hasImage { app.showCommandPalette.toggle() }
@@ -259,6 +270,11 @@ enum Actions {
         case .zoomFit: app.setZoom(nil)
         case .zoom100: app.zoomActual()
         case .present: app.togglePresentation()
+        case .prevImage: app.activateNext(-1)
+        case .nextImage: app.activateNext(1)
+        case .filmstrip: app.showFilmstrip.toggle()
+        case .syncSettings: app.showSync = app.stripSelection.count > 1
+        case .closeImage: if let id = app.activeID { app.closeDocuments([id]) }
         case .compare: if app.hasImage { app.compareSplit.toggle() }
         case .randomize: if let id = app.selectedID, !app.isMultiSelection { app.randomizeParams(id) }
         case .copyLayers: app.copyLayers()

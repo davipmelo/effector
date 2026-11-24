@@ -5,6 +5,7 @@ struct MainView: View {
     @ObservedObject var settings = AppSettings.shared
     @ObservedObject var shortcuts = ShortcutStore.shared
     @AppStorage("leftWidth") private var leftWidth = 270.0
+    @State private var showCanvas = false
     @AppStorage("rightWidth") private var rightWidth = 300.0
 
     var body: some View {
@@ -25,6 +26,7 @@ struct MainView: View {
                 VStack(spacing: 0) {
                     CanvasContainer()
                         .frame(minWidth: 300, maxWidth: .infinity, maxHeight: .infinity)
+                    if !app.presenting && app.showFilmstrip && !app.docs.isEmpty { Filmstrip() }
                     if !app.presenting { InfoBar() }
                 }
                 if !app.presenting {
@@ -52,6 +54,8 @@ struct MainView: View {
         .toolbar { toolbarContent }
         .navigationTitle(title)
         .toolbar(app.presenting ? .hidden : .visible, for: .windowToolbar)
+        .ignoresSafeArea(edges: app.presenting ? .all : [])
+        .background(app.presenting ? Color.black : Color.clear)
         .preferredColorScheme(settings.theme.colorScheme)
         .tint(Theme.accent)
     }
@@ -105,20 +109,30 @@ struct MainView: View {
                 .disabled(!app.hasImage)
         }
         ToolbarItem(placement: .principal) {
-            HStack(spacing: 7) {
-                Text("EFFECTOR").font(.system(size: 13, weight: .heavy)).tracking(2.2).foregroundStyle(Theme.text)
+            VStack(spacing: 2) {
+                Text("EFFECTOR")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .tracking(0.6)
+                    .foregroundStyle(Theme.text)
+                    .padding(.horizontal, 16).padding(.vertical, 2)
+                    .background(Capsule().fill(Theme.field))
                 Text("v" + AppInfo.version)
-                    .font(.system(size: 10.5, weight: .medium, design: .monospaced))
-                    .foregroundStyle(Theme.textDim)
+                    .font(.system(size: 8.5, weight: .regular, design: .monospaced))
+                    .foregroundStyle(Theme.textFaint.opacity(0.8))
             }
-            .padding(.horizontal, 10)
+            .frame(maxHeight: .infinity, alignment: .center)
             .help("EFFECTOR " + AppInfo.version)
         }
+        .sharedBackgroundVisibility(.hidden)
         ToolbarItemGroup(placement: .primaryAction) {
             Button { app.undo() } label: { Label(tr("Undo"), systemImage: "arrow.uturn.backward") }
                 .disabled(!app.canUndo).help(tr("Undo") + "  ⌘Z")
             Button { app.redo() } label: { Label(tr("Redo"), systemImage: "arrow.uturn.forward") }
                 .disabled(!app.canRedo).help(tr("Redo") + "  ⇧⌘Z")
+            Button { showCanvas.toggle() } label: { Label(tr("Canvas"), systemImage: "aspectratio") }
+                .disabled(!app.hasImage)
+                .help(tr("Canvas & Borders: fit the image in another aspect ratio (Instagram etc.)"))
+                .popover(isPresented: $showCanvas, arrowEdge: .bottom) { CanvasPopover() }
             Button { Actions.perform(.crop) } label: { Label(tr("Crop"), systemImage: "crop") }
                 .disabled(!app.hasImage).help(tr("Crop") + "  C")
             Toggle(isOn: $app.compareSplit) { Label(tr("Split Before / After"), systemImage: "rectangle.split.2x1") }
@@ -147,6 +161,11 @@ struct InfoBar: View {
         HStack(spacing: 10) {
             if let src = app.source {
                 let (w, h) = src.croppedSize(app.state.crop)
+                if app.docs.count > 1, let i = app.activeIndex {
+                    Text("\(i + 1) / \(app.docs.count)").font(font.monospacedDigit()).foregroundStyle(Theme.textDim)
+                        .help(tr("Image %d of %d · ← → to switch", i + 1, app.docs.count))
+                    sep
+                }
                 item("photo", src.fileName, help: "File")
                 sep
                 item("aspectratio", "\(w) × \(h) px", help: "Size")
@@ -156,6 +175,11 @@ struct InfoBar: View {
                 if !app.state.crop.isFull {
                     sep
                     item("crop", tr("Cropped from %@", "\(src.width) × \(src.height)"), help: "Crop")
+                }
+                if app.state.activeCanvas != nil {
+                    let (cw, ch) = app.outputSize()
+                    sep
+                    item("aspectratio", tr("Canvas %@", "\(cw) × \(ch)"), help: "Canvas & Borders")
                 }
                 sep
                 Text((src.fileName as NSString).pathExtension.uppercased() + (src.hasAlpha ? " · " + tr("Alpha") : ""))
@@ -175,6 +199,12 @@ struct InfoBar: View {
             }
             Spacer(minLength: 8)
             if app.isRendering { ProgressView().controlSize(.mini).help(tr("Rendering…")) }
+            Button { app.showFilmstrip.toggle() } label: {
+                Image(systemName: "photo.stack").font(.system(size: 11)).foregroundStyle(app.showFilmstrip ? Theme.accentText : Theme.textDim)
+            }
+            .buttonStyle(.borderless)
+            .padding(.trailing, 6)
+            .help(tr("Show / Hide Filmstrip") + "  B")
             zoomControl
         }
         .padding(.horizontal, 12)
@@ -203,7 +233,7 @@ struct InfoBar: View {
     private func megapixels(_ w: Int, _ h: Int) -> String { String(format: "%.1f MP", Double(w * h) / 1_000_000) }
 
     private var zoomControl: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 10) {
             Button { app.zoomOut() } label: { Image(systemName: "minus").font(.system(size: 10, weight: .semibold)) }
                 .buttonStyle(.borderless)
                 .help(tr("Zoom Out") + "  ⌘-")
@@ -217,7 +247,7 @@ struct InfoBar: View {
             } label: {
                 Text(app.hasImage ? "\(Int((app.displayZoom * app.backingScale * 100).rounded()))%" : "—")
                     .font(.system(size: 11).monospacedDigit())
-                    .frame(width: 42)
+                    .frame(width: 44)
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
@@ -226,6 +256,7 @@ struct InfoBar: View {
             Button { app.zoomIn() } label: { Image(systemName: "plus").font(.system(size: 10, weight: .semibold)) }
                 .buttonStyle(.borderless)
                 .help(tr("Zoom In") + "  ⌘=")
+            Rectangle().fill(Theme.separator).frame(width: 1, height: 12)
             Button { app.setZoom(nil) } label: { Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 10, weight: .semibold)) }
                 .buttonStyle(.borderless)
                 .help(tr("Fit to Window") + "  Z")
@@ -233,7 +264,7 @@ struct InfoBar: View {
                 .buttonStyle(.borderless)
                 .help(tr("Full Screen Preview") + "  F")
         }
-        .padding(.horizontal, 6).padding(.vertical, 2)
+        .padding(.horizontal, 12).padding(.vertical, 3)
         .background(Capsule().fill(Theme.field))
         .disabled(!app.hasImage)
     }

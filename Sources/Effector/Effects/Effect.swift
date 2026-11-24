@@ -2,7 +2,7 @@ import Foundation
 import Metal
 
 enum EffectCategory: String, CaseIterable {
-    case adjust, stylize, film, lens, distort, glitch, overlay
+    case adjust, stylize, film, lens, blur, distort, glitch, overlay
 
     var label: String {
         switch self {
@@ -10,6 +10,7 @@ enum EffectCategory: String, CaseIterable {
         case .stylize: return "Print & Pixel"
         case .film: return "Film & Light"
         case .lens: return "Lens Filters"
+        case .blur: return "Blur"
         case .distort: return "Distort"
         case .glitch: return "Glitch & Retro"
         case .overlay: return "Overlays & Tracking"
@@ -22,6 +23,7 @@ enum EffectCategory: String, CaseIterable {
         case .stylize: return "circle.grid.3x3"
         case .film: return "film"
         case .lens: return "camera.aperture"
+        case .blur: return "aqi.medium"
         case .distort: return "water.waves"
         case .glitch: return "tv"
         case .overlay: return "viewfinder"
@@ -73,9 +75,11 @@ enum EffectRegistry {
         FilmEffect(), GrainEffect(), GlowEffect(), BloomEffect(), HalationEffect(), LightLeakEffect(),
         // Lens filters
         AnamorphicEffect(), StarFilterEffect(), PrismEffect(), HaloEffect(),
-        ChromaticAberrationEffect(), LensBlurEffect(), VignetteEffect(), BlurEffect(),
+        ChromaticAberrationEffect(), VignetteEffect(),
+        // Blur
+        BlurEffect(), RadialBlurEffect(), MotionBlurEffect(), LensBlurEffect(),
         // Distort
-        FisheyeEffect(), TwirlEffect(), BulgeEffect(), WavesEffect(), PolarEffect(), LiquidEffect(), MirrorEffect(), StretchEffect(),
+        FisheyeEffect(), EdgeDistortEffect(), MirrorEffect(), StretchEffect(),
         // Glitch & retro
         VHSEffect(), CRTEffect(), DigicamEffect(), TrailEffect(),
         // Overlays & tracking

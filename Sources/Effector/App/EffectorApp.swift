@@ -11,8 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
-        guard let u = urls.first else { return }
-        if AppState.shared.confirmDiscardChanges() { AppState.shared.open(url: u) }
+        AppState.shared.open(urls: urls)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
@@ -71,6 +70,8 @@ struct EffectorApp: App {
             item(.save, disabled: !app.hasImage)
             item(.saveAs, disabled: !app.hasImage)
             Divider()
+            item(.closeImage, disabled: !app.hasImage)
+            Divider()
             item(.export, disabled: !app.hasImage)
             item(.copyResult, disabled: !app.hasImage)
         }
@@ -88,6 +89,11 @@ struct EffectorApp: App {
             item(.crop, disabled: !app.hasImage)
             item(.beforeAfter, disabled: !app.hasImage)
             item(.compare, disabled: !app.hasImage)
+            Divider()
+            item(.syncSettings, disabled: app.stripSelection.count < 2)
+            Button(tr("Copy Settings")) { AppState.shared.copySettings() }.disabled(!app.hasImage)
+            Button(tr("Paste Settings to Selected Images")) { AppState.shared.pasteSettings(to: AppState.shared.stripSelection) }
+                .disabled(!app.hasCopiedSettings)
         }
         CommandMenu(tr("Layer")) {
             item(.commandPalette, disabled: !app.hasImage)
@@ -117,6 +123,10 @@ struct EffectorApp: App {
             Button(tr(ShortcutAction.zoomFit.label)) { Actions.perform(.zoomFit) }.keyboardShortcut("0", modifiers: .command)
             item(.zoom100)
             Button(tr(ShortcutAction.present.label)) { Actions.perform(.present) }.disabled(!app.hasImage)
+            Divider()
+            item(.filmstrip)
+            item(.prevImage, disabled: app.docs.count < 2)
+            item(.nextImage, disabled: app.docs.count < 2)
             Divider()
             item(.showLayers); item(.showPresets)
             Divider()

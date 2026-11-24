@@ -267,12 +267,19 @@ Ao final, o app é instalado em `/Applications` e o usuário testa tudo e manda 
 - **Extras:** tela cheia (F), Antes/Depois dividido (/), aleatorizar layer (R / dado), copiar e colar layers (⌥⌘C / ⌥⌘V).
 - **Padronização:** todos os sliders com passo definido; nomes e seções revisados.
 
+## 9.5 v0.5.0 (feedback do quarto teste)
+- **Distorção:** ficaram Olho de Peixe, Espelho & Mosaico e Esticar Pixels; novo **Distorção de Borda** (centro protegido, 6 modos, desfoque e escurecimento de borda, 7 Looks).
+- **Categoria Desfoque (nova):** Desfoque (gaussiano/superfície, em tudo/bordas/centro), Desfoque Radial (zoom/giro/ambos, centro nítido), Desfoque de Movimento, Desfoque de Lente & Tilt-Shift. Desfoque de borda no Olho de Peixe e na Vinheta.
+- **Canvas & Bordas:** encaixa a imagem em outra proporção com bordas (cor, degradê, foto desfocada), margem, posição, cantos, sombra. Fica no documento (`canvas`), aplicado no fim do render; export no tamanho do canvas.
+- **Várias imagens:** filmstrip, troca com ← →, seleção múltipla, sincronizar/copiar/colar/limpar ajustes, exportação em lote, fechar imagem, sessão com todas as imagens (formato v2, lê o v1). Memória: só as 3 imagens usadas mais recentemente ficam decodificadas.
+- **Interface:** título "EFFECTOR" sem serifa numa bolha, versão discreta embaixo; controles de zoom mais espaçados; tela cheia (F) cobre a tela inteira, sem a barra de cima.
+- Testes headless (`--render-test`) não tocam mais na sessão real; novo teste `--multidoc`.
+
 ## 10. Backlog futuro (não fazer agora)
 - Importar paletas .ase (Adobe)
 - Pixel sort e outros glitches
 - Versão para iPad (ver resposta sobre portabilidade na conversa de 24/11/2026)
 - Máscaras (luminância, gradiente, pincel)
-- Várias imagens abertas
 - Lote
 - Export SVG (dither/halftone)
 - Vídeo e animação

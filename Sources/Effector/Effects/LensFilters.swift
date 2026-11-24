@@ -440,7 +440,7 @@ struct HaloEffect: Effect {
 struct LensBlurEffect: Effect {
     let id = "lensblur"
     let name = "Lens Blur & Tilt-Shift"
-    let category = EffectCategory.lens
+    let category = EffectCategory.blur
     var symbol: String { "camera.metering.center.weighted" }
     var summary: String { "Shallow focus: a sharp band (tilt-shift miniature) or a sharp centre with bright bokeh." }
     let params: [ParamDef] = [
