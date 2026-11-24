@@ -49,6 +49,7 @@ final class GlyphAtlas {
         let key = chars + (bold ? "|b" : "|r")
         lock.lock(); defer { lock.unlock() }
         if let c = cache[key] { return c }
+        if cache.count > 32 { cache.removeAll() }   // custom character sets change while typing
         let glyphs = Array(chars).map(String.init)
         let gw = GlyphAtlas.cellW, gh = GlyphAtlas.cellH
         // render each glyph separately to measure density
@@ -111,10 +112,14 @@ struct AsciiEffect: Effect {
         ("geometric", "Geometric", " ·○◎●■"),
         ("letters", "Letters", " ilEFFECTOR"),
         ("matrix", "Matrix", " ｱｲｳｴｵｶｷｸｹｺ"),
+        ("emoji", "Shapes", " ▫◽◻⬜"),
+        ("custom", "Custom…", ""),
     ]
 
     let params: [ParamDef] = [
         .choice("charset", "Characters", AsciiEffect.charsets.map { ($0.0, $0.1) }, "standard", section: "Characters"),
+        ParamDef(key: "customChars", label: "Your Characters (dark → light order is automatic)", kind: .text(def: " .oO@"),
+                 section: "Characters", visible: when("charset", "custom")),
         .slider("cell", "Cell Size", 2, 40, 8, step: 0.5, curve: 1.6, section: "Characters"),
         .slider("aspect", "Cell Height", 100, 250, 180, unit: "%", section: "Characters"),
         .toggle("bold", "Bold", false, section: "Characters"),
@@ -128,6 +133,24 @@ struct AsciiEffect: Effect {
         .slider("brightness", "Brightness", -100, 100, 0, section: "Tone"),
     ]
 
+    var looks: [EffectLook] {
+        [
+            EffectLook(id: "terminal", name: "Green Terminal", values: ["charset": "standard", "fg": RGBA(hex: "#5CFF7A"), "bg": RGBA(hex: "#04110A")]),
+            EffectLook(id: "amber", name: "Amber Terminal", values: ["charset": "detailed", "cell": 6.0, "fg": RGBA(hex: "#FFB000"), "bg": RGBA(hex: "#140A00")]),
+            EffectLook(id: "typewriter", name: "Typewriter", values: ["charset": "detailed", "cell": 6.0, "invert": true,
+                                                                    "fg": RGBA(hex: "#1A1A1A"), "bg": RGBA(hex: "#F2F2F2")]),
+            EffectLook(id: "matrix", name: "Matrix", values: ["charset": "matrix", "cell": 9.0, "fg": RGBA(hex: "#3BFF6E"), "bg": RGBA(hex: "#000000"),
+                                                            "contrast": 40.0]),
+            EffectLook(id: "color", name: "Color Text", values: ["charset": "detailed", "cell": 5.0, "mode": "original", "bg": RGBA(hex: "#000000")]),
+            EffectLook(id: "blocks", name: "Block Art", values: ["charset": "blocks", "cell": 7.0, "aspect": 100.0, "mode": "original"]),
+            EffectLook(id: "braille", name: "Braille Fine", values: ["charset": "braille", "cell": 4.0, "aspect": 150.0]),
+            EffectLook(id: "binary", name: "Binary Code", values: ["charset": "binary", "cell": 8.0, "fg": RGBA(hex: "#29ADFF"), "bg": RGBA(hex: "#020812")]),
+            EffectLook(id: "thermal", name: "Thermal Text", values: ["charset": "standard", "mode": "palette", "cell": 7.0,
+                                                                   "palette": PalettePresets.all.first { $0.name == "Thermal Iron" } ?? PalettePresets.oneBit]),
+            EffectLook(id: "yellow", name: "EFFECTOR", values: ["charset": "letters", "cell": 8.0, "fg": RGBA(hex: "#FFBB00"), "bg": RGBA(hex: "#0A0A0A")]),
+        ]
+    }
+
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
         // whole render pixels per cell so every glyph is drawn identically
         let cw = max(2, ctx.px(p.num("cell", 8)).rounded())
@@ -135,7 +158,13 @@ struct AsciiEffect: Effect {
         let gw = max(1, Int((Double(input.width) / cw).rounded(.up)))
         let gh = max(1, Int((Double(input.height) / ch).rounded(.up)))
         let grid = ctx.resize(input, gw, gh)
-        let set = AsciiEffect.charsets.first { $0.0 == p.choice("charset", "standard") }?.2 ?? " .:-=+*#%@"
+        var set = AsciiEffect.charsets.first { $0.0 == p.choice("charset", "standard") }?.2 ?? " .:-=+*#%@"
+        if p.choice("charset", "standard") == "custom" {
+            // unique characters, always including a blank so dark areas can stay empty
+            var seen = Set<Character>()
+            let chars = (" " + p.text("customChars", " .oO@")).filter { $0 != "\n" && seen.insert($0).inserted }
+            set = chars.count >= 2 ? String(chars) : " .oO@"
+        }
         let (atlas, n) = GlyphAtlas.shared.atlas(chars: set, bold: p.bool("bold"))
         let modeIdx: Float = ["mono": 0, "palette": 1, "original": 2][p.choice("mode", "mono")] ?? 0
         var pal = p.palette("palette") ?? PalettePresets.oneBit

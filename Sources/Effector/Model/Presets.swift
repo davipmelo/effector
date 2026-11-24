@@ -276,7 +276,6 @@ enum FactoryPresets {
             fx("basic", ["exposure": 0.2, "vibrance": 40.0, "highlights": -20.0]),
             fx("gradientmap", opacity: 0.35, blend: .softLight, ["gradient": gradient("Frutiger Aero")]),
             fx("bloom", ["threshold": 65.0, "intensity": 90.0, "radius": 40.0]),
-            fx("plastic", opacity: 0.6, ["intensity": 40.0]),
         ]),
         make("Dreamcore", "Y2K & Digital", [
             fx("gradientmap", opacity: 0.5, blend: .softLight, ["gradient": gradient("Dreamcore")]),
@@ -328,7 +327,6 @@ enum FactoryPresets {
         ]),
         make("Receipt Scan", "Print & Paper", [
             fx("receipt", ["fade": 35.0, "dead": 30.0]),
-            look("paper", "receipt"),
             look("dust", "subtle"),
             fx("vignette", ["amount": 20.0, "color": RGBA(hex: "#000000")]),
         ]),
@@ -337,15 +335,14 @@ enum FactoryPresets {
         ]),
         make("Zine Copy", "Print & Paper", [
             fx("xerox", ["threshold": 58.0, "dither": true, "generations": 2]),
-            look("paper", "fine"),
         ]),
         make("Fax", "Print & Paper", [
             fx("dither", ["algorithm": "atkinson", "pixelSize": 2.0, "contrast": 30.0, "dark": RGBA(hex: "#101010"), "light": RGBA(hex: "#F4F4F4")]),
             fx("xerox", opacity: 0.5, blend: .multiply, ["threshold": 70.0, "edge": 20.0, "streaks": 60.0]),
         ]),
         make("Newspaper", "Print & Paper", [
-            fx("halftone", ["mode": "bw", "cell": 5.0, "angle": 45.0, "ink": RGBA(hex: "#1A1A1A")]),
-            look("paper", "newsprint"),
+            fx("halftone", ["mode": "bw", "cell": 5.0, "angle": 45.0, "ink": RGBA(hex: "#1A1A1A"), "paper": RGBA(hex: "#ECE8DD")]),
+            fx("grain", ["amount": 25.0]),
         ]),
         make("Riso Duo", "Print & Paper", [
             fx("gradientmap", ["gradient": gradient("Duotone · Riso")]),
@@ -358,12 +355,8 @@ enum FactoryPresets {
         ]),
         make("Cyanotype", "Print & Paper", [
             fx("gradientmap", ["gradient": gradient("Cyanotype")]),
-            look("paper", "watercolor"),
+            fx("grain", ["amount": 30.0, "size": 1.5]),
             look("dust", "print", ["opacity": 40.0]),
-        ]),
-        make("Crumpled Print", "Print & Paper", [
-            fx("film", ["stock": "gold200", "grain": 25.0]),
-            look("paper", "crumpled"),
         ]),
 
         // MARK: Dither & pixel
@@ -397,6 +390,43 @@ enum FactoryPresets {
         make("Summer Leak", "Light & Mood", [
             fx("film", ["stock": "portra400", "warmth": 20.0]),
             look("leak", "end"),
+        ]),
+        make("Pro-Mist Portrait", "Light & Mood", [
+            fx("film", ["stock": "portra400", "grain": 25.0]),
+            look("diffusion", "pm4"),
+        ]),
+        make("Black Mist Cinema", "Light & Mood", [
+            fx("film", ["stock": "vision500t", "grain": 30.0]),
+            look("diffusion", "bpm2"),
+            fx("vignette", ["amount": 25.0]),
+        ]),
+        make("Anamorphic Night", "Light & Mood", [
+            fx("film", ["stock": "cinestill800t", "grain": 35.0]),
+            look("anamorphic", "blue"),
+        ]),
+        make("Starry Lights", "Light & Mood", [
+            fx("star", ["points": "6", "spectral": true]),
+            fx("bloom", opacity: 0.6, ["threshold": 75.0, "radius": 25.0]),
+        ]),
+        make("Prism Dream", "Light & Mood", [
+            look("prism", "dreamy"),
+            fx("bloom", opacity: 0.7, ["threshold": 65.0, "radius": 40.0]),
+            fx("grain", ["amount": 20.0]),
+        ]),
+        make("Halo Glow", "Light & Mood", [
+            fx("halo"),
+            look("diffusion", "pm8"),
+        ]),
+        make("Miniature World", "Light & Mood", [
+            look("lensblur", "mini"),
+            fx("basic", ["contrast": 15.0, "vibrance": 25.0]),
+        ]),
+        make("Smooth Motion", "Light & Mood", [
+            fx("trail", ["style": "smooth", "centered": true, "distance": 60.0, "opacity": 100.0, "decay": 85.0, "blend": "normal"]),
+        ]),
+        make("Skate Fisheye", "Analog Video", [
+            look("fisheye", "vx"),
+            look("vhs", "hi8", ["osdBottom": ParamValue.text("SEP 9 2001")]),
         ]),
         make("Ghost Trail", "Light & Mood", [
             fx("trail", ["distance": 90.0, "copies": 10.0, "blend": "screen", "rgbShift": 40.0]),

@@ -2,31 +2,25 @@ import Foundation
 import Metal
 
 enum EffectCategory: String, CaseIterable {
-    case adjust, color, stylize, light, lens, film, texture, glitch, overlay
+    case adjust, stylize, film, lens, glitch, overlay
 
     var label: String {
         switch self {
-        case .adjust: return "Adjustments"
-        case .color: return "Color"
-        case .stylize: return "Dither & Print"
-        case .light: return "Light & Blur"
-        case .lens: return "Lens"
-        case .film: return "Film & Camera"
-        case .texture: return "Texture & Paper"
+        case .adjust: return "Adjust & Color"
+        case .stylize: return "Print & Pixel"
+        case .film: return "Film & Light"
+        case .lens: return "Lens Filters"
         case .glitch: return "Glitch & Retro"
-        case .overlay: return "Tracking & Frames"
+        case .overlay: return "Overlays & Tracking"
         }
     }
 
     var symbol: String {
         switch self {
         case .adjust: return "slider.horizontal.3"
-        case .color: return "paintpalette"
         case .stylize: return "circle.grid.3x3"
-        case .light: return "sun.max"
-        case .lens: return "camera.aperture"
         case .film: return "film"
-        case .texture: return "doc.richtext"
+        case .lens: return "camera.aperture"
         case .glitch: return "tv"
         case .overlay: return "viewfinder"
         }
@@ -68,25 +62,20 @@ extension Effect {
 
 enum EffectRegistry {
     static let all: [Effect] = [
-        // Adjustments
-        BasicAdjustEffect(), CurvesEffect(), HSLEffect(), HueSatEffect(), BlackWhiteEffect(),
+        // Adjust & color
+        BasicAdjustEffect(), CurvesEffect(), HSLEffect(), HueSatEffect(), BlackWhiteEffect(), GradientMapEffect(), LUTEffect(),
         SharpenEffect(), InvertEffect(), PosterizeEffect(), ThresholdEffect(),
-        // Color
-        GradientMapEffect(), LUTEffect(),
-        // Dither & print
-        DitherEffect(), HalftoneEffect(), PhotocopyEffect(), ThermalPrintEffect(), AsciiEffect(),
-        // Light & blur
-        GlowEffect(), BloomEffect(), HalationEffect(), LightLeakEffect(), BlurEffect(), TrailEffect(),
-        // Lens
-        ChromaticAberrationEffect(), VignetteEffect(),
-        // Film & camera
-        FilmEffect(), GrainEffect(), DigicamEffect(),
-        // Texture
-        DustEffect(), PaperEffect(), PlasticEffect(),
+        // Print & pixel
+        DitherEffect(), HalftoneEffect(), AsciiEffect(), PhotocopyEffect(), ThermalPrintEffect(),
+        // Film & light
+        FilmEffect(), GrainEffect(), GlowEffect(), BloomEffect(), HalationEffect(), LightLeakEffect(),
+        // Lens filters
+        DiffusionEffect(), AnamorphicEffect(), StarFilterEffect(), PrismEffect(), HaloEffect(),
+        ChromaticAberrationEffect(), LensBlurEffect(), FisheyeEffect(), VignetteEffect(), BlurEffect(),
         // Glitch & retro
-        VHSEffect(), CRTEffect(), JPEGEffect(),
-        // Tracking & frames
-        BlobTrackerEffect(), FrameEffect(),
+        VHSEffect(), CRTEffect(), DigicamEffect(), JPEGEffect(), TrailEffect(),
+        // Overlays & tracking
+        DustEffect(), FrameEffect(), BlobTrackerEffect(),
     ]
 
     private static let byID: [String: Effect] = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })

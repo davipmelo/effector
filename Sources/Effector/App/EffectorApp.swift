@@ -6,6 +6,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         AppSettings.shared.applyTheme()
         ShortcutStore.shared.install()
         NSApp.activate()
+        // give a file opened from Finder a moment to arrive before restoring the previous session
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { AppState.shared.restoreSession() }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -16,7 +18,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        AppState.shared.confirmDiscardChanges() ? .terminateNow : .terminateCancel
+        // With session restore on, unsaved work comes back on the next launch: no need to ask.
+        if AppSettings.shared.reopenLastSession { AppState.shared.saveSession(sync: true); return .terminateNow }
+        return AppState.shared.confirmDiscardChanges() ? .terminateNow : .terminateCancel
     }
 }
 
@@ -91,11 +95,16 @@ struct EffectorApp: App {
             item(.group, disabled: !app.hasImage)
             item(.ungroup, disabled: app.selectedLayer?.isGroup != true)
             item(.duplicate, disabled: app.selectedID == nil)
-            item(.delete, disabled: app.selectedID == nil)
-            item(.toggleVisibility, disabled: app.selectedID == nil)
+            item(.delete, disabled: app.selectedIDs.isEmpty)
+            item(.toggleVisibility, disabled: app.selectedIDs.isEmpty)
             Divider()
             item(.moveUp, disabled: app.selectedID == nil)
             item(.moveDown, disabled: app.selectedID == nil)
+        }
+        CommandGroup(after: .pasteboard) {
+            Button(tr("Select All Layers")) { AppState.shared.selectAllLayers() }
+                .keyboardShortcut("a", modifiers: [.command, .option])
+                .disabled(!app.hasImage)
         }
         CommandGroup(after: .toolbar) {
             item(.zoomIn); item(.zoomOut)

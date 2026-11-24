@@ -4,38 +4,34 @@ struct MainView: View {
     @ObservedObject var app = AppState.shared
     @ObservedObject var settings = AppSettings.shared
     @ObservedObject var shortcuts = ShortcutStore.shared
+    @AppStorage("leftWidth") private var leftWidth = 270.0
+    @AppStorage("rightWidth") private var rightWidth = 300.0
 
     var body: some View {
         let _ = settings.languageRevision
-        HStack(spacing: 0) {
-            sidebar
-                .frame(width: 270)
-            Rectangle().fill(Theme.separator).frame(width: 1)
-            CanvasContainer()
-                .frame(minWidth: 400, maxWidth: .infinity, maxHeight: .infinity)
-            Rectangle().fill(Theme.separator).frame(width: 1)
-            InspectorView()
-                .frame(width: 300)
+        GeometryReader { geo in
+            let total = geo.size.width
+            // keep at least 420 pt for the canvas
+            let maxLeft = max(200, min(480, total - rightWidth - 420))
+            let maxRight = max(240, min(520, total - leftWidth - 420))
+            let lw = min(max(leftWidth, 200), maxLeft)
+            let rw = min(max(rightWidth, 240), maxRight)
+            HStack(spacing: 0) {
+                sidebar
+                    .frame(width: lw)
+                ResizeHandle(width: $leftWidth, range: 200...maxLeft, sign: 1)
+                CanvasContainer()
+                    .frame(minWidth: 300, maxWidth: .infinity, maxHeight: .infinity)
+                ResizeHandle(width: $rightWidth, range: 240...maxRight, sign: -1)
+                InspectorView()
+                    .frame(width: rw)
+            }
+            .overlay(alignment: .topLeading) { panels(left: lw) }
         }
         .id(settings.languageRevision)
         .background(Theme.panelBG)
-        .overlay(alignment: .topLeading) {
-            if app.showEffectBrowser {
-                ZStack(alignment: .topLeading) {
-                    Color.black.opacity(0.18).ignoresSafeArea()
-                        .onTapGesture { app.showEffectBrowser = false }
-                    EffectBrowser()
-                        .frame(maxHeight: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.separator))
-                        .shadow(color: .black.opacity(0.45), radius: 28, y: 10)
-                        .padding(.leading, 278)
-                        .padding(.vertical, 8)
-                        .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .topLeading)))
-                }
-            }
-        }
         .animation(.snappy(duration: 0.18), value: app.showEffectBrowser)
+        .animation(.snappy(duration: 0.18), value: app.showPresetBrowser)
         .overlay {
             if app.showCommandPalette {
                 ZStack(alignment: .top) {
@@ -53,6 +49,27 @@ struct MainView: View {
         .tint(Theme.accent)
     }
 
+    @ViewBuilder
+    private func panels(left: Double) -> some View {
+        if app.showEffectBrowser || app.showPresetBrowser {
+            ZStack(alignment: .topLeading) {
+                Color.black.opacity(0.18).ignoresSafeArea()
+                    .padding(.leading, left)
+                    .onTapGesture { app.showEffectBrowser = false; app.showPresetBrowser = false }
+                Group {
+                    if app.showEffectBrowser { EffectBrowser() } else { PresetBrowser() }
+                }
+                .frame(maxHeight: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.separator))
+                .shadow(color: .black.opacity(0.45), radius: 28, y: 10)
+                .padding(.leading, left + 8)
+                .padding(.vertical, 8)
+                .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .topLeading)))
+            }
+        }
+    }
+
     private var title: String {
         if let u = app.projectURL { return u.deletingPathExtension().lastPathComponent }
         return app.source?.fileName ?? "EFFECTOR"
@@ -67,31 +84,9 @@ struct MainView: View {
     private var sidebar: some View {
         VStack(spacing: 0) {
             AppHeader()
-            HStack(spacing: 2) {
-                tabButton(tr("Layers"), "square.3.layers.3d", 0)
-                tabButton(tr("Presets"), "wand.and.stars", 1)
-            }
-            .padding(3)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Theme.field))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            Rectangle().fill(Theme.separator).frame(height: 1)
-            if app.sidebarTab == 0 { LayersPanel() } else { PresetsPanel() }
+            LayersPanel()
         }
         .background(Theme.panelBG)
-    }
-
-    private func tabButton(_ title: String, _ symbol: String, _ tag: Int) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: symbol).font(.system(size: 11))
-            Text(title).font(.system(size: 12, weight: app.sidebarTab == tag ? .semibold : .regular))
-        }
-        .foregroundStyle(app.sidebarTab == tag ? Theme.text : Theme.textDim)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 5)
-        .background(RoundedRectangle(cornerRadius: 6).fill(app.sidebarTab == tag ? Theme.fieldStrong : .clear))
-        .contentShape(Rectangle())
-        .onTapGesture { app.sidebarTab = tag }
     }
 
     @ToolbarContentBuilder
@@ -106,6 +101,7 @@ struct MainView: View {
         ToolbarItemGroup(placement: .principal) {
             HStack(spacing: 2) {
                 Button { app.zoomOut() } label: { Image(systemName: "minus") }.buttonStyle(.borderless)
+                    .help(tr("Zoom Out") + "  ⌘-")
                 Menu {
                     Button(tr("Fit to Window")) { app.setZoom(nil) }
                     Button("50%") { app.setZoom(0.5 / app.backingScale) }
@@ -120,7 +116,9 @@ struct MainView: View {
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .fixedSize()
+                .help(tr("Zoom level · Z fits the image"))
                 Button { app.zoomIn() } label: { Image(systemName: "plus") }.buttonStyle(.borderless)
+                    .help(tr("Zoom In") + "  ⌘=")
             }
             .padding(.horizontal, 8)
             .disabled(!app.hasImage)
@@ -168,5 +166,37 @@ struct AppHeader: View {
         .padding(.horizontal, 12)
         .frame(height: 44)
         .overlay(alignment: .bottom) { Rectangle().fill(Theme.separator).frame(height: 1) }
+    }
+}
+
+/// Draggable divider between the panels and the canvas.
+struct ResizeHandle: View {
+    @Binding var width: Double
+    let range: ClosedRange<Double>
+    let sign: Double
+    @State private var start: Double?
+    @State private var hover = false
+
+    var body: some View {
+        Rectangle().fill(hover || start != nil ? Theme.accent.opacity(0.6) : Theme.separator)
+            .frame(width: 1)
+            .overlay(
+                Color.clear
+                    .frame(width: 9)
+                    .contentShape(Rectangle())
+                    .onHover { h in
+                        hover = h
+                        if h { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
+                    }
+                    .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                        .onChanged { g in
+                            if start == nil { start = min(max(width, range.lowerBound), range.upperBound) }
+                            width = min(max((start ?? width) + g.translation.width * sign, range.lowerBound), range.upperBound)
+                        }
+                        .onEnded { _ in start = nil })
+                    .onTapGesture(count: 2) { width = sign > 0 ? 270 : 300 }
+                    .help(tr("Drag to resize · double-click to reset"))
+            )
+            .zIndex(5)
     }
 }

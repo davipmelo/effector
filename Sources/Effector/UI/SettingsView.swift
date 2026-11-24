@@ -30,6 +30,12 @@ struct GeneralSettings: View {
             }
             .pickerStyle(.segmented)
             Section {
+                Toggle(tr("Reopen the last image and layers on launch"), isOn: $settings.reopenLastSession)
+                Toggle(tr("Preview effects and presets on hover"), isOn: $settings.hoverPreview)
+                Text(tr("Settings, shortcuts, favorites, presets, palettes, gradients and LUTs are always saved automatically."))
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+            }
+            Section {
                 Toggle(tr("Show built-in presets"), isOn: Binding(get: { PresetStore.shared.factoryVisible },
                                                                   set: { PresetStore.shared.setFactoryVisible($0) }))
             }

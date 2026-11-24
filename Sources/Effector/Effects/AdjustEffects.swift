@@ -332,7 +332,7 @@ struct ThresholdEffect: Effect {
 struct BlurEffect: Effect {
     let id = "blur"
     let name = "Blur"
-    let category = EffectCategory.light
+    let category = EffectCategory.lens
     var symbol: String { "aqi.medium" }
     var summary: String { "Gaussian blur." }
     let params: [ParamDef] = [.slider("radius", "Radius", 0, 200, 8, unit: "", curve: 2.2)]

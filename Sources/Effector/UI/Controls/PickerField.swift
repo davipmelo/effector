@@ -98,10 +98,15 @@ struct PickerField: View {
             case .upArrow: step(-1); return .handled
             case .downArrow: step(1); return .handled
             case .space, .return: open = true; return .handled
-            default: return .ignored
+            default:
+                switch press.characters.lowercased() {
+                case "w": step(-1); return .handled
+                case "s": step(1); return .handled
+                default: return .ignored
+                }
             }
         }
-        .help(tr("Click to choose · ↑↓ to browse"))
+        .help(tr("Click to choose · ↑↓ or W/S to browse"))
         .popover(isPresented: $open, arrowEdge: .bottom) {
             PickerList(scope: scope, items: items, initial: selected, actions: actions, onSelect: onSelect) {
                 open = false
@@ -200,7 +205,7 @@ struct PickerList: View {
                 .padding(.vertical, 4)
             }
             Rectangle().fill(Theme.separator).frame(height: 1)
-            Text(tr("↑↓ browse · ↩ keep · ⎋ revert · ★ favorite"))
+            Text(tr("↑↓ / W S browse · ↩ keep · ⎋ revert · ★ favorite"))
                 .font(.system(size: 9.5)).foregroundStyle(Theme.textFaint)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 5)
@@ -237,6 +242,8 @@ struct PickerList: View {
             revertAndClose(); return .handled
         default:
             let ch = press.characters.lowercased()
+            if ch == "w" { move(-1, rows); return .handled }
+            if ch == "s" { move(1, rows); return .handled }
             guard ch.count == 1, let c = ch.first, c.isLetter || c.isNumber else { return .ignored }
             if Date().timeIntervalSince(typedAt) > 0.9 { typed = "" }
             typed += ch; typedAt = Date()

@@ -52,6 +52,10 @@ final class AppSettings: ObservableObject {
     @Published var exportFormat: ImageExport.Format { didSet { d.set(exportFormat.rawValue, forKey: "exportFormat") } }
     @Published var exportQuality: Double { didSet { d.set(exportQuality, forKey: "exportQuality") } }
     @Published var exportScale: Int { didSet { d.set(exportScale, forKey: "exportScale") } }
+    /// Reopen the last image and its layers when the app starts.
+    @Published var reopenLastSession: Bool { didSet { d.set(reopenLastSession, forKey: "reopenLastSession") } }
+    /// Hovering effects / presets previews them on the image.
+    @Published var hoverPreview: Bool { didSet { d.set(hoverPreview, forKey: "hoverPreview") } }
     /// Bumped when the language changes so views re-render.
     @Published var languageRevision = 0
 
@@ -61,6 +65,8 @@ final class AppSettings: ObservableObject {
         exportFormat = ImageExport.Format(rawValue: d.string(forKey: "exportFormat") ?? "") ?? .png
         exportQuality = d.object(forKey: "exportQuality") as? Double ?? 0.92
         exportScale = d.object(forKey: "exportScale") as? Int ?? 1
+        reopenLastSession = d.object(forKey: "reopenLastSession") as? Bool ?? true
+        hoverPreview = d.object(forKey: "hoverPreview") as? Bool ?? true
         applyLanguage()
     }
 

@@ -6,7 +6,9 @@ struct InspectorView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if let layer = app.selectedLayer {
+            if app.isMultiSelection {
+                MultiInspector()
+            } else if let layer = app.selectedLayer {
                 LayerInspector(layer: layer)
                     .id(layer.id)
             } else {
@@ -15,6 +17,52 @@ struct InspectorView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Theme.panelBG)
+    }
+}
+
+/// Shared settings for several selected layers.
+struct MultiInspector: View {
+    @ObservedObject var app = AppState.shared
+    var body: some View {
+        let nodes = app.selectionRoots.compactMap { app.state.layers.find($0) }
+        let opacity = nodes.map(\.opacity).reduce(0, +) / Double(max(1, nodes.count))
+        let blend = Set(nodes.map(\.blend)).count == 1 ? nodes.first?.blend.rawValue ?? "normal" : ""
+        VStack(spacing: 0) {
+            header(tr("%d layers selected", app.selectedIDs.count), symbol: "square.stack.3d.up")
+            ScrollView {
+                VStack(spacing: 0) {
+                    PanelSection(title: "Layers") {
+                        ChoiceRow(label: "Blend", options: BlendMode.menuOrder.map { ChoiceOption(id: $0.rawValue, label: $0.label, group: $0.group) },
+                                  selected: blend, scope: "blend") { v in
+                            app.updateSelected { $0.blend = BlendMode(rawValue: v) ?? .normal }
+                        }
+                        ValueSlider(label: "Opacity", value: opacity * 100, range: 0...100, defaultValue: 100, step: 1, unit: "%") { v in
+                            app.updateSelected(coalesce: "multi-opacity") { $0.opacity = v / 100 }
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 8) {
+                            Button { app.groupSelected() } label: { Label(tr("Group"), systemImage: "folder.badge.plus") }
+                                .help(tr("Group selected layers (⌘G)"))
+                            Button { app.duplicateSelected() } label: { Label(tr("Duplicate"), systemImage: "plus.square.on.square") }
+                                .help(tr("Duplicate (⌘D)"))
+                        }
+                        HStack(spacing: 8) {
+                            Button { app.toggleSelectedVisibility() } label: { Label(tr("Show / Hide"), systemImage: "eye") }
+                                .help(tr("Show / Hide") + " (H)")
+                            Button(role: .destructive) { app.deleteSelected() } label: { Label(tr("Delete"), systemImage: "trash") }
+                                .help(tr("Delete") + " (⌘⌫)")
+                        }
+                        Text(tr("⇧-click selects a range, ⌘-click adds or removes one layer. Drag any selected layer to move them all."))
+                            .font(.system(size: 11)).foregroundStyle(Theme.textFaint)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 4)
+                    }
+                    .buttonStyle(PillButtonStyle())
+                    .padding(14)
+                }
+            }
+        }
     }
 }
 

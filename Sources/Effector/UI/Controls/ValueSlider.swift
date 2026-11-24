@@ -17,6 +17,7 @@ struct ValueSlider: View {
     let onChange: (Double) -> Void
 
     @State private var dragStart: Double?   // slider position (0…1) at drag start
+    @State private var resetting = false
     @State private var editing = false
     @State private var text = ""
     @State private var hover = false
@@ -48,6 +49,8 @@ struct ValueSlider: View {
         VStack(alignment: .leading, spacing: 5) {
             HStack {
                 Text(tr(label)).font(Theme.labelFont).foregroundStyle(Theme.textDim)
+                    .onTapGesture(count: 2) { onChange(defaultValue) }
+                    .help(tr("Double-click to reset"))
                 Spacer()
                 if editing {
                     TextField("", text: $text)
@@ -60,6 +63,7 @@ struct ValueSlider: View {
                         .onChange(of: focused) { _, f in if !f { commitText() } }
                 } else {
                     Text(formatted)
+                        .help(tr("Click to type a value"))
                         .font(Theme.valueFont)
                         .foregroundStyle(abs(value - defaultValue) > 1e-9 ? Theme.text : Theme.textFaint)
                         .onTapGesture {
@@ -95,7 +99,14 @@ struct ValueSlider: View {
                 .gesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { g in
+                            if resetting { return }
                             let fine = NSEvent.modifierFlags.contains(.option)
+                            if dragStart == nil, (NSApp.currentEvent?.clickCount ?? 1) >= 2 {
+                                // double-click anywhere on the track: back to the default
+                                resetting = true
+                                onChange(defaultValue)
+                                return
+                            }
                             if dragStart == nil {
                                 if fine {
                                     dragStart = fraction
@@ -109,11 +120,11 @@ struct ValueSlider: View {
                             let dx = Double(g.translation.width / w) * (fine ? 0.1 : 1)
                             set(value(at: (dragStart ?? fraction) + dx))
                         }
-                        .onEnded { _ in dragStart = nil }
+                        .onEnded { _ in dragStart = nil; resetting = false }
                 )
-                .simultaneousGesture(TapGesture(count: 2).onEnded { onChange(defaultValue) })
             }
             .frame(height: 14)
+            .help(tr("Drag to change · ⌥ for fine control · double-click to reset"))
         }
         .onHover { hover = $0 }
     }
@@ -218,6 +229,7 @@ struct ColorRow: View {
             Text(color.hex).font(Theme.valueFont).foregroundStyle(Theme.textFaint)
             ColorPicker("", selection: Binding(get: { color.color }, set: { onChange(RGBA($0)) }), supportsOpacity: false)
                 .labelsHidden()
+                .help(tr("Choose a color"))
                 .frame(width: 34)
         }
     }

@@ -61,6 +61,7 @@ struct PanelSection<Content: View>: View {
             .padding(.vertical, 9)
             .contentShape(Rectangle())
             .onTapGesture { withAnimation(.snappy(duration: 0.2)) { open.toggle() } }
+            .help(open ? tr("Collapse section") : tr("Expand section"))
             if open {
                 VStack(alignment: .leading, spacing: 10) { content() }
                     .padding(.horizontal, 14)

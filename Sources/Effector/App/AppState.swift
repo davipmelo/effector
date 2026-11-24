@@ -17,8 +17,17 @@ final class AppState: ObservableObject {
     @Published var state = DocumentState() { didSet { if state != oldValue { stateChanged(old: oldValue) } } }
     @Published var projectURL: URL?
     @Published var isDirty = false
-    @Published var selectedID: UUID?
+    /// Primary selection (shown in the inspector). Setting it directly collapses a multi-selection.
+    @Published var selectedID: UUID? {
+        didSet { if !extendingSelection { selectedIDs = selectedID.map { [$0] } ?? [] } }
+    }
+    /// All selected layers (shift/⌘-click).
+    @Published var selectedIDs: Set<UUID> = []
+    private var extendingSelection = false
+    private var selectionAnchor: UUID?
     @Published var soloID: UUID? { didSet { requestRender() } }
+    /// Temporary layers drawn on top while hovering / browsing effects and presets (not part of the document).
+    @Published var previewLayers: [LayerNode]? { didSet { requestRender() } }
 
     // View
     @Published var showOriginal = false
@@ -33,11 +42,11 @@ final class AppState: ObservableObject {
     @Published var isCropping = false
     @Published var cropDraft = CropRect.full
     @Published var cropAspect: String = "free"
-    @Published var showEffectBrowser = false
+    @Published var showEffectBrowser = false { didSet { if !showEffectBrowser { previewLayers = nil }; if showEffectBrowser { showPresetBrowser = false } } }
+    @Published var showPresetBrowser = false { didSet { if !showPresetBrowser { previewLayers = nil }; if showPresetBrowser { showEffectBrowser = false } } }
     @Published var showCommandPalette = false
     @Published var showExport = false
     @Published var isExporting = false
-    @Published var sidebarTab = 0 // 0 layers, 1 presets
     @Published var effectThumbs: [String: CGImage] = [:]
     @Published var toast: String?
 
@@ -70,6 +79,8 @@ final class AppState: ObservableObject {
 
     func openImage(_ img: SourceImage) {
         source = img
+        previewLayers = nil
+        if !restoringSession && AppSettings.shared.reopenLastSession { writeSessionOriginal(img) }
         suppressUndo = true
         state = DocumentState()
         suppressUndo = false
@@ -85,6 +96,80 @@ final class AppState: ObservableObject {
         updatePreviewScale(force: true)
         regenerateThumbnails()
         objectWillChange.send()
+        scheduleSessionSave()
+    }
+
+    // MARK: - Session (reopened on next launch)
+
+    private struct SessionFile: Codable {
+        var fileName: String
+        var originalFile: String
+        var state: DocumentState
+        var projectPath: String?
+        var dirty: Bool
+    }
+    private var restoringSession = false
+    private var sessionWork: DispatchWorkItem?
+    private let sessionQueue = DispatchQueue(label: "effector.session", qos: .utility)
+
+    private var sessionDir: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let d = base.appendingPathComponent("EFFECTOR/Session", isDirectory: true)
+        try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+        return d
+    }
+
+    private func writeSessionOriginal(_ src: SourceImage) {
+        let dir = sessionDir
+        let ext = (src.fileName as NSString).pathExtension.isEmpty ? "png" : (src.fileName as NSString).pathExtension.lowercased()
+        let data = src.data
+        sessionQueue.async {
+            let fm = FileManager.default
+            for f in (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? [] { try? fm.removeItem(at: f) }
+            try? data.write(to: dir.appendingPathComponent("original." + ext), options: .atomic)
+        }
+    }
+
+    func scheduleSessionSave() {
+        guard !restoringSession, AppSettings.shared.reopenLastSession else { return }
+        sessionWork?.cancel()
+        let w = DispatchWorkItem { [weak self] in self?.saveSession() }
+        sessionWork = w
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: w)
+    }
+
+    func saveSession(sync: Bool = false) {
+        guard let src = source else { return }
+        let ext = (src.fileName as NSString).pathExtension.isEmpty ? "png" : (src.fileName as NSString).pathExtension.lowercased()
+        let f = SessionFile(fileName: src.fileName, originalFile: "original." + ext, state: state,
+                            projectPath: projectURL?.path, dirty: isDirty)
+        let url = sessionDir.appendingPathComponent("session.json")
+        let work = { if let d = try? JSONEncoder().encode(f) { try? d.write(to: url, options: .atomic) } }
+        if sync { sessionQueue.sync(execute: work) } else { sessionQueue.async(execute: work) }
+    }
+
+    /// Reopens the image and layers that were open when the app last quit.
+    @discardableResult
+    func restoreSession() -> Bool {
+        guard AppSettings.shared.reopenLastSession, !hasImage else { return false }
+        let dir = sessionDir
+        guard let d = try? Data(contentsOf: dir.appendingPathComponent("session.json")),
+              let f = try? JSONDecoder().decode(SessionFile.self, from: d),
+              let data = try? Data(contentsOf: dir.appendingPathComponent(f.originalFile)),
+              let img = try? SourceImage.load(data: data, fileName: f.fileName,
+                                              typeHint: UTType(filenameExtension: (f.originalFile as NSString).pathExtension)) else { return false }
+        restoringSession = true
+        openImage(img)
+        suppressUndo = true
+        state = f.state
+        suppressUndo = false
+        projectURL = f.projectPath.map { URL(fileURLWithPath: $0) }
+        isDirty = f.dirty
+        sourceTexCache = nil
+        updatePreviewScale(force: true)
+        regenerateThumbnails()
+        restoringSession = false
+        return true
     }
 
     func open(url: URL) {
@@ -161,6 +246,7 @@ final class AppState: ObservableObject {
 
     private func stateChanged(old: DocumentState) {
         isDirty = true
+        scheduleSessionSave()
         if old.crop != state.crop { sourceTexCache = nil; updatePreviewScale(force: true) }
         requestRender()
     }
@@ -207,12 +293,64 @@ final class AppState: ObservableObject {
         updateLayer(id, coalesce: coalesce ? "\(id)-\(key)" : nil) { $0.params[key] = value }
     }
 
+    // MARK: Selection
+
+    var isMultiSelection: Bool { selectedIDs.count > 1 }
+
+    /// Click on a layer row: plain = select, ⇧ = range, ⌘ = toggle.
+    func click(_ id: UUID) {
+        let f = NSEvent.modifierFlags
+        if f.contains(.shift), let anchor = selectionAnchor ?? selectedID {
+            let order = state.layers.flattened().map(\.node.id)
+            if let a = order.firstIndex(of: anchor), let b = order.firstIndex(of: id) {
+                extendingSelection = true
+                selectedIDs = Set(order[min(a, b)...max(a, b)])
+                selectedID = id
+                extendingSelection = false
+                return
+            }
+        }
+        if f.contains(.command) {
+            extendingSelection = true
+            if selectedIDs.contains(id) {
+                selectedIDs.remove(id)
+                if selectedID == id { selectedID = order(selectedIDs).first }
+            } else {
+                selectedIDs.insert(id)
+                selectedID = id
+            }
+            extendingSelection = false
+            selectionAnchor = id
+            return
+        }
+        selectedID = id
+        selectionAnchor = id
+    }
+
+    func selectAllLayers() {
+        let all = state.layers.flattened().map(\.node.id)
+        extendingSelection = true
+        selectedIDs = Set(all)
+        selectedID = all.first
+        extendingSelection = false
+    }
+
+    /// Every node id, depth-first, top-first.
+    private func allIDs(_ nodes: [LayerNode]) -> [UUID] { nodes.flatMap { [$0.id] + allIDs($0.children) } }
+    private func order(_ ids: Set<UUID>) -> [UUID] { allIDs(state.layers).filter { ids.contains($0) } }
+
+    /// Selected nodes that are not inside another selected node, top-first.
+    var selectionRoots: [UUID] {
+        let sel = selectedIDs.isEmpty ? Set(selectedID.map { [$0] } ?? []) : selectedIDs
+        return order(sel).filter { id in !sel.contains { other in other != id && state.layers.contains(id, inside: other) } }
+    }
+
     func deleteSelected() {
-        guard let id = selectedID else { return }
-        let loc = state.layers.location(of: id)
-        edit { $0.layers.remove(id) }
-        if soloID == id { soloID = nil }
-        // select a neighbour
+        let roots = selectionRoots
+        guard let first = roots.first else { return }
+        let loc = state.layers.location(of: first)
+        edit { s in for id in roots { _ = s.layers.remove(id) } }
+        if let s = soloID, roots.contains(s) || roots.contains(where: { state.layers.contains(s, inside: $0) }) { soloID = nil }
         if let loc {
             let siblings = loc.parent.flatMap { state.layers.find($0)?.children } ?? state.layers
             if siblings.isEmpty { selectedID = loc.parent } else { selectedID = siblings[min(loc.index, siblings.count - 1)].id }
@@ -220,27 +358,60 @@ final class AppState: ObservableObject {
     }
 
     func duplicateSelected() {
-        guard let id = selectedID, let n = state.layers.find(id), let loc = state.layers.location(of: id) else { return }
-        var copy = n.reidentified()
-        copy.name = n.name + " " + tr("copy")
-        edit { $0.layers.insert(copy, parent: loc.parent, index: loc.index) }
-        selectedID = copy.id
+        let roots = selectionRoots
+        guard !roots.isEmpty else { return }
+        var copies: [UUID] = []
+        edit { s in
+            for id in roots {
+                guard let n = s.layers.find(id), let loc = s.layers.location(of: id) else { continue }
+                var copy = n.reidentified()
+                copy.name = n.name + " " + tr("copy")
+                s.layers.insert(copy, parent: loc.parent, index: loc.index)
+                copies.append(copy.id)
+            }
+        }
+        extendingSelection = true
+        selectedIDs = Set(copies)
+        selectedID = copies.first
+        extendingSelection = false
     }
 
+    /// Groups the selection (all selected layers go into one new group, keeping their order).
     func groupSelected() {
         guard hasImage else { return }
-        guard let id = selectedID, let n = state.layers.find(id), let loc = state.layers.location(of: id) else {
+        let roots = selectionRoots
+        guard let first = roots.first, let loc = state.layers.location(of: first) else {
             let g = LayerNode.group(tr("Group"), [])
             edit { $0.layers.insert(g, at: 0) }
             selectedID = g.id
             return
         }
-        let g = LayerNode.group(tr("Group"), [n])
+        let nodes = roots.compactMap { state.layers.find($0) }
+        let g = LayerNode.group(tr("Group"), nodes)
         edit { s in
-            s.layers.remove(id)
-            s.layers.insert(g, parent: loc.parent, index: loc.index)
+            for id in roots { _ = s.layers.remove(id) }
+            let parentOK = loc.parent.map { s.layers.find($0) != nil } ?? true
+            if parentOK {
+                let count = loc.parent.flatMap { s.layers.find($0)?.children.count } ?? s.layers.count
+                s.layers.insert(g, parent: loc.parent, index: min(loc.index, count))
+            } else {
+                s.layers.insert(g, at: 0)
+            }
         }
         selectedID = g.id
+    }
+
+    /// Applies a change to every selected layer as one undo step.
+    func updateSelected(coalesce: String? = nil, _ body: (inout LayerNode) -> Void) {
+        let ids = selectionRoots
+        edit(coalesce) { s in for id in ids { s.layers.update(id, body) } }
+    }
+
+    func toggleSelectedVisibility() {
+        let ids = selectionRoots
+        guard let first = ids.first.flatMap({ state.layers.find($0) }) else { return }
+        let on = !first.enabled
+        edit { s in for id in ids { s.layers.update(id) { $0.enabled = on } } }
     }
 
     func ungroupSelected() {
@@ -280,26 +451,33 @@ final class AppState: ObservableObject {
     enum DropPosition { case above, below, inside }
 
     /// Moves `id` relative to `target`.
-    func move(_ id: UUID, to target: UUID, _ pos: DropPosition) {
-        guard id != target, !state.layers.contains(target, inside: id) else { return }
+    func move(_ id: UUID, to target: UUID, _ pos: DropPosition) { move([id], to: target, pos) }
+
+    /// Moves several layers (kept in order) relative to `target`.
+    func move(_ ids: [UUID], to target: UUID, _ pos: DropPosition) {
+        let ids = ids.filter { $0 != target && !state.layers.contains(target, inside: $0) }
+        guard !ids.isEmpty else { return }
         edit { s in
-            guard let node = s.layers.remove(id) else { return }
-            guard let loc = s.layers.location(of: target) else { s.layers.insert(node, at: 0); return }
-            switch pos {
-            case .above: s.layers.insert(node, parent: loc.parent, index: loc.index)
-            case .below: s.layers.insert(node, parent: loc.parent, index: loc.index + 1)
-            case .inside: s.layers.insert(node, parent: target, index: 0)
+            let nodes = ids.compactMap { s.layers.remove($0) }
+            guard let loc = s.layers.location(of: target) else { for n in nodes.reversed() { s.layers.insert(n, at: 0) }; return }
+            for (i, n) in nodes.enumerated() {
+                switch pos {
+                case .above: s.layers.insert(n, parent: loc.parent, index: loc.index + i)
+                case .below: s.layers.insert(n, parent: loc.parent, index: loc.index + 1 + i)
+                case .inside: s.layers.insert(n, parent: target, index: i)
+                }
             }
         }
         if pos == .inside { updateLayerSilently(target) { $0.expanded = true } }
     }
 
-    func moveToRootBottom(_ id: UUID) {
+    func moveToRootBottom(_ ids: [UUID]) {
         edit { s in
-            guard let n = s.layers.remove(id) else { return }
-            s.layers.append(n)
+            let nodes = ids.compactMap { s.layers.remove($0) }
+            s.layers.append(contentsOf: nodes)
         }
     }
+
 
     /// Move selected layer up / down among siblings (keyboard).
     func nudgeSelected(_ delta: Int) {
@@ -327,6 +505,23 @@ final class AppState: ObservableObject {
         guard let n = promptText(tr("Save as Preset"), tr("Name"), tr("My Preset")) else { return }
         PresetStore.shared.add(name: n, layers: state.layers, thumbnail: renderThumbnail(layers: state.layers, size: 240))
         flash(tr("Preset saved: %@", n))
+    }
+
+    private var hoverWork: DispatchWorkItem?
+    /// Temporary preview while hovering / browsing (nil clears it, with a short delay so moving
+    /// between cards doesn't flicker back to the original).
+    func hoverPreview(_ layers: [LayerNode]?) {
+        guard AppSettings.shared.hoverPreview || layers == nil else { return }
+        hoverWork?.cancel()
+        let w = DispatchWorkItem { [weak self] in self?.previewLayers = layers }
+        hoverWork = w
+        DispatchQueue.main.asyncAfter(deadline: .now() + (layers == nil ? 0.18 : 0.06), execute: w)
+    }
+
+    func presetPreviewLayers(_ p: Preset) -> [LayerNode] {
+        var g = LayerNode.group(p.displayName, p.layers)
+        g.expanded = false
+        return [g]
     }
 
     func applyPreset(_ preset: Preset) {
@@ -364,6 +559,7 @@ final class AppState: ObservableObject {
         isRendering = true
         var layers = state.layers
         if let solo = soloID, let n = layers.find(solo) { var n = n; n.enabled = true; n.opacity = 1; n.blend = .normal; layers = [n] }
+        if let pv = previewLayers { layers = pv + layers }
         let crop = state.crop
         let scale = currentScale()
         renderQueue.async { [weak self] in
@@ -527,6 +723,7 @@ final class AppState: ObservableObject {
             projectURL = url
             isDirty = false
             NSDocumentController.shared.noteNewRecentDocumentURL(url)
+            scheduleSessionSave()
             flash(tr("Saved"))
         } catch {
             alert(tr("Could not save"), error.localizedDescription)

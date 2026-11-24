@@ -57,7 +57,7 @@ enum GlowPipeline {
 struct GlowEffect: Effect {
     let id = "glow"
     let name = "Glow"
-    let category = EffectCategory.light
+    let category = EffectCategory.film
     var symbol: String { "sun.max" }
     var summary: String { "Soft diffusion: the whole image (above a low threshold) gets a dreamy haze." }
     let params: [ParamDef] = [
@@ -79,7 +79,7 @@ struct GlowEffect: Effect {
 struct BloomEffect: Effect {
     let id = "bloom"
     let name = "Bloom"
-    let category = EffectCategory.light
+    let category = EffectCategory.film
     var symbol: String { "sparkles" }
     var summary: String { "Only the brightest highlights spill light, in several sizes, like a lens." }
     let params: [ParamDef] = [
@@ -100,7 +100,7 @@ struct BloomEffect: Effect {
 struct HalationEffect: Effect {
     let id = "halation"
     let name = "Halation"
-    let category = EffectCategory.light
+    let category = EffectCategory.film
     var symbol: String { "circle.dotted.and.circle" }
     var summary: String { "Red-orange fringe around highlights, from light bouncing in the film base." }
     let params: [ParamDef] = [
@@ -132,6 +132,45 @@ enum TrailShaders {
         float ang = u[1] * 0.0174533;
         float2 dir = float2(cos(ang), -sin(ang)) * u[2] / size;
         float2 center = float2(u[7], u[8]);
+        if (u[10] > 0.5) {
+            // smooth: a continuous trail (many sub-samples), optionally centred = motion blur
+            const int N = 64;
+            float3 acc = float3(0.0); float wsum = 0.0;
+            for (int i = 0; i < N; i++) {
+                float jit = hash12(float2(gid) + float(i) * 1.37) - 0.5;
+                float t = (float(i) + 0.5 + jit * 0.9) / float(N);
+                if (u[11] > 0.5) t = t * 2.0 - 1.0;
+                float w = pow(max(u[4], 0.02), abs(t) * 6.0);
+                float3 s;
+                for (int ch = 0; ch < 3; ch++) {
+                    float k = t * (1.0 + (float(ch) - 1.0) * u[6]);
+                    float2 suv;
+                    if (mode == 1) {
+                        float z = 1.0 + u[2] / max(size.x, size.y) * 4.0 * k;
+                        suv = center + (uv - center) / z;
+                    } else if (mode == 2) {
+                        float r = u[1] * 0.0174533 * k * 0.25;
+                        float2 d = (uv - center) * size;
+                        float c = cos(r), sn = sin(r);
+                        suv = center + float2(c * d.x - sn * d.y, sn * d.x + c * d.y) / size;
+                    } else {
+                        suv = uv - dir * k;
+                    }
+                    s[ch] = a.sample(sLin, suv)[ch];
+                }
+                acc += s * w; wsum += w;
+            }
+            float3 tr = acc / max(wsum, 1e-4);
+            int bm = int(u[5]);
+            float3 r;
+            if (bm == 0) r = max(col, tr);
+            else if (bm == 1) r = 1.0 - (1.0 - col) * (1.0 - tr);
+            else if (bm == 2) r = tr;
+            else if (bm == 3) r = abs(col - tr);
+            else r = min(col, tr);
+            o.write(float4(clamp(mix(col, r, clamp(u[9], 0.0, 1.0)), 0.0, 1.0), base.a), gid);
+            return;
+        }
         for (int i = n; i >= 1; i--) {
             float t = float(i) / float(n);
             float w = pow(u[4], float(i - 1)) * u[9];
@@ -169,15 +208,17 @@ enum TrailShaders {
 
 struct TrailEffect: Effect {
     let id = "trail"
-    let name = "Trail / Ghosting"
-    let category = EffectCategory.light
+    let name = "Trail & Motion Blur"
+    let category = EffectCategory.glitch
     var symbol: String { "wind" }
-    var summary: String { "Ghost copies: directional, zoom or spin motion trails." }
+    var summary: String { "Ghost copies or a smooth trail: directional, zoom or spin. Smooth + both directions = motion blur." }
     let params: [ParamDef] = [
+        .segmented("style", "Style", [("copies", "Copies"), ("smooth", "Smooth")], "copies", section: "Trail"),
         .segmented("mode", "Mode", [("dir", "Directional"), ("zoom", "Zoom"), ("spin", "Spin")], "dir", section: "Trail"),
+        .toggle("centered", "Both Directions (Motion Blur)", false, section: "Trail", visible: when("style", "smooth")),
         .slider("angle", "Angle", -180, 180, 0, unit: "°", section: "Trail"),
         .slider("distance", "Distance", 0, 400, 60, curve: 1.8, section: "Trail"),
-        .slider("copies", "Copies", 1, 48, 8, step: 1, section: "Trail"),
+        .slider("copies", "Copies", 1, 48, 8, step: 1, section: "Trail", visible: whenNot("style", "smooth")),
         .slider("decay", "Decay", 0, 100, 75, unit: "%", section: "Trail"),
         .slider("opacity", "Ghost Opacity", 0, 100, 60, unit: "%", section: "Trail"),
         .choice("blend", "Ghost Blend", [("lighten", "Lighten"), ("screen", "Screen"), ("normal", "Normal"),
@@ -191,6 +232,7 @@ struct TrailEffect: Effect {
         let blend: Float = ["lighten": 0, "screen": 1, "normal": 2, "difference": 3, "darken": 4][p.choice("blend", "lighten")] ?? 0
         return ctx.apply("k_trail", [input], [mode, p.f("angle"), Float(ctx.px(p.num("distance", 60))), p.f("copies", 8),
                                               p.f("decay", 75) / 100, blend, p.f("rgbShift") / 100 * 0.5,
-                                              p.f("cx", 50) / 100, p.f("cy", 50) / 100, p.f("opacity", 60) / 100])
+                                              p.f("cx", 50) / 100, p.f("cy", 50) / 100, p.f("opacity", 60) / 100,
+                                              p.choice("style", "copies") == "smooth" ? 1 : 0, p.bool("centered") ? 1 : 0])
     }
 }

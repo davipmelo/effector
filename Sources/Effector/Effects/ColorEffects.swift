@@ -32,7 +32,7 @@ enum GradientShaders {
 struct GradientMapEffect: Effect {
     let id = "gradientmap"
     let name = "Gradient Map"
-    let category = EffectCategory.color
+    let category = EffectCategory.adjust
     var symbol: String { "thermometer.medium" }
     var summary: String { "Maps brightness to a gradient: duotones, thermal, night vision." }
     let params: [ParamDef] = [
@@ -88,7 +88,7 @@ final class LUTCache {
 struct LUTEffect: Effect {
     let id = "lut"
     let name = "LUT (.cube)"
-    let category = EffectCategory.color
+    let category = EffectCategory.adjust
     var symbol: String { "cube" }
     var summary: String { "Apply a .cube colour LUT. Drop .cube files on the layer or the canvas." }
     let params: [ParamDef] = [

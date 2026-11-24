@@ -99,8 +99,8 @@ enum ShortcutAction: String, CaseIterable, Codable {
         case .zoomOut: return "Zoom Out"
         case .zoomFit: return "Fit to Window"
         case .zoom100: return "Actual Size (100%)"
-        case .showLayers: return "Show Layers"
-        case .showPresets: return "Show Presets"
+        case .showLayers: return "Close Panels"
+        case .showPresets: return "Presets…"
         }
     }
 
@@ -207,6 +207,9 @@ final class ShortcutStore: ObservableObject {
         let editing = isEditingText(w)
         guard let action = ShortcutAction.allCases.first(where: { self.combo($0) == pressed }) else { return false }
         if editing && (!combo.hasModifier || action.isTextEditingStandard) { return false }
+        // while a browser panel is open, plain letters belong to its search field
+        let app = AppState.shared
+        if (app.showEffectBrowser || app.showPresetBrowser) && !combo.hasModifier && action != .showPresets { return false }
         DispatchQueue.main.async { Actions.perform(action) }
         return true
     }
@@ -227,22 +230,22 @@ enum Actions {
         case .undo: app.undo()
         case .redo: app.redo()
         case .commandPalette: if app.hasImage { app.showCommandPalette.toggle() }
-        case .addEffect: if app.hasImage { app.sidebarTab = 0; app.showEffectBrowser = true }
+        case .addEffect: if app.hasImage { app.showEffectBrowser.toggle() }
         case .beforeAfter: if app.hasImage { app.showOriginal.toggle() }
         case .crop: if app.isCropping { app.commitCrop() } else { app.beginCrop() }
         case .group: app.groupSelected()
         case .ungroup: app.ungroupSelected()
         case .duplicate: app.duplicateSelected()
         case .delete: app.deleteSelected()
-        case .toggleVisibility: if let id = app.selectedID { app.toggleVisibility(id) }
+        case .toggleVisibility: app.toggleSelectedVisibility()
         case .moveUp: app.nudgeSelected(-1)
         case .moveDown: app.nudgeSelected(1)
         case .zoomIn: app.zoomIn()
         case .zoomOut: app.zoomOut()
         case .zoomFit: app.setZoom(nil)
         case .zoom100: app.zoomActual()
-        case .showLayers: app.sidebarTab = 0
-        case .showPresets: app.sidebarTab = 1
+        case .showLayers: app.showEffectBrowser = false; app.showPresetBrowser = false
+        case .showPresets: if app.hasImage { app.showPresetBrowser.toggle() }
         }
     }
 }

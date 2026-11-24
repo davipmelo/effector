@@ -52,12 +52,14 @@ struct PaletteEditor: View {
                         .aspectRatio(1, contentMode: .fit)
                         .overlay(RoundedRectangle(cornerRadius: 4).stroke(selected == i ? Theme.accent : Theme.separator, lineWidth: selected == i ? 2 : 1))
                         .onTapGesture { selected = (selected == i ? nil : i) }
+                        .help(c.hex + " · " + tr("click to edit"))
                 }
                 if palette.colors.count < 64 {
                     RoundedRectangle(cornerRadius: 4)
                         .strokeBorder(Theme.textFaint, style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
                         .aspectRatio(1, contentMode: .fit)
                         .overlay(Image(systemName: "plus").font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.textDim))
+                        .help(tr("Add a color"))
                         .onTapGesture {
                             var p = palette
                             p.colors.append(p.colors.last ?? .white)
@@ -89,6 +91,7 @@ struct PaletteEditor: View {
                     Label(tr("Extract from image"), systemImage: "eyedropper")
                 }
                 .buttonStyle(PillButtonStyle())
+                .help(tr("Build a palette from the colors of your image"))
                 Stepper(value: $extractCount, in: 2...16) {
                     Text("\(Int(extractCount))").font(Theme.valueFont).foregroundStyle(Theme.textDim)
                 }
@@ -194,6 +197,7 @@ struct LUTControl: View {
                     }
                 }
                 Button(tr("Load .cube…")) { load() }.buttonStyle(PillButtonStyle())
+                    .help(tr("Load .cube files (they are saved to your LUT library)"))
             }
             Text(targeted ? tr("Drop to load and save the LUT") : tr("Drop .cube files here · loaded LUTs are saved to your library"))
                 .font(.system(size: 10.5)).foregroundStyle(targeted ? Theme.accentText : Theme.textFaint)

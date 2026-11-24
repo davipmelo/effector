@@ -104,7 +104,7 @@ struct JPEGEffect: Effect {
 struct DigicamEffect: Effect {
     let id = "digicam"
     let name = "Digicam 2003"
-    let category = EffectCategory.film
+    let category = EffectCategory.glitch
     var symbol: String { "camera.compact" }
     var summary: String { "Early-2000s compact digital camera: CCD colour, clipped highlights, noise, JPEG and date stamp." }
     let params: [ParamDef] = [

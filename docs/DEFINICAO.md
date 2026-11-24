@@ -239,6 +239,22 @@ Ao final, o app é instalado em `/Applications` e o usuário testa tudo e manda 
 
 **Mais paletas e degradês**, agrupados por tema. **56 presets de fábrica** em 7 categorias, incluindo Receipt, Receipt Scan, Xerox, Zine, Fax, Y2K Blue, Chrome Dream, Frutiger Aero, Digicam 2003, Flip Phone, Deep Fried, VHS por época, Polaroid, Instax, Folha de Contato.
 
+## 9.3 v0.3.0 (feedback do segundo teste)
+- **Removidos:** Papel e Plástico Filme (e os presets que os usavam foram ajustados).
+- **Categorias enxutas (6):** Ajustes & Cor, Impressão & Pixel, Filme & Luz, Filtros de Lente, Glitch & Retrô, Sobreposições & Rastreio. Digicam foi para Glitch & Retrô.
+- **Filtros de Lente (novo):** Difusão (Pro-Mist/Black Pro-Mist/Glimmerglass/Soft FX/CineBloom/Neblina), Flare Anamórfico, Filtro Estrela, Prisma, Halo, Desfoque de Lente & Tilt-Shift, Olho de Peixe & Distorção, além de Aberração Cromática, Vinheta e Desfoque. Riscos feitos com "máximo ponderado" (não estoura áreas planas) e controle "Só Luzes Pequenas".
+- **Trail & Motion Blur:** estilo Cópias ou Suave (rastro contínuo), com opção de duas direções (motion blur).
+- **ASCII:** 10 Looks e conjunto de caracteres personalizado.
+- **Menus:** W/S além de ↑↓. **Sliders:** duplo clique em qualquer ponto reseta (também no nome).
+- **Tooltips** em todos os botões e controles.
+- **Sidebars redimensionáveis** (largura lembrada).
+- **Presets em painel lateral** (como Adicionar Efeito), sem esconder os layers; grade ou lista.
+- **Prévia ao vivo** ao passar o mouse ou navegar com as setas nos navegadores de efeitos e presets.
+- **Seleção múltipla** (⇧ intervalo, ⌘ alternar, ⌥⌘A todos), ações em massa, inspector com opacidade/mesclagem compartilhadas, arrastar vários.
+- **Arrastar e soltar refeito** com gesto próprio: o indicador amarelo sempre some.
+- **Sessão restaurada:** o app reabre a última imagem e os layers (salvamento automático), sem perguntar ao sair.
+- 9 presets novos (Pro-Mist Portrait, Black Mist Cinema, Anamorphic Night, Starry Lights, Prism Dream, Halo Glow, Miniature World, Smooth Motion, Skate Fisheye).
+
 ## 10. Backlog futuro (não fazer agora)
 - Importar paletas .ase (Adobe)
 - Pixel sort e outros glitches
