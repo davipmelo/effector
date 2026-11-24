@@ -218,8 +218,31 @@ Ao final, o app é instalado em `/Applications` e o usuário testa tudo e manda 
 - Modo Solo por layer; miniaturas dos efeitos e presets geradas a partir da imagem aberta.
 - 18 presets de fábrica.
 
+## 9.2 v0.2.0 (feedback do primeiro teste)
+**Correções e UX**
+- Campo de zoom com mais respiro; tecla **Z** ajusta à janela; lixeira em cada layer; botão de configurações na barra; cabeçalho com ícone, nome e versão.
+- **Menus suspensos novos (pilar de UX):** clicar + ↑↓ com prévia ao vivo, ↩ mantém, ⎋ desfaz; seções agrupadas; favoritos (★) no topo; toda a navegação conta como um único passo de desfazer.
+- HSL e Matiz/Saturação refeitos em OKLCh (perceptual), com mapeamento de gamut: sem artefatos ao escurecer cores, e os tons neutros não são afetados. O HSL ganhou bolinhas de cor nas seções e sliders com trilho colorido.
+- Halftone com supersampling (sem moiré ao mudar o tamanho da célula); ASCII e linhas de varredura usam pixels inteiros; sliders com passos inteiros onde faz sentido.
+- Sliders recalibrados com curva de resposta (mais controle no começo da escala): grain, raios, tamanhos, blob tracker.
+- LUT: arrastar e soltar `.cube`, biblioteca de LUTs salvas (Application Support/EFFECTOR/LUTs).
+- Navegador de efeitos com a altura toda da janela, modo lista com descrições.
+- Salvar a pilha inteira como preset (botão nos Layers e nos Presets).
+- Blob tracker: escala da caixa, caixa de tamanho fixo e padding negativo.
+- 7 modos de mesclagem novos (Subexposição/Superexposição de Cor, Adição, Superexposição Linear, Exclusão, Matiz, Saturação).
+
+**VHS refeito**: luma com banda limitada + realce de bordas de videocassete (halos), croma de baixa resolução com atraso e média entre linhas, ruído de croma, troca de cabeçote na base, pretos levantados, roll-off de altas luzes, tom da fita, OSD com fonte larga e contorno; datas de filmadora gravadas na fita (degradam junto). 11 Looks: Fita SP Limpa, Vídeo Caseiro '86, Videoclipe '89, Locadora '94, Cópia de 3ª Geração, TV de Madrugada, Fita Mastigada, Filmadora '98, Férias em Hi8, MiniDV 2003, CFTV.
+
+**Novos efeitos (13):** Nitidez, Fotocópia, Cupom Térmico, Vazamento de Luz, Aberração Cromática, Vinheta, Digicam 2003 (JPEG real), Poeira & Arranhões, Papel (fibras, amassado em facetas, dobras, manchas, bordas), Plástico Filme, Tela CRT (máscaras de fósforo), Artefatos de JPEG (recompressão real), Moldura & Borda (Polaroid, Instax, tira 35 mm, slide, borda).
+
+**Mais filmes (40 no total)**, agrupados: Negativo Colorido, Slide, Cinema, Instantâneo, Criativo (Cross Process, LomoChrome Purple, Aerochrome com matriz de canais) e P&B (todos exatamente neutros, verificado).
+
+**Mais paletas e degradês**, agrupados por tema. **56 presets de fábrica** em 7 categorias, incluindo Receipt, Receipt Scan, Xerox, Zine, Fax, Y2K Blue, Chrome Dream, Frutiger Aero, Digicam 2003, Flip Phone, Deep Fried, VHS por época, Polaroid, Instax, Folha de Contato.
+
 ## 10. Backlog futuro (não fazer agora)
 - Importar paletas .ase (Adobe)
+- Pixel sort e outros glitches
+- Versão para iPad (ver resposta sobre portabilidade na conversa de 24/11/2026)
 - Máscaras (luminância, gradiente, pincel)
 - Várias imagens abertas
 - Lote

@@ -2,6 +2,11 @@ import Foundation
 
 enum BlendMode: String, Codable, CaseIterable, Hashable {
     case normal, multiply, screen, overlay, softLight, hardLight, darken, lighten, difference, color, luminosity
+    // appended later (shader indices follow declaration order)
+    case colorDodge, colorBurn, add, linearBurn, exclusion, hue, saturation
+
+    static let menuOrder: [BlendMode] = [.normal, .multiply, .darken, .colorBurn, .linearBurn, .screen, .lighten, .colorDodge, .add,
+                                         .overlay, .softLight, .hardLight, .difference, .exclusion, .hue, .saturation, .color, .luminosity]
 
     var label: String {
         switch self {
@@ -16,6 +21,24 @@ enum BlendMode: String, Codable, CaseIterable, Hashable {
         case .difference: return "Difference"
         case .color: return "Color"
         case .luminosity: return "Luminosity"
+        case .colorDodge: return "Color Dodge"
+        case .colorBurn: return "Color Burn"
+        case .add: return "Add (Linear Dodge)"
+        case .linearBurn: return "Linear Burn"
+        case .exclusion: return "Exclusion"
+        case .hue: return "Hue"
+        case .saturation: return "Saturation"
+        }
+    }
+
+    var group: String {
+        switch self {
+        case .normal: return "Normal"
+        case .multiply, .darken, .colorBurn, .linearBurn: return "Darken"
+        case .screen, .lighten, .colorDodge, .add: return "Lighten"
+        case .overlay, .softLight, .hardLight: return "Contrast"
+        case .difference, .exclusion: return "Inversion"
+        case .color, .luminosity, .hue, .saturation: return "Component"
         }
     }
 

@@ -198,10 +198,12 @@ struct Params: Codable, Hashable {
 struct ChoiceOption: Hashable {
     let id: String
     let label: String
+    /// Optional section title used to group long lists in pickers.
+    var group: String? = nil
 }
 
 enum ParamKind {
-    case slider(min: Double, max: Double, def: Double, step: Double = 0, unit: String = "")
+    case slider(min: Double, max: Double, def: Double, step: Double = 0, unit: String = "", curve: Double = 1)
     case toggle(def: Bool)
     case choice([ChoiceOption], def: String)
     case segmented([ChoiceOption], def: String)
@@ -220,10 +222,12 @@ struct ParamDef {
     let kind: ParamKind
     var section: String? = nil
     var visible: ((Params) -> Bool)? = nil
+    /// Optional colours drawn on the slider track (e.g. hue ramps).
+    var track: [RGBA]? = nil
 
     var defaultValue: ParamValue? {
         switch kind {
-        case .slider(_, _, let d, _, _): return .number(d)
+        case .slider(_, _, let d, _, _, _): return .number(d)
         case .toggle(let d): return .bool(d)
         case .choice(_, let d), .segmented(_, let d): return .choice(d)
         case .color(let d): return .color(d)
@@ -242,11 +246,16 @@ func opts(_ pairs: [(String, String)]) -> [ChoiceOption] {
 }
 
 extension ParamDef {
+    /// `curve` > 1 gives finer control at the low end of the range (slider position^curve).
     static func slider(_ key: String, _ label: String, _ min: Double, _ max: Double, _ def: Double,
-                       step: Double = 0, unit: String = "", section: String? = nil,
-                       visible: ((Params) -> Bool)? = nil) -> ParamDef {
-        ParamDef(key: key, label: label, kind: .slider(min: min, max: max, def: def, step: step, unit: unit),
-                 section: section, visible: visible)
+                       step: Double = 0, unit: String = "", curve: Double = 1, section: String? = nil,
+                       track: [RGBA]? = nil, visible: ((Params) -> Bool)? = nil) -> ParamDef {
+        ParamDef(key: key, label: label, kind: .slider(min: min, max: max, def: def, step: step, unit: unit, curve: curve),
+                 section: section, visible: visible, track: track)
+    }
+    static func choice(_ key: String, _ label: String, options: [ChoiceOption], _ def: String,
+                       section: String? = nil, visible: ((Params) -> Bool)? = nil) -> ParamDef {
+        ParamDef(key: key, label: label, kind: .choice(options, def: def), section: section, visible: visible)
     }
     static func toggle(_ key: String, _ label: String, _ def: Bool, section: String? = nil,
                        visible: ((Params) -> Bool)? = nil) -> ParamDef {

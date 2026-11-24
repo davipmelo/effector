@@ -127,7 +127,7 @@ enum ShortcutAction: String, CaseIterable, Codable {
         case .moveDown: return KeyCombo(key: "[", cmd: true)
         case .zoomIn: return KeyCombo(key: "=", cmd: true)
         case .zoomOut: return KeyCombo(key: "-", cmd: true)
-        case .zoomFit: return KeyCombo(key: "0", cmd: true)
+        case .zoomFit: return KeyCombo(key: "z")
         case .zoom100: return KeyCombo(key: "1", cmd: true)
         case .showLayers: return KeyCombo(key: "l")
         case .showPresets: return KeyCombo(key: "p")

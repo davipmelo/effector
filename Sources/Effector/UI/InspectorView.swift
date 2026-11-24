@@ -96,8 +96,8 @@ struct LayerInspector: View {
             ScrollView {
                 VStack(spacing: 0) {
                     PanelSection(title: layer.isGroup ? "Group" : "Layer") {
-                        ChoiceRow(label: "Blend", options: BlendMode.allCases.map { ChoiceOption(id: $0.rawValue, label: $0.label) },
-                                  selected: layer.blend.rawValue) { v in
+                        ChoiceRow(label: "Blend", options: BlendMode.menuOrder.map { ChoiceOption(id: $0.rawValue, label: $0.label, group: $0.group) },
+                                  selected: layer.blend.rawValue, scope: "blend") { v in
                             app.updateLayer(layer.id) { $0.blend = BlendMode(rawValue: v) ?? .normal }
                         }
                         ValueSlider(label: "Opacity", value: layer.opacity * 100, range: 0...100, defaultValue: 100, step: 1, unit: "%") { v in
@@ -105,7 +105,8 @@ struct LayerInspector: View {
                         }
                     }
                     if let effect {
-                        ParamSections(layer: layer, defs: effect.params)
+                        if !effect.looks.isEmpty { LookRow(layer: layer, effect: effect) }
+                        ParamSections(layer: layer, defs: effect.params, colors: effect.sectionColors)
                     } else if layer.isGroup {
                         Text(tr("%d layers in this group", layer.children.count))
                             .font(.system(size: 11.5)).foregroundStyle(Theme.textFaint)
@@ -125,15 +126,40 @@ struct LayerInspector: View {
     }
 }
 
+struct LookRow: View {
+    let layer: LayerNode
+    let effect: Effect
+    @ObservedObject var app = AppState.shared
+    var body: some View {
+        let looks = effect.looks
+        HStack(spacing: 8) {
+            Image(systemName: "sparkles").font(.system(size: 11)).foregroundStyle(Theme.accentText)
+            Text(tr("Look")).font(Theme.labelFont).foregroundStyle(Theme.textDim)
+            Spacer(minLength: 4)
+            PickerField(scope: "look." + effect.id,
+                        items: looks.map { PickerItem(id: $0.id, label: tr($0.name), group: $0.group.map { tr($0) }) },
+                        selected: layer.params.text("_look", ""),
+                        title: looks.first { $0.id == layer.params.text("_look", "") }.map { tr($0.name) } ?? tr("Custom")) { id in
+                guard let look = looks.first(where: { $0.id == id }) else { return }
+                app.applyLook(layer.id, look)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .overlay(alignment: .bottom) { Rectangle().fill(Theme.separator).frame(height: 1) }
+    }
+}
+
 struct ParamSections: View {
     let layer: LayerNode
     let defs: [ParamDef]
+    var colors: [String: RGBA] = [:]
 
     var body: some View {
         let visible = defs.filter { $0.visible?(layer.params) ?? true }
         let sections = orderedSections(visible)
         ForEach(sections, id: \.0) { title, items in
-            PanelSection(title: title) {
+            PanelSection(title: title, dot: colors[title]?.color) {
                 ForEach(items, id: \.key) { def in
                     ParamControl(layer: layer, def: def)
                 }
@@ -163,14 +189,17 @@ struct ParamControl: View {
     var body: some View {
         let p = layer.params
         switch def.kind {
-        case .slider(let mn, let mx, let d, let step, let unit):
-            ValueSlider(label: def.label, value: p.num(def.key, d), range: mn...mx, defaultValue: d, step: step, unit: unit) {
+        case .slider(let mn, let mx, let d, let step, let unit, let curve):
+            ValueSlider(label: def.label, value: p.num(def.key, d), range: mn...mx, defaultValue: d, step: step, unit: unit,
+                        curve: curve, track: def.track?.map(\.color)) {
                 set(.number($0))
             }
         case .toggle(let d):
             ToggleRow(label: def.label, isOn: p.bool(def.key, d)) { set(.bool($0), coalesce: false) }
         case .choice(let o, let d):
-            ChoiceRow(label: def.label, options: o, selected: p.choice(def.key, d)) { set(.choice($0), coalesce: false) }
+            ChoiceRow(label: def.label, options: o, selected: p.choice(def.key, d), scope: layer.effectID + "." + def.key) {
+                set(.choice($0), coalesce: false)
+            }
         case .segmented(let o, let d):
             SegmentedRow(label: def.label, options: o, selected: p.choice(def.key, d)) { set(.choice($0), coalesce: false) }
         case .color(let d):

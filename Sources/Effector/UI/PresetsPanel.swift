@@ -7,12 +7,31 @@ struct PresetsPanel: View {
 
     private var list: [Preset] {
         let q = query.lowercased()
-        return store.all.filter { q.isEmpty || $0.name.lowercased().contains(q) }
+        return store.all.filter { q.isEmpty || $0.displayName.lowercased().contains(q) || tr($0.category ?? "").lowercased().contains(q) }
+    }
+
+    private var sections: [(String, [Preset])] {
+        let l = list
+        var out: [(String, [Preset])] = []
+        let mine = l.filter { !$0.isFactory }
+        if !mine.isEmpty { out.append(("My Presets", mine)) }
+        for c in FactoryPresets.categories {
+            let items = l.filter { $0.isFactory && $0.category == c }
+            if !items.isEmpty { out.append((c, items)) }
+        }
+        return out
     }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 4) {
+                Button { saveStack() } label: { Image(systemName: "plus").font(.system(size: 12, weight: .semibold)) }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(app.state.layers.isEmpty ? Theme.textFaint : Theme.text)
+                    .frame(width: 26, height: 26)
+                    .background(RoundedRectangle(cornerRadius: 7).fill(Theme.field))
+                    .disabled(app.state.layers.isEmpty)
+                    .help(tr("Save all layers as a preset"))
                 HStack(spacing: 6) {
                     Image(systemName: "magnifyingglass").font(.system(size: 11)).foregroundStyle(Theme.textFaint)
                     TextField(tr("Search presets"), text: $query).textFieldStyle(.plain).font(.system(size: 12))
@@ -39,10 +58,26 @@ struct PresetsPanel: View {
             .overlay(alignment: .bottom) { Rectangle().fill(Theme.separator).frame(height: 1) }
 
             ScrollView {
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 12) {
-                    ForEach(list) { p in PresetCard(preset: p) }
+                LazyVStack(alignment: .leading, spacing: 6, pinnedViews: [.sectionHeaders]) {
+                    ForEach(sections, id: \.0) { title, items in
+                        Section {
+                            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 12) {
+                                ForEach(items) { p in PresetCard(preset: p) }
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.bottom, 10)
+                        } header: {
+                            HStack {
+                                Text(tr(title).uppercased()).font(Theme.sectionFont).tracking(0.6).foregroundStyle(Theme.textDim)
+                                Spacer()
+                                Text("\(items.count)").font(.system(size: 10).monospacedDigit()).foregroundStyle(Theme.textFaint)
+                            }
+                            .padding(.horizontal, 12).padding(.vertical, 7)
+                            .background(Theme.panelBG)
+                        }
+                    }
                 }
-                .padding(10)
+                .padding(.vertical, 4)
                 if list.isEmpty {
                     Text(tr("No presets yet. Build a stack of effects and save it from the ⋯ menu."))
                         .font(.system(size: 11.5)).foregroundStyle(Theme.textFaint)
@@ -55,11 +90,7 @@ struct PresetsPanel: View {
         .onChange(of: store.user.count) { _, _ in store.regenerateThumbs() }
     }
 
-    private func saveStack() {
-        guard let n = promptText(tr("Save as Preset"), tr("Name"), tr("My Preset")) else { return }
-        store.add(name: n, layers: app.state.layers, thumbnail: app.renderThumbnail(layers: app.state.layers, size: 240))
-        app.flash(tr("Preset saved"))
-    }
+    private func saveStack() { app.saveStackAsPreset() }
 }
 
 struct PresetCard: View {
@@ -86,7 +117,7 @@ struct PresetCard: View {
                     Image(systemName: "seal.fill").font(.system(size: 9)).foregroundStyle(Theme.accent).padding(5)
                 }
             }
-            Text(preset.name).font(.system(size: 11.5, weight: .medium)).foregroundStyle(Theme.text).lineLimit(1)
+            Text(preset.displayName).font(.system(size: 11.5, weight: .medium)).foregroundStyle(Theme.text).lineLimit(1)
         }
         .contentShape(Rectangle())
         .onHover { hover = $0 }

@@ -2,7 +2,7 @@ import Foundation
 import Metal
 
 enum EffectCategory: String, CaseIterable {
-    case adjust, color, stylize, light, film, glitch, overlay
+    case adjust, color, stylize, light, lens, film, texture, glitch, overlay
 
     var label: String {
         switch self {
@@ -10,9 +10,11 @@ enum EffectCategory: String, CaseIterable {
         case .color: return "Color"
         case .stylize: return "Dither & Print"
         case .light: return "Light & Blur"
-        case .film: return "Film"
+        case .lens: return "Lens"
+        case .film: return "Film & Camera"
+        case .texture: return "Texture & Paper"
         case .glitch: return "Glitch & Retro"
-        case .overlay: return "Tracking"
+        case .overlay: return "Tracking & Frames"
         }
     }
 
@@ -22,11 +24,21 @@ enum EffectCategory: String, CaseIterable {
         case .color: return "paintpalette"
         case .stylize: return "circle.grid.3x3"
         case .light: return "sun.max"
+        case .lens: return "camera.aperture"
         case .film: return "film"
+        case .texture: return "doc.richtext"
         case .glitch: return "tv"
         case .overlay: return "viewfinder"
         }
     }
+}
+
+/// A named starting point for an effect's parameters (shown as "Look" in the inspector).
+struct EffectLook {
+    let id: String
+    let name: String
+    var group: String? = nil
+    let values: [String: Any]
 }
 
 protocol Effect {
@@ -35,6 +47,9 @@ protocol Effect {
     var category: EffectCategory { get }
     var symbol: String { get }
     var params: [ParamDef] { get }
+    var summary: String { get }
+    var looks: [EffectLook] { get }
+    var sectionColors: [String: RGBA] { get }
     /// Produces the effect output from `input`. The renderer blends it with `input`
     /// using the layer opacity / blend mode.
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture
@@ -43,25 +58,35 @@ protocol Effect {
 extension Effect {
     var symbol: String { category.symbol }
     var producesAlpha: Bool { false }
+    /// One-line description shown in the effect browser.
+    var summary: String { "" }
+    /// Optional parameter presets for this effect.
+    var looks: [EffectLook] { [] }
+    /// Colour dot shown next to section titles (e.g. HSL bands).
+    var sectionColors: [String: RGBA] { [:] }
 }
 
 enum EffectRegistry {
     static let all: [Effect] = [
         // Adjustments
         BasicAdjustEffect(), CurvesEffect(), HSLEffect(), HueSatEffect(), BlackWhiteEffect(),
-        InvertEffect(), PosterizeEffect(), ThresholdEffect(),
+        SharpenEffect(), InvertEffect(), PosterizeEffect(), ThresholdEffect(),
         // Color
         GradientMapEffect(), LUTEffect(),
         // Dither & print
-        DitherEffect(), HalftoneEffect(), AsciiEffect(),
+        DitherEffect(), HalftoneEffect(), PhotocopyEffect(), ThermalPrintEffect(), AsciiEffect(),
         // Light & blur
-        GlowEffect(), BloomEffect(), HalationEffect(), BlurEffect(), TrailEffect(),
-        // Film
-        FilmEffect(), GrainEffect(),
-        // Glitch
-        VHSEffect(),
-        // Tracking
-        BlobTrackerEffect(),
+        GlowEffect(), BloomEffect(), HalationEffect(), LightLeakEffect(), BlurEffect(), TrailEffect(),
+        // Lens
+        ChromaticAberrationEffect(), VignetteEffect(),
+        // Film & camera
+        FilmEffect(), GrainEffect(), DigicamEffect(),
+        // Texture
+        DustEffect(), PaperEffect(), PlasticEffect(),
+        // Glitch & retro
+        VHSEffect(), CRTEffect(), JPEGEffect(),
+        // Tracking & frames
+        BlobTrackerEffect(), FrameEffect(),
     ]
 
     private static let byID: [String: Effect] = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })

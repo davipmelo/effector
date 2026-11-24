@@ -59,9 +59,10 @@ struct GlowEffect: Effect {
     let name = "Glow"
     let category = EffectCategory.light
     var symbol: String { "sun.max" }
+    var summary: String { "Soft diffusion: the whole image (above a low threshold) gets a dreamy haze." }
     let params: [ParamDef] = [
         .slider("intensity", "Intensity", 0, 200, 60, unit: "%"),
-        .slider("radius", "Radius", 1, 200, 20),
+        .slider("radius", "Radius", 1, 200, 20, curve: 2),
         .slider("threshold", "Threshold", 0, 100, 30, unit: "%"),
         .slider("saturation", "Saturation", 0, 200, 100, unit: "%"),
         .choice("mode", "Blend", [("screen", "Screen"), ("add", "Add"), ("soft", "Soft Light")], "screen"),
@@ -80,9 +81,10 @@ struct BloomEffect: Effect {
     let name = "Bloom"
     let category = EffectCategory.light
     var symbol: String { "sparkles" }
+    var summary: String { "Only the brightest highlights spill light, in several sizes, like a lens." }
     let params: [ParamDef] = [
         .slider("intensity", "Intensity", 0, 300, 100, unit: "%"),
-        .slider("radius", "Radius", 1, 200, 30),
+        .slider("radius", "Radius", 1, 200, 30, curve: 2),
         .slider("threshold", "Threshold", 0, 100, 70, unit: "%"),
         .slider("knee", "Softness", 0, 50, 15, unit: "%"),
         .slider("saturation", "Saturation", 0, 200, 100, unit: "%"),
@@ -100,9 +102,10 @@ struct HalationEffect: Effect {
     let name = "Halation"
     let category = EffectCategory.light
     var symbol: String { "circle.dotted.and.circle" }
+    var summary: String { "Red-orange fringe around highlights, from light bouncing in the film base." }
     let params: [ParamDef] = [
         .slider("intensity", "Intensity", 0, 200, 70, unit: "%"),
-        .slider("radius", "Radius", 1, 100, 10),
+        .slider("radius", "Radius", 1, 100, 10, curve: 2),
         .slider("threshold", "Threshold", 0, 100, 65, unit: "%"),
         .color("color", "Color", RGBA(hex: "#FF3D14")),
     ]
@@ -169,10 +172,11 @@ struct TrailEffect: Effect {
     let name = "Trail / Ghosting"
     let category = EffectCategory.light
     var symbol: String { "wind" }
+    var summary: String { "Ghost copies: directional, zoom or spin motion trails." }
     let params: [ParamDef] = [
         .segmented("mode", "Mode", [("dir", "Directional"), ("zoom", "Zoom"), ("spin", "Spin")], "dir", section: "Trail"),
         .slider("angle", "Angle", -180, 180, 0, unit: "°", section: "Trail"),
-        .slider("distance", "Distance", 0, 400, 60, section: "Trail"),
+        .slider("distance", "Distance", 0, 400, 60, curve: 1.8, section: "Trail"),
         .slider("copies", "Copies", 1, 48, 8, step: 1, section: "Trail"),
         .slider("decay", "Decay", 0, 100, 75, unit: "%", section: "Trail"),
         .slider("opacity", "Ghost Opacity", 0, 100, 60, unit: "%", section: "Trail"),

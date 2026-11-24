@@ -26,12 +26,16 @@ final class OverlayCanvas {
     /// Draws text with its top-left at `p`. Returns the text size.
     @discardableResult
     func text(_ s: String, at p: CGPoint, size: CGFloat, color: RGBA, weight: NSFont.Weight = .semibold,
-              mono: Bool = true, shadow: Bool = false, background: RGBA? = nil, padding: CGFloat = 0) -> CGSize {
-        let font = mono ? NSFont.monospacedSystemFont(ofSize: size, weight: weight) : NSFont.systemFont(ofSize: size, weight: weight)
-        let attr = NSAttributedString(string: s, attributes: [.font: font, .foregroundColor: NSColor(cgColor: cg(color)) ?? .white])
+              mono: Bool = true, shadow: Bool = false, background: RGBA? = nil, padding: CGFloat = 0,
+              fontName: String? = nil, stretch: CGFloat = 1, outline: RGBA? = nil, kern: CGFloat = 0) -> CGSize {
+        let font = fontName.flatMap { NSFont(name: $0, size: size) }
+            ?? (mono ? NSFont.monospacedSystemFont(ofSize: size, weight: weight) : NSFont.systemFont(ofSize: size, weight: weight))
+        var attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor(cgColor: cg(color)) ?? .white]
+        if kern != 0 { attrs[.kern] = kern * size }
+        let attr = NSAttributedString(string: s, attributes: attrs)
         let line = CTLineCreateWithAttributedString(attr)
         var ascent: CGFloat = 0, descent: CGFloat = 0, leading: CGFloat = 0
-        let width = CGFloat(CTLineGetTypographicBounds(line, &ascent, &descent, &leading))
+        let width = CGFloat(CTLineGetTypographicBounds(line, &ascent, &descent, &leading)) * stretch
         let height = ascent + descent
         if let bg = background {
             ctx.setFillColor(cg(bg))
@@ -40,10 +44,18 @@ final class OverlayCanvas {
         ctx.saveGState()
         // flip back locally so glyphs are upright
         ctx.translateBy(x: p.x, y: p.y + ascent)
-        ctx.scaleBy(x: 1, y: -1)
+        ctx.scaleBy(x: stretch, y: -1)
         if shadow {
             ctx.setShadow(offset: CGSize(width: size * 0.08, height: -size * 0.08), blur: size * 0.15,
                           color: CGColor(gray: 0, alpha: 0.8))
+        }
+        if let outline {
+            // draw a stroked copy underneath for the classic outlined OSD look
+            let o = NSMutableAttributedString(attributedString: attr)
+            o.addAttributes([.strokeWidth: 18, .strokeColor: NSColor(cgColor: cg(outline)) ?? .black],
+                            range: NSRange(location: 0, length: o.length))
+            ctx.textPosition = .zero
+            CTLineDraw(CTLineCreateWithAttributedString(o), ctx)
         }
         ctx.textPosition = .zero
         CTLineDraw(line, ctx)

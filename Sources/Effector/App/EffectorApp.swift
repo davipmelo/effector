@@ -98,7 +98,10 @@ struct EffectorApp: App {
             item(.moveDown, disabled: app.selectedID == nil)
         }
         CommandGroup(after: .toolbar) {
-            item(.zoomIn); item(.zoomOut); item(.zoomFit); item(.zoom100)
+            item(.zoomIn); item(.zoomOut)
+            // ⌘0 always fits; the single-key shortcut (Z by default) is handled by the key monitor
+            Button(tr(ShortcutAction.zoomFit.label)) { Actions.perform(.zoomFit) }.keyboardShortcut("0", modifiers: .command)
+            item(.zoom100)
             Divider()
             item(.showLayers); item(.showPresets)
             Divider()

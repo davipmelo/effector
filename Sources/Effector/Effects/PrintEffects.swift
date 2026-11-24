@@ -42,19 +42,14 @@ enum HalftoneShaders {
         return float4((1.0 - c.r - k) / d, (1.0 - c.g - k) / d, (1.0 - c.b - k) / d, k);
     }
 
-    kernel void k_halftone(KIN, texture2d<float> src [[texture(1)]]) {
-        GUARD
-        float2 p = float2(gid) + 0.5;
-        float2 size = OSIZE;
+    inline float3 halftoneAt(float2 p, texture2d<float> src, constant float* u, float2 size) {
         float cs = max(2.0, u[0]);
         int shape = int(u[2]);
         int mode = int(u[3]);
         float scale = u[4];
-        float aa = max(u[5], 1.2 / cs);
+        float aa = max(u[5], 0.6 / cs);
         float3 paper = float3(u[6], u[7], u[8]);
         float3 ink = float3(u[9], u[10], u[11]);
-        float a0 = src.read(gid).a;
-
         if (mode == 1) {
             float angs[4] = { u[12], u[13], u[14], u[15] };
             float3 inks[4] = { float3(0.0, 0.62, 0.88), float3(0.90, 0.05, 0.52), float3(1.0, 0.93, 0.0), float3(0.08, 0.08, 0.09) };
@@ -62,32 +57,40 @@ enum HalftoneShaders {
             for (int i = 0; i < 4; i++) {
                 float a = angs[i] * 0.0174533;
                 float2 q = rot2(p, -a);
-                float2 cell = floor(q / cs);
-                float2 center = (cell + 0.5) * cs;
-                float2 uv = rot2(center, a) / size;
-                float3 c = src.sample(sLin, uv).rgb;
+                float2 center = (floor(q / cs) + 0.5) * cs;
+                float3 c = src.sample(sLin, rot2(center, a) / size).rgb;
                 float v = cmykOf(c, u[16])[i] * scale;
-                float amt = dotInk((q - center) / cs, v, shape, aa);
-                col *= mix(float3(1.0), inks[i], amt);
+                col *= mix(float3(1.0), inks[i], dotInk((q - center) / cs, v, shape, aa));
             }
-            o.write(float4(col, a0), gid);
-            return;
+            return col;
         }
         float a = u[1] * 0.0174533;
         float2 q = rot2(p, -a);
-        float2 cell = floor(q / cs);
-        float2 center = (cell + 0.5) * cs;
-        float2 uv = rot2(center, a) / size;
-        float3 c = src.sample(sLin, uv).rgb;
-        float v = (1.0 - neutralGray(c)) * scale;
-        float amt = dotInk((q - center) / cs, v, shape, aa);
-        float3 dotColor = mode == 2 ? c : ink;
+        float2 center = (floor(q / cs) + 0.5) * cs;
+        float3 c = src.sample(sLin, rot2(center, a) / size).rgb;
         if (mode == 2) {
-            // colour dots: dot size from darkness of a desaturated copy, colour from image
-            v = (1.0 - neutralGray(c) * 0.85) * scale;
-            amt = dotInk((q - center) / cs, v, shape, aa);
+            float v = (1.0 - neutralGray(c) * 0.85) * scale;
+            return mix(paper, c, dotInk((q - center) / cs, v, shape, aa));
         }
-        o.write(float4(mix(paper, dotColor, amt), a0), gid);
+        float v = (1.0 - neutralGray(c)) * scale;
+        return mix(paper, ink, dotInk((q - center) / cs, v, shape, aa));
+    }
+
+    // Supersampled (anti-aliased) halftone: avoids moiré between the dot grid and the pixel grid.
+    kernel void k_halftone(KIN, texture2d<float> src [[texture(1)]]) {
+        GUARD
+        float2 size = OSIZE;
+        float2 p = float2(gid) + 0.5;
+        float cs = max(2.0, u[0]);
+        int n = cs < 6.0 ? 4 : (cs < 16.0 ? 3 : 2);
+        float3 acc = float3(0.0);
+        for (int y = 0; y < n; y++) {
+            for (int x = 0; x < n; x++) {
+                float2 off = (float2(x, y) + 0.5) / float(n) - 0.5;
+                acc += halftoneAt(p + off, src, u, size);
+            }
+        }
+        o.write(float4(acc / float(n * n), src.read(gid).a), gid);
     }
     """
 }
@@ -97,11 +100,12 @@ struct HalftoneEffect: Effect {
     let name = "Halftone"
     let category = EffectCategory.stylize
     var symbol: String { "circle.hexagongrid" }
+    var summary: String { "Print screen dots: B&W, CMYK or colour, with angles and shapes." }
     let params: [ParamDef] = [
         .segmented("mode", "Mode", [("bw", "B&W"), ("cmyk", "CMYK"), ("color", "Color")], "bw", section: "Screen"),
         .choice("shape", "Dot Shape", [("circle", "Circle"), ("square", "Square"), ("diamond", "Diamond"),
                                        ("line", "Line"), ("ellipse", "Ellipse"), ("cross", "Cross")], "circle", section: "Screen"),
-        .slider("cell", "Cell Size", 1, 80, 8, step: 0.25, unit: "", section: "Screen"),
+        .slider("cell", "Cell Size", 2, 80, 8, step: 0.5, unit: "", curve: 1.8, section: "Screen"),
         .slider("angle", "Angle", 0, 180, 45, unit: "°", section: "Screen", visible: whenNot("mode", "cmyk")),
         .slider("dotScale", "Dot Size", 20, 200, 100, unit: "%", section: "Screen"),
         .slider("softness", "Softness", 0, 100, 10, unit: "%", section: "Screen"),

@@ -80,6 +80,7 @@ struct DitherEffect: Effect {
     let name = "Dither"
     let category = EffectCategory.stylize
     var symbol: String { "circle.grid.3x3.fill" }
+    var summary: String { "Classic dithering (ordered and error diffusion) with palettes and pixel size." }
 
     static let diffusionKinds = ["floyd", "atkinson", "jjn", "stucki", "sierra", "sierralite", "burkes"]
     static let orderedKinds = ["bayer2": 0, "bayer4": 1, "bayer8": 2, "threshold": 3, "random": 4, "bluenoise": 5, "lines": 6, "cluster": 7]
@@ -91,7 +92,7 @@ struct DitherEffect: Effect {
             ("bayer2", "Bayer 2×2"), ("bayer4", "Bayer 4×4"), ("bayer8", "Bayer 8×8"), ("cluster", "Clustered Dot"),
             ("bluenoise", "Blue Noise"), ("random", "Random"), ("lines", "Lines"), ("threshold", "Threshold"),
         ], "floyd", section: "Dither"),
-        .slider("pixelSize", "Pixel Size", 0.2, 24, 2, step: 0.1, unit: "", section: "Dither"),
+        .slider("pixelSize", "Pixel Size", 0.5, 24, 2, step: 0.1, unit: "", curve: 1.8, section: "Dither"),
         .slider("strength", "Strength", 0, 100, 100, unit: "%", section: "Dither"),
         .toggle("serpentine", "Serpentine", true, section: "Dither",
                 visible: { DitherEffect.diffusionKinds.contains($0.choice("algorithm")) }),

@@ -34,6 +34,7 @@ enum Theme {
 
 struct PanelSection<Content: View>: View {
     let title: String
+    var dot: Color? = nil
     var trailing: AnyView? = nil
     @State private var open = true
     @ViewBuilder var content: () -> Content
@@ -45,6 +46,10 @@ struct PanelSection<Content: View>: View {
                     .font(.system(size: 8.5, weight: .bold))
                     .rotationEffect(.degrees(open ? 90 : 0))
                     .foregroundStyle(Theme.textFaint)
+                if let dot {
+                    Circle().fill(dot).frame(width: 9, height: 9)
+                        .overlay(Circle().stroke(Color.black.opacity(0.25), lineWidth: 0.5))
+                }
                 Text(tr(title).uppercased())
                     .font(Theme.sectionFont)
                     .tracking(0.6)

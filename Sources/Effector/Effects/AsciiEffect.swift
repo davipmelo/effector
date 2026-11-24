@@ -97,6 +97,7 @@ struct AsciiEffect: Effect {
     let name = "ASCII"
     let category = EffectCategory.stylize
     var symbol: String { "textformat.characters" }
+    var summary: String { "Rebuilds the image from characters." }
 
     static let charsets: [(String, String, String)] = [
         ("standard", "Standard", " .:-=+*#%@"),
@@ -114,7 +115,7 @@ struct AsciiEffect: Effect {
 
     let params: [ParamDef] = [
         .choice("charset", "Characters", AsciiEffect.charsets.map { ($0.0, $0.1) }, "standard", section: "Characters"),
-        .slider("cell", "Cell Size", 2, 40, 8, section: "Characters"),
+        .slider("cell", "Cell Size", 2, 40, 8, step: 0.5, curve: 1.6, section: "Characters"),
         .slider("aspect", "Cell Height", 100, 250, 180, unit: "%", section: "Characters"),
         .toggle("bold", "Bold", false, section: "Characters"),
         .segmented("mode", "Color", [("mono", "Mono"), ("palette", "Palette"), ("original", "Original")], "mono", section: "Color"),
@@ -128,8 +129,9 @@ struct AsciiEffect: Effect {
     ]
 
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
-        let cw = max(2, ctx.px(p.num("cell", 8)))
-        let ch = cw * p.num("aspect", 180) / 100
+        // whole render pixels per cell so every glyph is drawn identically
+        let cw = max(2, ctx.px(p.num("cell", 8)).rounded())
+        let ch = max(2, (cw * p.num("aspect", 180) / 100).rounded())
         let gw = max(1, Int((Double(input.width) / cw).rounded(.up)))
         let gh = max(1, Int((Double(input.height) / ch).rounded(.up)))
         let grid = ctx.resize(input, gw, gh)

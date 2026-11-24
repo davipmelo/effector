@@ -25,11 +25,12 @@ struct MainView: View {
                     Color.black.opacity(0.18).ignoresSafeArea()
                         .onTapGesture { app.showEffectBrowser = false }
                     EffectBrowser()
+                        .frame(maxHeight: .infinity)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                         .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.separator))
                         .shadow(color: .black.opacity(0.45), radius: 28, y: 10)
                         .padding(.leading, 278)
-                        .padding(.top, 8)
+                        .padding(.vertical, 8)
                         .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .topLeading)))
                 }
             }
@@ -65,6 +66,7 @@ struct MainView: View {
 
     private var sidebar: some View {
         VStack(spacing: 0) {
+            AppHeader()
             HStack(spacing: 2) {
                 tabButton(tr("Layers"), "square.3.layers.3d", 0)
                 tabButton(tr("Presets"), "wand.and.stars", 1)
@@ -120,6 +122,7 @@ struct MainView: View {
                 .fixedSize()
                 Button { app.zoomIn() } label: { Image(systemName: "plus") }.buttonStyle(.borderless)
             }
+            .padding(.horizontal, 8)
             .disabled(!app.hasImage)
         }
         ToolbarItemGroup(placement: .primaryAction) {
@@ -134,6 +137,36 @@ struct MainView: View {
                 .help(tr("Toggle Before / After") + "  " + (shortcuts.combo(.beforeAfter)?.display ?? ""))
             Button { app.showExport = true } label: { Label(tr("Export"), systemImage: "square.and.arrow.up") }
                 .disabled(!app.hasImage).help(tr("Export Image…") + "  ⌘E")
+            SettingsLink { Label(tr("Settings"), systemImage: "gearshape") }
+                .help(tr("Settings") + "  ⌘,")
         }
+    }
+}
+
+/// App identity at the top of the sidebar: icon, name and version.
+struct AppHeader: View {
+    private var version: String {
+        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "dev"
+    }
+    var body: some View {
+        HStack(spacing: 9) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: 26, height: 26)
+            Text("EFFECTOR")
+                .font(.system(size: 13, weight: .heavy))
+                .tracking(1.6)
+                .foregroundStyle(Theme.text)
+            Spacer()
+            Text("v" + version)
+                .font(.system(size: 10.5, weight: .medium, design: .monospaced))
+                .foregroundStyle(Theme.textFaint)
+                .padding(.horizontal, 6).padding(.vertical, 2)
+                .background(Capsule().fill(Theme.field))
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 44)
+        .overlay(alignment: .bottom) { Rectangle().fill(Theme.separator).frame(height: 1) }
     }
 }

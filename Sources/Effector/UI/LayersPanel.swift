@@ -24,7 +24,8 @@ struct LayersPanel: View {
                 Spacer()
                 IconButton(symbol: "folder.badge.plus", help: "Group (⌘G)") { app.groupSelected() }
                 IconButton(symbol: "plus.square.on.square", help: "Duplicate (⌘D)") { app.duplicateSelected() }
-                IconButton(symbol: "trash", help: "Delete (⌘⌫)") { app.deleteSelected() }
+                IconButton(symbol: "square.and.arrow.down.on.square", help: "Save all layers as a preset") { app.saveStackAsPreset() }
+                    .disabled(app.state.layers.isEmpty)
             }
             .padding(.horizontal, 10)
             .frame(height: 44)
@@ -184,6 +185,13 @@ struct LayerRow: View {
                     .onTapGesture { app.soloID = app.soloID == node.id ? nil : node.id }
                     .help(tr("Solo: show only this layer"))
             }
+            Image(systemName: "trash")
+                .font(.system(size: 10.5))
+                .foregroundStyle(hover ? Theme.textDim : Theme.textFaint.opacity(0.7))
+                .frame(width: 18)
+                .contentShape(Rectangle())
+                .onTapGesture { app.selectedID = node.id; app.deleteSelected() }
+                .help(tr("Delete") + " (⌘⌫)")
             Image(systemName: node.enabled ? "eye" : "eye.slash")
                 .font(.system(size: 11.5))
                 .foregroundStyle(node.enabled ? (hover ? Theme.text : Theme.textDim) : Theme.textFaint)

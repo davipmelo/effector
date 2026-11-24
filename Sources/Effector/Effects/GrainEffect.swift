@@ -39,9 +39,10 @@ struct GrainEffect: Effect {
     let name = "Grain"
     let category = EffectCategory.film
     var symbol: String { "aqi.high" }
+    var summary: String { "Film-like grain that responds to shadows, midtones and highlights." }
     let params: [ParamDef] = [
-        .slider("amount", "Amount", 0, 100, 35, unit: "%", section: "Grain"),
-        .slider("size", "Size", 0.25, 6, 1.0, unit: "", section: "Grain"),
+        .slider("amount", "Amount", 0, 100, 35, step: 1, unit: "%", curve: 1.4, section: "Grain"),
+        .slider("size", "Size", 0.25, 6, 1.0, step: 0.05, unit: "", curve: 2.2, section: "Grain"),
         .slider("roughness", "Roughness", 0, 100, 45, unit: "%", section: "Grain"),
         .toggle("color", "Color Grain", false, section: "Grain"),
         .slider("colorAmount", "Color Amount", 0, 100, 50, unit: "%", section: "Grain", visible: whenOn("color")),

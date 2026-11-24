@@ -47,6 +47,8 @@ final class AppState: ObservableObject {
     private var lastCoalesceKey: String?
     private var lastCoalesceTime = Date.distantPast
     private var suppressUndo = false
+    private var browsing = false
+    private var browseUndoPushed = false
     var canUndo: Bool { !undoStack.isEmpty }
     var canRedo: Bool { !redoStack.isEmpty }
 
@@ -118,7 +120,13 @@ final class AppState: ObservableObject {
         body(&s)
         guard s != state else { return }
         let now = Date()
-        let merge = coalesce != nil && coalesce == lastCoalesceKey && now.timeIntervalSince(lastCoalesceTime) < 1.0
+        var merge = coalesce != nil && coalesce == lastCoalesceKey && now.timeIntervalSince(lastCoalesceTime) < 1.0
+        if browsing {
+            // all changes made while browsing a picker form one undo step
+            merge = browseUndoPushed
+            browseUndoPushed = true
+            interactiveUntil = now.addingTimeInterval(0.2)
+        }
         if !merge {
             undoStack.append(state)
             if undoStack.count > 300 { undoStack.removeFirst() }
@@ -131,6 +139,10 @@ final class AppState: ObservableObject {
         state = s
         suppressUndo = false
     }
+
+    /// Picker browsing session: every change until `endBrowse` is a single undo step.
+    func beginBrowse() { browsing = true; browseUndoPushed = false }
+    func endBrowse() { browsing = false; browseUndoPushed = false; lastCoalesceKey = nil }
 
     func undo() {
         guard let prev = undoStack.popLast() else { return }
@@ -161,6 +173,15 @@ final class AppState: ObservableObject {
         guard hasImage else { return }
         let node = LayerNode.effect(id)
         insertAboveSelection(node)
+    }
+
+    func addLUTLayer(_ l: LUTData) {
+        var p = Params()
+        p["lut"] = .lut(l)
+        var node = LayerNode.effect("lut", params: p)
+        node.name = l.name
+        insertAboveSelection(node)
+        flash(tr("LUT added: %@", l.name))
     }
 
     func insertAboveSelection(_ node: LayerNode) {
@@ -245,6 +266,17 @@ final class AppState: ObservableObject {
         updateLayer(id) { $0.params = fresh.params }
     }
 
+    /// Resets the layer to the effect defaults and applies a look's values.
+    func applyLook(_ id: UUID, _ look: EffectLook) {
+        guard let n = state.layers.find(id), !n.isGroup else { return }
+        var p = LayerNode.effect(n.effectID).params
+        for (k, v) in look.values { if let pv = paramValue(v) { p[k] = pv } }
+        // keep the seed so browsing looks doesn't reshuffle noise
+        if let seed = n.params["seed"] { p["seed"] = seed }
+        p["_look"] = .text(look.id)
+        updateLayer(id) { $0.params = p }
+    }
+
     enum DropPosition { case above, below, inside }
 
     /// Moves `id` relative to `target`.
@@ -289,13 +321,21 @@ final class AppState: ObservableObject {
         suppressUndo = false
     }
 
+    /// Saves the whole layer stack (order, groups, parameters, blend, opacity) as a user preset.
+    func saveStackAsPreset() {
+        guard hasImage, !state.layers.isEmpty else { return }
+        guard let n = promptText(tr("Save as Preset"), tr("Name"), tr("My Preset")) else { return }
+        PresetStore.shared.add(name: n, layers: state.layers, thumbnail: renderThumbnail(layers: state.layers, size: 240))
+        flash(tr("Preset saved: %@", n))
+    }
+
     func applyPreset(_ preset: Preset) {
         guard hasImage else { return }
-        var g = LayerNode.group(preset.name, preset.layers.map { $0.reidentified() })
+        var g = LayerNode.group(preset.displayName, preset.layers.map { $0.reidentified() })
         g.expanded = false
         edit { $0.layers.insert(g, at: 0) }
         selectedID = g.id
-        flash(tr("Preset applied: %@", preset.name))
+        flash(tr("Preset applied: %@", preset.displayName))
     }
 
     // MARK: - Rendering

@@ -10,28 +10,38 @@ struct PaletteEditor: View {
     @State private var extractCount = 6.0
     @State private var selected: Int?
 
+    private var paletteItems: [PickerItem] {
+        lib.palettes.map { PickerItem(id: "s:" + $0.name, label: $0.name, group: tr("Saved"), swatches: $0.colors) }
+        + PalettePresets.groups.flatMap { g in
+            g.1.map { PickerItem(id: "b:" + $0.name, label: $0.name, group: tr(g.0), swatches: $0.colors) }
+        }
+    }
+    private var selectedID: String {
+        if lib.palettes.contains(where: { $0.name == palette.name }) { return "s:" + palette.name }
+        return "b:" + palette.name
+    }
+    private func lookup(_ id: String) -> PaletteSpec? {
+        let name = String(id.dropFirst(2))
+        return id.hasPrefix("s:") ? lib.palettes.first { $0.name == name } : PalettePresets.all.first { $0.name == name }
+    }
+    private var paletteActions: [PickerAction] {
+        var a = [PickerAction(label: tr("Save Palette…"), symbol: "square.and.arrow.down") { save() },
+                 PickerAction(label: tr("Import Palettes…"), symbol: "square.and.arrow.down.on.square") {
+                     if let p = lib.importPalettes() { onChange(p) } },
+                 PickerAction(label: tr("Export Palette…"), symbol: "square.and.arrow.up") { lib.exportPalette(palette) }]
+        if lib.palettes.contains(palette) {
+            a.append(PickerAction(label: tr("Delete Saved Palette"), symbol: "trash", destructive: true) { lib.deletePalette(palette) })
+        }
+        return a
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Menu {
-                    Section(tr("Classic")) {
-                        ForEach(PalettePresets.all, id: \.name) { p in Button(p.name) { onChange(p) } }
-                    }
-                    if !lib.palettes.isEmpty {
-                        Section(tr("Saved")) { ForEach(lib.palettes, id: \.self) { p in Button(p.name) { onChange(p) } } }
-                    }
-                    Divider()
-                    Button(tr("Save Palette…")) { save() }
-                    Button(tr("Import Palettes…")) { if let p = lib.importPalettes() { onChange(p) } }
-                    Button(tr("Export Palette…")) { lib.exportPalette(palette) }
-                    if lib.palettes.contains(palette) {
-                        Button(tr("Delete Saved Palette"), role: .destructive) { lib.deletePalette(palette) }
-                    }
-                } label: {
-                    Text(palette.name).font(Theme.labelFont)
+                PickerField(scope: "palette", items: paletteItems, selected: selectedID, title: palette.name,
+                            actions: paletteActions) { id in
+                    if let p = lookup(id) { onChange(p) }
                 }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
                 Spacer()
                 Text("\(palette.colors.count)").font(Theme.valueFont).foregroundStyle(Theme.textFaint)
             }
@@ -96,27 +106,135 @@ struct PaletteEditor: View {
     }
 }
 
+/// Saved LUTs (copies of .cube files in Application Support/EFFECTOR/LUTs).
+final class LUTLibrary: ObservableObject {
+    static let shared = LUTLibrary()
+    @Published private(set) var names: [String] = []
+    private var cache: [String: LUTData] = [:]
+
+    var dir: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let d = base.appendingPathComponent("EFFECTOR/LUTs", isDirectory: true)
+        try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+        return d
+    }
+
+    private init() { reload() }
+
+    func reload() {
+        let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
+        names = files.filter { $0.pathExtension.lowercased() == "cube" }
+            .map { $0.deletingPathExtension().lastPathComponent }
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
+    func contains(_ name: String) -> Bool { names.contains(name) }
+
+    func load(_ name: String) -> LUTData? {
+        if let c = cache[name] { return c }
+        guard let l = try? CubeLUT.parse(url: dir.appendingPathComponent(name + ".cube")) else { return nil }
+        cache[name] = l
+        return l
+    }
+
+    /// Copies .cube files into the library. Returns the last imported LUT.
+    @discardableResult
+    func add(urls: [URL]) -> LUTData? {
+        var last: LUTData?
+        for u in urls where u.pathExtension.lowercased() == "cube" {
+            guard let l = try? CubeLUT.parse(url: u) else { continue }
+            let dest = dir.appendingPathComponent(u.lastPathComponent)
+            if dest.standardizedFileURL != u.standardizedFileURL {
+                try? FileManager.default.removeItem(at: dest)
+                try? FileManager.default.copyItem(at: u, to: dest)
+            }
+            cache[l.name] = l
+            last = l
+        }
+        reload()
+        return last
+    }
+
+    /// Writes a LUT held in memory (e.g. from a project) into the library.
+    func save(_ l: LUTData) {
+        var text = "TITLE \"\(l.name)\"\nLUT_3D_SIZE \(l.size)\n"
+        for i in stride(from: 0, to: l.values.count, by: 3) {
+            text += String(format: "%.6f %.6f %.6f\n", l.values[i], l.values[i + 1], l.values[i + 2])
+        }
+        try? text.write(to: dir.appendingPathComponent(l.name + ".cube"), atomically: true, encoding: .utf8)
+        cache[l.name] = l
+        reload()
+    }
+
+    func delete(_ name: String) {
+        try? FileManager.default.removeItem(at: dir.appendingPathComponent(name + ".cube"))
+        cache[name] = nil
+        reload()
+    }
+}
+
 struct LUTControl: View {
     let lut: LUTData?
     let onChange: (LUTData) -> Void
+    @ObservedObject private var lib = LUTLibrary.shared
+    @State private var targeted = false
+
     var body: some View {
-        HStack {
-            Image(systemName: "cube").foregroundStyle(Theme.textDim)
-            Text(lut?.name ?? tr("No LUT loaded"))
-                .font(Theme.labelFont)
-                .foregroundStyle(lut == nil ? Theme.textFaint : Theme.text)
-                .lineLimit(1).truncationMode(.middle)
-            Spacer()
-            Button(tr("Load .cube…")) { load() }.buttonStyle(PillButtonStyle())
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "cube").foregroundStyle(targeted ? Theme.accentText : Theme.textDim)
+                if lib.names.isEmpty && lut == nil {
+                    Text(tr("No LUT loaded")).font(Theme.labelFont).foregroundStyle(Theme.textFaint)
+                    Spacer()
+                } else {
+                    PickerField(scope: "lut", items: lib.names.map { PickerItem(id: $0, label: $0) },
+                                selected: lut?.name ?? "", title: lut?.name ?? tr("Choose a LUT"),
+                                actions: actions, expand: true) { name in
+                        if let l = lib.load(name) { onChange(l) }
+                    }
+                }
+                Button(tr("Load .cube…")) { load() }.buttonStyle(PillButtonStyle())
+            }
+            Text(targeted ? tr("Drop to load and save the LUT") : tr("Drop .cube files here · loaded LUTs are saved to your library"))
+                .font(.system(size: 10.5)).foregroundStyle(targeted ? Theme.accentText : Theme.textFaint)
         }
+        .padding(8)
+        .background(RoundedRectangle(cornerRadius: 8).strokeBorder(targeted ? Theme.accent : Theme.separator,
+                                                                   style: StrokeStyle(lineWidth: targeted ? 1.5 : 1, dash: [4, 3])))
+        .onDrop(of: [.fileURL], isTargeted: $targeted) { providers in
+            Task { @MainActor in
+                var urls: [URL] = []
+                for pr in providers {
+                    if let u = try? await pr.loadItem(forTypeIdentifier: UTType.fileURL.identifier) as? Data,
+                       let url = URL(dataRepresentation: u, relativeTo: nil) { urls.append(url) }
+                }
+                if let l = lib.add(urls: urls) { onChange(l) }
+                else { AppState.shared.flash(tr("Invalid .cube file")) }
+            }
+            return true
+        }
+    }
+
+    private var actions: [PickerAction] {
+        var a: [PickerAction] = [PickerAction(label: tr("Load .cube…"), symbol: "folder") { load() },
+                                 PickerAction(label: tr("Show LUT Folder"), symbol: "folder.badge.gearshape") {
+                                     NSWorkspace.shared.open(lib.dir) }]
+        if let l = lut, !lib.contains(l.name) {
+            a.insert(PickerAction(label: tr("Save to Library"), symbol: "square.and.arrow.down") { lib.save(l) }, at: 0)
+        }
+        if let l = lut, lib.contains(l.name) {
+            a.append(PickerAction(label: tr("Remove from Library"), symbol: "trash", destructive: true) { lib.delete(l.name) })
+        }
+        return a
     }
 
     private func load() {
         let p = NSOpenPanel()
         p.allowedContentTypes = [UTType(filenameExtension: "cube") ?? .data]
-        guard p.runModal() == .OK, let url = p.url else { return }
-        do { onChange(try CubeLUT.parse(url: url)) }
-        catch { AppState.shared.alert(tr("Could not read LUT"), error.localizedDescription) }
+        p.allowsMultipleSelection = true
+        guard p.runModal() == .OK else { return }
+        if let l = lib.add(urls: p.urls) { onChange(l) }
+        else { AppState.shared.alert(tr("Could not read LUT"), tr("Invalid .cube file")) }
     }
 }
 

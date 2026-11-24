@@ -8,32 +8,37 @@ struct GradientEditor: View {
     @State private var selected: UUID?
     @ObservedObject private var lib = SwatchLibrary.shared
 
+    private var gradientItems: [PickerItem] {
+        lib.gradients.map { PickerItem(id: "s:" + $0.name, label: $0.name, group: tr("Saved"), gradient: $0.previewColors) }
+        + GradientPresets.groups.flatMap { g in
+            g.1.map { PickerItem(id: "b:" + $0.name, label: $0.name, group: tr(g.0), gradient: $0.previewColors) }
+        }
+    }
+    private var selectedID: String {
+        if lib.gradients.contains(where: { $0.name == gradient.name }) { return "s:" + gradient.name }
+        return "b:" + gradient.name
+    }
+    private func lookup(_ id: String) -> GradientSpec? {
+        let name = String(id.dropFirst(2))
+        return id.hasPrefix("s:") ? lib.gradients.first { $0.name == name } : GradientPresets.all.first { $0.name == name }
+    }
+    private var gradientActions: [PickerAction] {
+        var a = [PickerAction(label: tr("Save Gradient…"), symbol: "square.and.arrow.down") { saveGradient() },
+                 PickerAction(label: tr("Import Gradients…"), symbol: "square.and.arrow.down.on.square") { lib.importGradients() },
+                 PickerAction(label: tr("Export Gradient…"), symbol: "square.and.arrow.up") { lib.exportGradient(gradient) }]
+        if lib.gradients.contains(gradient) {
+            a.append(PickerAction(label: tr("Delete Saved Gradient"), symbol: "trash", destructive: true) { lib.deleteGradient(gradient) })
+        }
+        return a
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Menu {
-                    Section(tr("Built-in")) {
-                        ForEach(GradientPresets.all, id: \.name) { g in
-                            Button(g.name) { onChange(g) }
-                        }
-                    }
-                    if !lib.gradients.isEmpty {
-                        Section(tr("Saved")) {
-                            ForEach(lib.gradients, id: \.self) { g in Button(g.name) { onChange(g) } }
-                        }
-                    }
-                    Divider()
-                    Button(tr("Save Gradient…")) { saveGradient() }
-                    Button(tr("Import Gradients…")) { lib.importGradients() }
-                    Button(tr("Export Gradient…")) { lib.exportGradient(gradient) }
-                    if lib.gradients.contains(gradient) {
-                        Button(tr("Delete Saved Gradient"), role: .destructive) { lib.deleteGradient(gradient) }
-                    }
-                } label: {
-                    Text(gradient.name).font(Theme.labelFont)
+                PickerField(scope: "gradient", items: gradientItems, selected: selectedID, title: gradient.name,
+                            actions: gradientActions) { id in
+                    if let g = lookup(id) { onChange(g) }
                 }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
                 Spacer()
                 Button { reverse() } label: { Image(systemName: "arrow.left.arrow.right") }
                     .buttonStyle(.plain).foregroundStyle(Theme.textDim).help(tr("Reverse"))

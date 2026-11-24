@@ -10,25 +10,36 @@ struct ValueSlider: View {
     var defaultValue: Double = 0
     var step: Double = 0
     var unit: String = ""
+    /// Position → value mapping exponent (> 1 = finer control near the minimum).
+    var curve: Double = 1
+    /// Optional colours painted on the track.
+    var track: [Color]? = nil
     let onChange: (Double) -> Void
 
-    @State private var dragStart: Double?
+    @State private var dragStart: Double?   // slider position (0…1) at drag start
     @State private var editing = false
     @State private var text = ""
     @State private var hover = false
     @FocusState private var focused: Bool
 
-    private var fraction: Double { (value - range.lowerBound) / (range.upperBound - range.lowerBound) }
-    private var originFraction: Double {
-        let o = min(max(0, range.lowerBound), range.upperBound)
-        return (o - range.lowerBound) / (range.upperBound - range.lowerBound)
+    private var span: Double { range.upperBound - range.lowerBound }
+    private func position(of v: Double) -> Double {
+        let lin = min(1, max(0, (v - range.lowerBound) / span))
+        return curve == 1 ? lin : pow(lin, 1 / curve)
     }
+    private func value(at pos: Double) -> Double {
+        let t = min(1, max(0, pos))
+        return range.lowerBound + span * (curve == 1 ? t : pow(t, curve))
+    }
+    private var fraction: Double { position(of: value) }
+    private var originFraction: Double { position(of: min(max(0, range.lowerBound), range.upperBound)) }
 
     private var formatted: String {
         let decimals: Int
         if step >= 1 { decimals = 0 }
-        else if range.upperBound - range.lowerBound <= 4 { decimals = 2 }
-        else if range.upperBound - range.lowerBound <= 20 { decimals = 1 }
+        else if step > 0 { decimals = step >= 0.1 ? 1 : 2 }
+        else if span <= 4 || (curve > 1 && value < 1 && span < 30) { decimals = 2 }
+        else if span <= 20 || (curve > 1 && value < 10) { decimals = 1 }
         else { decimals = 0 }
         return String(format: "%.\(decimals)f", value) + unit
     }
@@ -60,17 +71,24 @@ struct ValueSlider: View {
             }
             GeometryReader { geo in
                 let w = geo.size.width
+                let active = hover || dragStart != nil
                 ZStack(alignment: .leading) {
-                    Capsule().fill(Theme.track).frame(height: 4)
-                    let a = min(fraction, originFraction), b = max(fraction, originFraction)
-                    Capsule().fill(Theme.trackFill)
-                        .frame(width: max(0, (b - a) * w), height: 4)
-                        .offset(x: a * w)
+                    if let track {
+                        Capsule().fill(LinearGradient(colors: track, startPoint: .leading, endPoint: .trailing))
+                            .frame(height: 5)
+                            .overlay(Capsule().stroke(Theme.separator, lineWidth: 0.5))
+                    } else {
+                        Capsule().fill(Theme.track).frame(height: 4)
+                        let a = min(fraction, originFraction), b = max(fraction, originFraction)
+                        Capsule().fill(Theme.trackFill)
+                            .frame(width: max(0, (b - a) * w), height: 4)
+                            .offset(x: a * w)
+                    }
                     Circle()
                         .fill(Color.white)
                         .shadow(color: .black.opacity(0.35), radius: 1.5, y: 0.5)
-                        .frame(width: hover || dragStart != nil ? 12 : 10, height: hover || dragStart != nil ? 12 : 10)
-                        .offset(x: fraction * w - (hover || dragStart != nil ? 6 : 5))
+                        .frame(width: active ? 12 : 10, height: active ? 12 : 10)
+                        .offset(x: fraction * w - (active ? 6 : 5))
                 }
                 .frame(height: 14)
                 .contentShape(Rectangle())
@@ -79,16 +97,17 @@ struct ValueSlider: View {
                         .onChanged { g in
                             let fine = NSEvent.modifierFlags.contains(.option)
                             if dragStart == nil {
-                                dragStart = value
-                                if !fine {
+                                if fine {
+                                    dragStart = fraction
+                                } else {
                                     // jump to click position
-                                    set(range.lowerBound + Double(g.startLocation.x / w) * (range.upperBound - range.lowerBound))
-                                    dragStart = clampValue(range.lowerBound + Double(g.startLocation.x / w) * (range.upperBound - range.lowerBound))
+                                    let pos = Double(g.startLocation.x / w)
+                                    dragStart = position(of: clampValue(value(at: pos)))
+                                    set(value(at: pos))
                                 }
                             }
-                            let span = range.upperBound - range.lowerBound
-                            let dx = Double(g.translation.width / w) * span * (fine ? 0.1 : 1)
-                            set((dragStart ?? value) + dx)
+                            let dx = Double(g.translation.width / w) * (fine ? 0.1 : 1)
+                            set(value(at: (dragStart ?? fraction) + dx))
                         }
                         .onEnded { _ in dragStart = nil }
                 )
@@ -102,7 +121,7 @@ struct ValueSlider: View {
     private func clampValue(_ v: Double) -> Double {
         var v = min(range.upperBound, max(range.lowerBound, v))
         if step > 0 { v = (v / step).rounded() * step }
-        return v
+        return min(range.upperBound, max(range.lowerBound, v))
     }
 
     private func set(_ v: Double) {
@@ -149,21 +168,13 @@ struct ChoiceRow: View {
     let label: String
     let options: [ChoiceOption]
     let selected: String
+    var scope: String? = nil
     let onChange: (String) -> Void
     var body: some View {
         LabeledRow(label: label) {
-            Menu {
-                ForEach(options, id: \.id) { o in
-                    Button { onChange(o.id) } label: {
-                        if o.id == selected { Label(tr(o.label), systemImage: "checkmark") } else { Text(tr(o.label)) }
-                    }
-                }
-            } label: {
-                Text(tr(options.first { $0.id == selected }?.label ?? selected))
-                    .font(Theme.labelFont)
-            }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
+            PickerField(scope: scope ?? "choice." + label,
+                        items: options.map { PickerItem(id: $0.id, label: tr($0.label), group: $0.group.map { tr($0) }) },
+                        selected: selected, onSelect: onChange)
         }
     }
 }

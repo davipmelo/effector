@@ -101,6 +101,7 @@ struct BlobTrackerEffect: Effect {
     let name = "Blob Tracker"
     let category = EffectCategory.overlay
     var symbol: String { "viewfinder" }
+    var summary: String { "TouchDesigner-style tracking boxes, labels and connections." }
     let params: [ParamDef] = [
         .choice("detect", "Detect By", [("brightness", "Brightness"), ("darkness", "Darkness"), ("color", "Color"),
                                         ("contours", "Contours (Vision)"), ("saliency", "Objects (Vision)")], "brightness", section: "Detection"),
@@ -109,14 +110,17 @@ struct BlobTrackerEffect: Effect {
         .color("target", "Target Color", RGBA(hex: "#E03020"), section: "Detection", visible: when("detect", "color")),
         .slider("tolerance", "Tolerance", 1, 100, 25, unit: "%", section: "Detection", visible: when("detect", "color")),
         .slider("maxBlobs", "Max Blobs", 1, 60, 14, step: 1, section: "Detection"),
-        .slider("minSize", "Min Size", 0, 20, 0.3, unit: "%", section: "Detection"),
-        .slider("maxSize", "Max Size", 1, 100, 40, unit: "%", section: "Detection"),
+        .slider("minSize", "Min Size", 0, 20, 0.3, unit: "%", curve: 3, section: "Detection"),
+        .slider("maxSize", "Max Size", 1, 100, 40, unit: "%", curve: 2, section: "Detection"),
         .slider("detail", "Detail", 40, 400, 160, step: 10, section: "Detection"),
         .choice("shape", "Marker", [("box", "Box"), ("corners", "Corners"), ("circle", "Circle"), ("cross", "Crosshair"),
                                     ("brackets", "Brackets")], "box", section: "Style"),
+        .segmented("boxMode", "Box Size", [("fit", "Fit Blob"), ("fixed", "Fixed")], "fit", section: "Style"),
+        .slider("boxScale", "Box Scale", 10, 200, 100, step: 1, unit: "%", section: "Style", visible: whenNot("boxMode", "fixed")),
+        .slider("boxSize", "Box Size", 4, 200, 30, step: 1, curve: 1.8, section: "Style", visible: when("boxMode", "fixed")),
+        .slider("padding", "Padding", -20, 40, 4, step: 0.5, section: "Style", visible: whenNot("boxMode", "fixed")),
         .color("color", "Color", RGBA(hex: "#FFFFFF"), section: "Style"),
-        .slider("lineWidth", "Line Width", 0.25, 8, 1.6, section: "Style"),
-        .slider("padding", "Padding", 0, 40, 4, section: "Style"),
+        .slider("lineWidth", "Line Width", 0.25, 8, 1.6, step: 0.05, curve: 1.8, section: "Style"),
         .toggle("centerDot", "Center Dot", true, section: "Style"),
         .slider("fill", "Fill", 0, 100, 0, unit: "%", section: "Style"),
         .slider("invertInside", "Invert Inside", 0, 100, 0, unit: "%", section: "Style"),
@@ -124,11 +128,11 @@ struct BlobTrackerEffect: Effect {
         .choice("label", "Label", [("none", "None"), ("id", "ID"), ("coords", "Coordinates"), ("size", "Size"),
                                    ("hex", "Hex ID"), ("custom", "Custom Text")], "id", section: "Labels"),
         ParamDef(key: "labelText", label: "Text", kind: .text(def: "TARGET"), section: "Labels", visible: when("label", "custom")),
-        .slider("labelSize", "Label Size", 4, 60, 16, section: "Labels", visible: whenNot("label", "none")),
+        .slider("labelSize", "Label Size", 4, 60, 16, step: 0.5, curve: 1.5, section: "Labels", visible: whenNot("label", "none")),
         .toggle("labelBG", "Label Background", true, section: "Labels", visible: whenNot("label", "none")),
         .choice("connect", "Connections", [("none", "None"), ("sequence", "Sequence"), ("nearest", "Nearest"), ("center", "To Center"),
                                            ("all", "All")], "nearest", section: "Connections"),
-        .slider("connectWidth", "Line Width", 0.25, 6, 1.0, section: "Connections", visible: whenNot("connect", "none")),
+        .slider("connectWidth", "Line Width", 0.25, 6, 1.0, step: 0.05, curve: 1.8, section: "Connections", visible: whenNot("connect", "none")),
         .toggle("dashed", "Dashed", false, section: "Connections", visible: whenNot("connect", "none")),
         .slider("connectOpacity", "Opacity", 0, 100, 70, unit: "%", section: "Connections", visible: whenNot("connect", "none")),
     ]
@@ -177,8 +181,15 @@ struct BlobTrackerEffect: Effect {
         let color = p.color("color", .white)
         let lw = CGFloat(max(0.5, ctx.px(p.num("lineWidth", 1.6))))
         let pad = CGFloat(ctx.px(p.num("padding", 4)))
-        let rects = blobs.map { CGRect(x: $0.rect.minX * W - pad, y: $0.rect.minY * H - pad,
-                                       width: $0.rect.width * W + pad * 2, height: $0.rect.height * H + pad * 2) }
+        let fixed = p.choice("boxMode", "fit") == "fixed"
+        let bs = CGFloat(p.num("boxScale", 100) / 100)
+        let fs = CGFloat(ctx.px(p.num("boxSize", 30)))
+        let rects: [CGRect] = blobs.map { b in
+            let cx = b.rect.midX * W, cy = b.rect.midY * H
+            if fixed { return CGRect(x: cx - fs / 2, y: cy - fs / 2, width: fs, height: fs) }
+            let w = max(2, b.rect.width * W * bs + pad * 2), h = max(2, b.rect.height * H * bs + pad * 2)
+            return CGRect(x: cx - w / 2, y: cy - h / 2, width: w, height: h)
+        }
         let g = ov.ctx
         // connections (under markers)
         let conn = p.choice("connect", "nearest")

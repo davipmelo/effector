@@ -3,7 +3,8 @@ enum ShaderLibrary {
         [common, coreKernels, displayShaders,
          AdjustShaders.source, DitherShaders.source, HalftoneShaders.source, AsciiShaders.source,
          GradientShaders.source, GrainShaders.source, GlowShaders.source, FilmShaders.source,
-         TrailShaders.source, VHSShaders.source, BlobShaders.source].joined(separator: "\n")
+         TrailShaders.source, VHSShaders.source, BlobShaders.source,
+         TextureShaders.source, LensShaders.source, DigitalShaders.source, CopyShaders.source, FrameShaders.source].joined(separator: "\n")
     }
 
     static let common = """
@@ -63,6 +64,46 @@ enum ShaderLibrary {
         return float3(hue2rgb(p, q, h.x + 1.0/3.0), hue2rgb(p, q, h.x), hue2rgb(p, q, h.x - 1.0/3.0));
     }
 
+    // OKLab (Björn Ottosson). Input/output linear sRGB.
+    inline float cbrtf(float x) { return sign(x) * pow(abs(x), 1.0 / 3.0); }
+    inline float3 lin2oklab(float3 c) {
+        float l = 0.4122214708 * c.r + 0.5363325363 * c.g + 0.0514459929 * c.b;
+        float m = 0.2119034982 * c.r + 0.6806995451 * c.g + 0.1073969566 * c.b;
+        float s = 0.0883024619 * c.r + 0.2817188376 * c.g + 0.6299787005 * c.b;
+        l = cbrtf(l); m = cbrtf(m); s = cbrtf(s);
+        return float3(0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+                      1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+                      0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s);
+    }
+    inline float3 oklab2lin(float3 c) {
+        float l = c.x + 0.3963377774 * c.y + 0.2158037573 * c.z;
+        float m = c.x - 0.1055613458 * c.y - 0.0638541728 * c.z;
+        float s = c.x - 0.0894841775 * c.y - 1.2914855480 * c.z;
+        l = l * l * l; m = m * m * m; s = s * s * s;
+        return float3( 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+                      -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+                      -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s);
+    }
+    /// sRGB (gamma) → OKLCh (L, C, h in radians)
+    inline float3 srgb2oklch(float3 c) {
+        float3 lab = lin2oklab(toLinear(clamp(c, 0.0, 1.0)));
+        return float3(lab.x, length(lab.yz), atan2(lab.z, lab.y));
+    }
+    /// OKLCh → sRGB (gamma), mapping out-of-gamut colours by reducing chroma (keeps L and hue).
+    inline float3 oklch2srgb(float3 lch) {
+        float L = clamp(lch.x, 0.0, 1.0);
+        float2 dir = float2(cos(lch.z), sin(lch.z));
+        float3 rgb = oklab2lin(float3(L, dir * lch.y));
+        if (all(rgb >= -1e-4) && all(rgb <= 1.0001)) return toSRGB(clamp(rgb, 0.0, 1.0));
+        float lo = 0.0, hi = lch.y;
+        for (int i = 0; i < 12; i++) {
+            float mid = 0.5 * (lo + hi);
+            float3 t = oklab2lin(float3(L, dir * mid));
+            if (all(t >= -1e-4) && all(t <= 1.0001)) lo = mid; else hi = mid;
+        }
+        return toSRGB(clamp(oklab2lin(float3(L, dir * lo)), 0.0, 1.0));
+    }
+
     inline float hash12(float2 p) {
         float3 p3 = fract(float3(p.xyx) * 0.1031);
         p3 += dot(p3, p3.yzx + 33.33);
@@ -103,6 +144,13 @@ enum ShaderLibrary {
         if (x > 1.0) c = L + (c - L) * (1.0 - L) / max(x - L, 1e-5);
         return c;
     }
+    inline float satOf(float3 c) { return max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b)); }
+    inline float3 setSat(float3 c, float s) {
+        float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b));
+        float d = mx - mn;
+        if (d < 1e-5) return float3(0.0);
+        return (c - mn) / d * s;
+    }
     inline float3 blendMode(float3 b, float3 s, int m) {
         switch (m) {
             case 1: return b * s;
@@ -115,6 +163,13 @@ enum ShaderLibrary {
             case 8: return abs(b - s);
             case 9: return setLum(s, luma(b));
             case 10: return setLum(b, luma(s));
+            case 11: return select(min(1.0, b / max(1.0 - s, 1e-4)), float3(1.0), s >= 1.0);
+            case 12: return select(1.0 - min(1.0, (1.0 - b) / max(s, 1e-4)), float3(0.0), s <= 0.0);
+            case 13: return min(b + s, 1.0);
+            case 14: return max(b + s - 1.0, 0.0);
+            case 15: return b + s - 2.0 * b * s;
+            case 16: return setLum(setSat(s, satOf(b)), luma(b));
+            case 17: return setLum(setSat(b, satOf(s)), luma(b));
             default: return s;
         }
     }

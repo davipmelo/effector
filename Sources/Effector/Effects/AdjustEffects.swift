@@ -95,48 +95,53 @@ enum AdjustShaders {
         o.write(float4(r, c.a), gid);
     }
 
-    // u: 8 bands x (hue, sat, lum) in -100..100
+    // u: 8 bands x (hue, sat, lum) in -100..100. Works in OKLCh so changes stay smooth and neutrals untouched.
     kernel void k_hsl(KIN, texture2d<float> a [[texture(1)]]) {
         GUARD
         float4 src = a.read(gid);
-        float3 h = rgb2hsl(clamp(src.rgb, 0.0, 1.0));
-        const float centers[8] = {0.0, 30.0, 60.0, 120.0, 180.0, 240.0, 280.0, 320.0};
-        float deg = h.x * 360.0;
+        float3 lch = srgb2oklch(src.rgb);
+        // band centres (OKLCh hue, degrees): red orange yellow green aqua blue purple magenta
+        const float centers[8] = {29.0, 58.0, 108.0, 142.0, 195.0, 264.0, 295.0, 330.0};
+        float deg = lch.z * 57.29578;
+        deg = deg < 0.0 ? deg + 360.0 : deg;
         float dh = 0, ds = 0, dl = 0;
         for (int i = 0; i < 8; i++) {
             float c0 = centers[i];
             float cPrev = centers[(i + 7) % 8]; float cNext = centers[(i + 1) % 8];
             float dPrev = fmod(c0 - cPrev + 360.0, 360.0);
             float dNext = fmod(cNext - c0 + 360.0, 360.0);
-            float d = deg - c0;
-            d = fmod(d + 540.0, 360.0) - 180.0;
-            float w = d >= 0.0 ? 1.0 - d / dNext : 1.0 + d / dPrev;
-            w = clamp(w, 0.0, 1.0);
+            float d = fmod(deg - c0 + 540.0, 360.0) - 180.0;
+            float w = clamp(d >= 0.0 ? 1.0 - d / dNext : 1.0 + d / dPrev, 0.0, 1.0);
+            w = w * w * (3.0 - 2.0 * w);          // smooth partition of unity
             dh += w * u[i * 3 + 0];
             ds += w * u[i * 3 + 1];
             dl += w * u[i * 3 + 2];
         }
-        float satW = smoothstep(0.0, 0.15, h.y);
-        h.x = fract(h.x + dh / 100.0 * 30.0 / 360.0 * satW);
-        h.y = clamp(h.y * (1.0 + ds / 100.0), 0.0, 1.0);
-        float3 c = hsl2rgb(h);
-        c = clamp(c + dl / 100.0 * 0.4 * satW * h.y, 0.0, 1.0);
-        o.write(float4(c, src.a), gid);
+        dh /= 100.0; ds /= 100.0; dl /= 100.0;
+        // neutral / near-neutral pixels are left alone (no noise amplification)
+        float cw = smoothstep(0.012, 0.07, lch.y);
+        lch.z += dh * 0.5236 * cw;                 // ±30°
+        lch.y *= max(0.0, 1.0 + ds * cw);
+        if (dl < 0.0) lch.x *= 1.0 + dl * 0.55 * cw;
+        else lch.x += (1.0 - lch.x) * dl * 0.45 * cw;
+        o.write(float4(oklch2srgb(lch), src.a), gid);
     }
 
     // u: hue(deg), sat, light, colorize, colorHue(deg), colorSat
     kernel void k_huesat(KIN, texture2d<float> a [[texture(1)]]) {
         GUARD
         float4 src = a.read(gid);
-        float3 h = rgb2hsl(clamp(src.rgb, 0.0, 1.0));
+        float3 lch = srgb2oklch(src.rgb);
         if (u[3] > 0.5) {
-            h.x = u[4] / 360.0;
-            h.y = u[5] / 100.0;
+            float3 ref = srgb2oklch(hsl2rgb(float3(u[4] / 360.0, 1.0, 0.5)));
+            lch.z = ref.z;
+            lch.y = u[5] / 100.0 * 0.26;
         } else {
-            h.x = fract(h.x + u[0] / 360.0);
-            h.y = clamp(h.y * (1.0 + u[1] / 100.0), 0.0, 1.0);
+            lch.z += u[0] * 0.0174533;
+            float s = u[1] / 100.0;
+            lch.y *= max(0.0, 1.0 + s);
         }
-        float3 c = hsl2rgb(h);
+        float3 c = oklch2srgb(lch);
         float L = u[2] / 100.0;
         c = L >= 0.0 ? mix(c, float3(1.0), L) : c * (1.0 + L);
         o.write(float4(clamp(c, 0.0, 1.0), src.a), gid);
@@ -172,6 +177,7 @@ struct BasicAdjustEffect: Effect {
     let name = "Basic Adjustments"
     let category = EffectCategory.adjust
     var symbol: String { "slider.horizontal.3" }
+    var summary: String { "Exposure, contrast, highlights, shadows, white balance and saturation." }
     let params: [ParamDef] = [
         .slider("exposure", "Exposure", -4, 4, 0, unit: " EV", section: "Tone"),
         .slider("contrast", "Contrast", -100, 100, 0, section: "Tone"),
@@ -179,8 +185,8 @@ struct BasicAdjustEffect: Effect {
         .slider("shadows", "Shadows", -100, 100, 0, section: "Tone"),
         .slider("whites", "Whites", -100, 100, 0, section: "Tone"),
         .slider("blacks", "Blacks", -100, 100, 0, section: "Tone"),
-        .slider("temperature", "Temperature", -100, 100, 0, section: "Color"),
-        .slider("tint", "Tint", -100, 100, 0, section: "Color"),
+        .slider("temperature", "Temperature", -100, 100, 0, section: "Color", track: [RGBA(hex: "#3A7BFF"), RGBA(hex: "#9A9A9A"), RGBA(hex: "#FFB020")]),
+        .slider("tint", "Tint", -100, 100, 0, section: "Color", track: [RGBA(hex: "#2FBF5A"), RGBA(hex: "#9A9A9A"), RGBA(hex: "#E040C0")]),
         .slider("vibrance", "Vibrance", -100, 100, 0, section: "Color"),
         .slider("saturation", "Saturation", -100, 100, 0, section: "Color"),
     ]
@@ -195,6 +201,7 @@ struct CurvesEffect: Effect {
     let name = "Curves"
     let category = EffectCategory.adjust
     var symbol: String { "point.topleft.down.to.point.bottomright.curvepath" }
+    var summary: String { "Tone curves for RGB and each channel." }
     let params: [ParamDef] = [ParamDef(key: "curves", label: "Curves", kind: .curves)]
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
         let lut = ctx.gpu.makeLUT1D(CurveMath.lut(p.curves("curves")))
@@ -204,17 +211,27 @@ struct CurvesEffect: Effect {
 
 struct HSLEffect: Effect {
     static let bands = ["Red", "Orange", "Yellow", "Green", "Aqua", "Blue", "Purple", "Magenta"]
+    static let bandColors = ["#FF3B30", "#FF9500", "#FFD60A", "#34C759", "#32D3E0", "#1E6BFF", "#8E44EF", "#FF2D95"].map { RGBA(hex: $0) }
+    var summary: String { "Shift hue, saturation and luminance of 8 colour ranges, smoothly." }
+    var sectionColors: [String: RGBA] {
+        Dictionary(uniqueKeysWithValues: zip(HSLEffect.bands, HSLEffect.bandColors))
+    }
     let id = "hsl"
     let name = "HSL"
     let category = EffectCategory.adjust
     var symbol: String { "circle.lefthalf.filled.righthalf.striped.horizontal" }
     var params: [ParamDef] {
-        HSLEffect.bands.flatMap { b -> [ParamDef] in
+        HSLEffect.bands.enumerated().flatMap { i, b -> [ParamDef] in
             let k = b.lowercased()
+            let c = HSLEffect.bandColors[i]
+            let prev = HSLEffect.bandColors[(i + 7) % 8], next = HSLEffect.bandColors[(i + 1) % 8]
+            let gray = RGBA(r: c.luma, g: c.luma, b: c.luma)
+            let dark = RGBA(r: c.r * 0.25, g: c.g * 0.25, b: c.b * 0.25)
+            let light = RGBA(r: 0.5 + c.r * 0.5, g: 0.5 + c.g * 0.5, b: 0.5 + c.b * 0.5)
             return [
-                .slider("\(k)_h", "Hue", -100, 100, 0, section: b),
-                .slider("\(k)_s", "Saturation", -100, 100, 0, section: b),
-                .slider("\(k)_l", "Luminance", -100, 100, 0, section: b),
+                .slider("\(k)_h", "Hue", -100, 100, 0, section: b, track: [prev, c, next]),
+                .slider("\(k)_s", "Saturation", -100, 100, 0, section: b, track: [gray, c]),
+                .slider("\(k)_l", "Luminance", -100, 100, 0, section: b, track: [dark, c, light]),
             ]
         }
     }
@@ -233,12 +250,15 @@ struct HueSatEffect: Effect {
     let name = "Hue / Saturation"
     let category = EffectCategory.adjust
     var symbol: String { "drop.halffull" }
+    var summary: String { "Rotate hue, change saturation and lightness, or colorize." }
     let params: [ParamDef] = [
-        .slider("hue", "Hue", -180, 180, 0, unit: "°"),
-        .slider("saturation", "Saturation", -100, 100, 0),
-        .slider("lightness", "Lightness", -100, 100, 0),
+        .slider("hue", "Hue", -180, 180, 0, unit: "°", track: [RGBA(hex: "#00FFFF"), RGBA(hex: "#0000FF"), RGBA(hex: "#FF00FF"), RGBA(hex: "#FF0000"), RGBA(hex: "#FFFF00"), RGBA(hex: "#00FF00"), RGBA(hex: "#00FFFF")]),
+        .slider("saturation", "Saturation", -100, 100, 0, track: [RGBA(hex: "#808080"), RGBA(hex: "#FF3B30")]),
+        .slider("lightness", "Lightness", -100, 100, 0, track: [.black, RGBA(hex: "#808080"), .white]),
         .toggle("colorize", "Colorize", false),
-        .slider("colorHue", "Color Hue", 0, 360, 30, unit: "°", visible: whenOn("colorize")),
+        .slider("colorHue", "Color Hue", 0, 360, 30, unit: "°",
+                track: [RGBA(hex: "#FF0000"), RGBA(hex: "#FFFF00"), RGBA(hex: "#00FF00"), RGBA(hex: "#00FFFF"), RGBA(hex: "#0000FF"), RGBA(hex: "#FF00FF"), RGBA(hex: "#FF0000")],
+                visible: whenOn("colorize")),
         .slider("colorSat", "Color Saturation", 0, 100, 40, visible: whenOn("colorize")),
     ]
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
@@ -252,6 +272,7 @@ struct BlackWhiteEffect: Effect {
     let name = "Black & White"
     let category = EffectCategory.adjust
     var symbol: String { "circle.lefthalf.filled" }
+    var summary: String { "Black & white with per-colour mixing. Always perfectly neutral." }
     let params: [ParamDef] = [
         .slider("reds", "Reds", -200, 300, 40, unit: "%"),
         .slider("yellows", "Yellows", -200, 300, 60, unit: "%"),
@@ -271,6 +292,7 @@ struct InvertEffect: Effect {
     let name = "Invert"
     let category = EffectCategory.adjust
     var symbol: String { "circle.righthalf.filled.inverse" }
+    var summary: String { "Negative image." }
     let params: [ParamDef] = []
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
         ctx.apply("k_invert", [input])
@@ -282,6 +304,7 @@ struct PosterizeEffect: Effect {
     let name = "Posterize"
     let category = EffectCategory.adjust
     var symbol: String { "square.stack.3d.down.forward" }
+    var summary: String { "Reduce the number of tones per channel." }
     let params: [ParamDef] = [.slider("levels", "Levels", 2, 16, 4, step: 1)]
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
         ctx.apply("k_posterize", [input], [p.f("levels", 4)])
@@ -293,6 +316,7 @@ struct ThresholdEffect: Effect {
     let name = "Threshold"
     let category = EffectCategory.adjust
     var symbol: String { "circle.and.line.horizontal" }
+    var summary: String { "Two-colour cut at a brightness level." }
     let params: [ParamDef] = [
         .slider("level", "Level", 0, 100, 50, unit: "%"),
         .slider("softness", "Softness", 0, 50, 0, unit: "%"),
@@ -310,7 +334,8 @@ struct BlurEffect: Effect {
     let name = "Blur"
     let category = EffectCategory.light
     var symbol: String { "aqi.medium" }
-    let params: [ParamDef] = [.slider("radius", "Radius", 0, 200, 8, unit: "")]
+    var summary: String { "Gaussian blur." }
+    let params: [ParamDef] = [.slider("radius", "Radius", 0, 200, 8, unit: "", curve: 2.2)]
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
         ctx.blur(input, sigma: ctx.px(p.num("radius", 8)) / 2)
     }

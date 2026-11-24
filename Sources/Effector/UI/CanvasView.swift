@@ -51,7 +51,13 @@ struct CanvasContainer: View {
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
             guard let p = providers.first else { return false }
             _ = p.loadObject(ofClass: URL.self) { url, _ in
-                if let url { DispatchQueue.main.async { if app.confirmDiscardChanges() { app.open(url: url) } } }
+                guard let url else { return }
+                DispatchQueue.main.async {
+                    if url.pathExtension.lowercased() == "cube" {
+                        // a LUT dropped on the canvas: save it and add a LUT layer
+                        if app.hasImage, let l = LUTLibrary.shared.add(urls: [url]) { app.addLUTLayer(l) }
+                    } else if app.confirmDiscardChanges() { app.open(url: url) }
+                }
             }
             return true
         }
