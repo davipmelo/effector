@@ -17,6 +17,7 @@ struct MainView: View {
             InspectorView()
                 .frame(width: 300)
         }
+        .id(settings.languageRevision)
         .background(Theme.panelBG)
         .overlay(alignment: .topLeading) {
             if app.showEffectBrowser {

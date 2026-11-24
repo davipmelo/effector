@@ -193,6 +193,11 @@ final class RenderContext {
         apply("k_nearest", [src], [], w: w, h: h)
     }
 
+    /// Upscale where every source texel becomes an exact pix×pix block (no seams).
+    func upscaleBlocks(_ src: MTLTexture, pix: Int, _ w: Int, _ h: Int) -> MTLTexture {
+        apply("k_block", [src], [Float(pix)], w: w, h: h)
+    }
+
     /// Commit pending GPU work and wait (needed before CPU reads).
     func flush() {
         cb.commit()

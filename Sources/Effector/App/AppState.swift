@@ -483,23 +483,7 @@ final class AppState: ObservableObject {
         }
         guard let url else { return }
         do {
-            let manifest = ProjectManifest(originalFileName: src.fileName, state: state)
-            let enc = JSONEncoder()
-            enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let json = try enc.encode(manifest)
-            let ext = (src.fileName as NSString).pathExtension.isEmpty ? "png" : (src.fileName as NSString).pathExtension
-            var files: [String: FileWrapper] = [
-                "document.json": FileWrapper(regularFileWithContents: json),
-                "original.\(ext.lowercased())": FileWrapper(regularFileWithContents: src.data),
-            ]
-            if let thumb = renderThumbnail(layers: state.layers, size: 512) {
-                let rep = NSBitmapImageRep(cgImage: thumb)
-                if let png = rep.representation(using: .png, properties: [:]) {
-                    files["thumbnail.png"] = FileWrapper(regularFileWithContents: png)
-                }
-            }
-            let wrapper = FileWrapper(directoryWithFileWrappers: files)
-            try wrapper.write(to: url, options: .atomic, originalContentsURL: nil)
+            try writeProject(to: url)
             projectURL = url
             isDirty = false
             NSDocumentController.shared.noteNewRecentDocumentURL(url)
@@ -507,6 +491,29 @@ final class AppState: ObservableObject {
         } catch {
             alert(tr("Could not save"), error.localizedDescription)
         }
+    }
+
+    /// Writes the .effector package (document.json + original image + thumbnail).
+    func writeProject(to url: URL) throws {
+        guard let src = source else { return }
+        let manifest = ProjectManifest(originalFileName: src.fileName, state: state)
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let json = try enc.encode(manifest)
+        let ext = (src.fileName as NSString).pathExtension.isEmpty ? "png" : (src.fileName as NSString).pathExtension
+        var files: [String: FileWrapper] = [
+            "document.json": FileWrapper(regularFileWithContents: json),
+            "original.\(ext.lowercased())": FileWrapper(regularFileWithContents: src.data),
+        ]
+        if let thumb = renderThumbnail(layers: state.layers, size: 512) {
+            let rep = NSBitmapImageRep(cgImage: thumb)
+            if let png = rep.representation(using: .png, properties: [:]) {
+                files["thumbnail.png"] = FileWrapper(regularFileWithContents: png)
+            }
+        }
+        if FileManager.default.fileExists(atPath: url.path) { try? FileManager.default.removeItem(at: url) }
+        let wrapper = FileWrapper(directoryWithFileWrappers: files)
+        try wrapper.write(to: url, options: .atomic, originalContentsURL: nil)
     }
 
     func openProject(_ url: URL) throws {

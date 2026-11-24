@@ -109,9 +109,10 @@ struct DitherEffect: Effect {
 
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
         let mono = p.choice("mode", "mono") == "mono"
-        let pix = max(1, ctx.px(p.num("pixelSize", 2)))
-        let sw = max(1, Int((Double(input.width) / pix).rounded()))
-        let sh = max(1, Int((Double(input.height) / pix).rounded()))
+        // whole render pixels per dither pixel, so blocks are uniform (no seams)
+        let pix = max(1, Int(ctx.px(p.num("pixelSize", 2)).rounded()))
+        let sw = max(1, (input.width + pix - 1) / pix)
+        let sh = max(1, (input.height + pix - 1) / pix)
         let small = ctx.resize(input, sw, sh)
         let pre = ctx.apply("k_dither_pre", [small], [p.f("brightness"), p.f("contrast"), mono ? 1 : 0, p.f("gamma", 1)])
         let palette = p.palette("palette") ?? PalettePresets.all[1]
@@ -132,7 +133,7 @@ struct DitherEffect: Effect {
                                mono: mono, levels: levels, dark: dark, light: light, palette: palette.colors)
             result = ctx.upload(px, sw, sh)
         }
-        return ctx.upscaleNearest(result, input.width, input.height)
+        return ctx.upscaleBlocks(result, pix: pix, input.width, input.height)
     }
 }
 

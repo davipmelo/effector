@@ -173,12 +173,12 @@ struct BasicAdjustEffect: Effect {
     let category = EffectCategory.adjust
     var symbol: String { "slider.horizontal.3" }
     let params: [ParamDef] = [
-        .slider("exposure", "Exposure", -4, 4, 0, unit: " EV", section: "Light"),
-        .slider("contrast", "Contrast", -100, 100, 0, section: "Light"),
-        .slider("highlights", "Highlights", -100, 100, 0, section: "Light"),
-        .slider("shadows", "Shadows", -100, 100, 0, section: "Light"),
-        .slider("whites", "Whites", -100, 100, 0, section: "Light"),
-        .slider("blacks", "Blacks", -100, 100, 0, section: "Light"),
+        .slider("exposure", "Exposure", -4, 4, 0, unit: " EV", section: "Tone"),
+        .slider("contrast", "Contrast", -100, 100, 0, section: "Tone"),
+        .slider("highlights", "Highlights", -100, 100, 0, section: "Tone"),
+        .slider("shadows", "Shadows", -100, 100, 0, section: "Tone"),
+        .slider("whites", "Whites", -100, 100, 0, section: "Tone"),
+        .slider("blacks", "Blacks", -100, 100, 0, section: "Tone"),
         .slider("temperature", "Temperature", -100, 100, 0, section: "Color"),
         .slider("tint", "Tint", -100, 100, 0, section: "Color"),
         .slider("vibrance", "Vibrance", -100, 100, 0, section: "Color"),

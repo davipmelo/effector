@@ -13,10 +13,26 @@ enum RenderTest {
         let input = URL(fileURLWithPath: args[i + 1])
         let outDir = URL(fileURLWithPath: args[i + 2])
         try? FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
+        if args.contains("--project-roundtrip") {
+            let app = AppState.shared
+            do {
+                app.openImage(try SourceImage.load(url: input))
+                app.state.layers = FactoryPresets.all.first { $0.name == "Surveillance" }!.layers
+                app.state.crop = CropRect(x: 0.1, y: 0.1, w: 0.8, h: 0.6)
+                let url = outDir.appendingPathComponent("test.effector")
+                try app.writeProject(to: url)
+                let saved = app.state
+                app.openImage(try SourceImage.load(url: input))
+                try app.openProject(url)
+                print("roundtrip equal:", saved == app.state, "layers:", app.state.layers.count,
+                      "files:", (try? FileManager.default.contentsOfDirectory(atPath: url.path)) ?? [])
+            } catch { print("roundtrip error:", error) }
+            return
+        }
         let specs = Array(args.dropFirst(i + 3)).filter { !$0.hasPrefix("--") }
         do {
             let src = try SourceImage.load(url: input)
-            let scale = min(1, 1200 / Double(max(src.width, src.height)))
+            let scale = args.contains("--full2x") ? 2.0 : (args.contains("--full") ? 1.0 : min(1, 1200 / Double(max(src.width, src.height))))
             let tex = src.makeTexture(crop: .full, scale: scale)
             let r = Renderer(useCache: false)
             let list = specs.isEmpty ? EffectRegistry.all.map { $0.id } : specs
@@ -24,6 +40,13 @@ enum RenderTest {
             for spec in list {
                 // spec "a:k=v,k=v+b:k=v" -> stack (first = bottom)
                 var layers: [LayerNode] = []
+                if spec == "presets" {
+                    for pr in FactoryPresets.all {
+                        let out = r.render(layers: pr.layers, source: tex, sourceKey: 0)
+                        if let cg = ImageExport.cgImage(out) { sheet.append((pr.name, cg)) }
+                    }
+                    continue
+                }
                 for part in spec.split(separator: "+") {
                     let comps = part.split(separator: ":", maxSplits: 1)
                     var node = LayerNode.effect(String(comps[0]))
@@ -55,7 +78,7 @@ enum RenderTest {
                     .replacingOccurrences(of: "=", with: "-").replacingOccurrences(of: "+", with: "__")
                 let url = outDir.appendingPathComponent(String(name.prefix(120)) + ".jpg")
                 try ImageExport.write(out, to: url, format: .jpg, quality: 0.85, keepAlpha: false)
-                if let cg = ImageExport.cgImage(out) { sheet.append((spec, cg)) }
+                if !args.contains("--full") && !args.contains("--full2x"), let cg = ImageExport.cgImage(out) { sheet.append((spec, cg)) }
                 print("ok \(spec) \(ms)ms -> \(url.lastPathComponent)")
             }
             writeSheet(sheet, to: outDir.appendingPathComponent("_sheet.jpg"))

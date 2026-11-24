@@ -44,7 +44,7 @@ struct EffectBrowser: View {
                 .padding(.bottom, 14)
             }
         }
-        .frame(width: 400, height: 560)
+        .frame(width: 400, height: 640)
         .background(Theme.panelBG)
         .onAppear { focused = true }
     }

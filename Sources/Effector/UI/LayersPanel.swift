@@ -139,15 +139,19 @@ struct LayerRow: View {
         HStack(spacing: 6) {
             Color.clear.frame(width: CGFloat(depth) * 14)
             if node.isGroup {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 9, weight: .bold))
-                    .rotationEffect(.degrees(node.expanded ? 90 : 0))
-                    .foregroundStyle(Theme.textDim)
-                    .frame(width: 12)
-                    .contentShape(Rectangle())
-                    .onTapGesture { withAnimation(.snappy(duration: 0.18)) { app.updateLayerSilently(node.id) { $0.expanded.toggle() } } }
+                Button {
+                    withAnimation(.snappy(duration: 0.18)) { app.updateLayerSilently(node.id) { $0.expanded.toggle() } }
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .bold))
+                        .rotationEffect(.degrees(node.expanded ? 90 : 0))
+                        .foregroundStyle(Theme.textDim)
+                        .frame(width: 16, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             } else {
-                Color.clear.frame(width: 12)
+                Color.clear.frame(width: 16)
             }
             Image(systemName: node.isGroup ? (node.expanded ? "folder" : "folder.fill") : (EffectRegistry.effect(node.effectID)?.symbol ?? "square"))
                 .font(.system(size: 11.5))
@@ -215,7 +219,7 @@ struct LayerRow: View {
             Button(node.enabled ? tr("Hide") : tr("Show")) { app.toggleVisibility(node.id) }
             Button(app.soloID == node.id ? tr("Unsolo") : tr("Solo")) { app.soloID = app.soloID == node.id ? nil : node.id }
             Divider()
-            Button(tr("Group")) { app.selectedID = node.id; app.groupSelected() }
+            Button(tr("Group Layer")) { app.selectedID = node.id; app.groupSelected() }
             if node.isGroup { Button(tr("Ungroup")) { app.selectedID = node.id; app.ungroupSelected() } }
             Button(tr("Save as Preset…")) { savePreset() }
             Divider()

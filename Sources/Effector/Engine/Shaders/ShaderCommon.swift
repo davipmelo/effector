@@ -147,6 +147,13 @@ enum ShaderLibrary {
         p = min(p, uint2(a.get_width() - 1, a.get_height() - 1));
         o.write(a.read(p), gid);
     }
+    // Integer block upscale: each source texel becomes a pix×pix block. u[0] = pix
+    kernel void k_block(KIN, texture2d<float> a [[texture(1)]]) {
+        GUARD
+        uint pix = max(1u, uint(u[0]));
+        uint2 p = min(gid / pix, uint2(a.get_width() - 1, a.get_height() - 1));
+        o.write(a.read(p), gid);
+    }
     // Unpremultiply (after loading through CoreGraphics).
     kernel void k_unpremul(KIN, texture2d<float> a [[texture(1)]]) {
         GUARD
