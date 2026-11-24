@@ -115,6 +115,6 @@ enum PT {
         "Orange": "Laranja", "Yellow": "Amarelo", "Aqua": "Água", "Purple": "Roxo", "Magenta": "Magenta",
         "Standard": "Padrão", "Detailed": "Detalhado", "Blocks": "Blocos", "Dots": "Pontos", "Binary": "Binário",
         "Slashes": "Barras", "Braille": "Braille", "Geometric": "Geométrico", "Letters": "Letras", "Matrix": "Matrix",
-        "Zoom Level": "Zoom",
+        "Zoom Level": "Zoom", "System menus (File, Edit…) switch language after reopening the app.": "Os menus do sistema (Arquivo, Editar…) mudam de idioma depois de reabrir o app.",
     ]
 }

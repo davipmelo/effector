@@ -15,6 +15,8 @@ APP=build/EFFECTOR.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Effector"
+mkdir -p "$APP/Contents/Resources/en.lproj" "$APP/Contents/Resources/pt-BR.lproj"
+touch "$APP/Contents/Resources/en.lproj/InfoPlist.strings" "$APP/Contents/Resources/pt-BR.lproj/InfoPlist.strings"
 sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD/" scripts/Info.plist > "$APP/Contents/Info.plist"
 
 # Icon

@@ -70,6 +70,12 @@ final class AppSettings: ObservableObject {
         case .pt: L10nState.isPortuguese = true
         case .system: L10nState.isPortuguese = (Locale.preferredLanguages.first ?? "en").hasPrefix("pt")
         }
+        // System menus (File, Edit, Window…) follow AppleLanguages; applied on next launch.
+        switch language {
+        case .en: d.set(["en"], forKey: "AppleLanguages")
+        case .pt: d.set(["pt-BR"], forKey: "AppleLanguages")
+        case .system: d.removeObject(forKey: "AppleLanguages")
+        }
         languageRevision += 1
     }
 

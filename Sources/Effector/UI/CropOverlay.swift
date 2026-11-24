@@ -19,9 +19,10 @@ struct CropOverlay: View {
     }
 
     private var imageRect: CGRect {
-        let z = min((viewSize.width - 80) / imgSize.width, (viewSize.height - 80) / imgSize.height)
+        let z = min((viewSize.width - 80) / imgSize.width, (viewSize.height - 130) / imgSize.height)
+        let yOff: CGFloat = -25
         let w = imgSize.width * z, h = imgSize.height * z
-        return CGRect(x: (viewSize.width - w) / 2, y: (viewSize.height - h) / 2, width: w, height: h)
+        return CGRect(x: (viewSize.width - w) / 2, y: (viewSize.height - h) / 2 + yOff, width: w, height: h)
     }
 
     /// target aspect in normalized units (w/h in normalized space)
@@ -78,7 +79,11 @@ struct CropOverlay: View {
                     .position(p)
                     .gesture(DragGesture().onChanged { g in dragHandle(h.1, g, ir) }.onEnded { _ in start = nil })
             }
-            cropBar.frame(maxWidth: .infinity).padding(.top, 10)
+            VStack {
+                Spacer()
+                cropBar.padding(.bottom, 12)
+            }
+            .frame(width: viewSize.width, height: viewSize.height)
         }
         .frame(width: viewSize.width, height: viewSize.height)
         .onChange(of: app.cropAspect) { _, _ in applyAspect() }

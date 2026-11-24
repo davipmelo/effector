@@ -23,6 +23,8 @@ struct GeneralSettings: View {
             Picker(tr("Language"), selection: $settings.language) {
                 ForEach(AppLanguage.allCases, id: \.self) { Text($0.label).tag($0) }
             }
+            Text(tr("System menus (File, Edit…) switch language after reopening the app."))
+                .font(.system(size: 11)).foregroundStyle(.secondary)
             Picker(tr("Appearance"), selection: $settings.theme) {
                 ForEach(AppTheme.allCases, id: \.self) { Text($0.label).tag($0) }
             }

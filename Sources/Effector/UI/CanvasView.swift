@@ -157,11 +157,12 @@ final class CanvasMTKView: MTKView, MTKViewDelegate {
         guard let app, let src = app.source else { return .zero }
         let (w, h): (Int, Int) = app.isCropping ? (src.width, src.height) : src.croppedSize(app.state.crop)
         var z = app.displayZoom
+        var pan = app.pan
         if app.isCropping {
-            z = min(Double(bounds.width - 80) / Double(w), Double(bounds.height - 80) / Double(h))
+            z = min(Double(bounds.width - 80) / Double(w), Double(bounds.height - 130) / Double(h))
+            pan = CGSize(width: 0, height: -25)
         }
         let size = CGSize(width: Double(w) * z, height: Double(h) * z)
-        let pan = app.isCropping ? .zero : app.pan
         return CGRect(x: bounds.midX - size.width / 2 + pan.width, y: bounds.midY - size.height / 2 + pan.height,
                       width: size.width, height: size.height)
     }

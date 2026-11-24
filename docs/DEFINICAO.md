@@ -1,7 +1,7 @@
 # EFFECTOR: Definição do Projeto
 
 > Documento vivo. Registra tudo o que foi decidido para o desenvolvimento.
-> Última atualização: 24/11/2026 · Status: **aguardando aprovação**
+> Última atualização: 24/11/2026 · Status: **v0.1.0 implementada** (todas as etapas 1–5 entregues)
 
 ---
 
@@ -45,7 +45,8 @@ App nativo para macOS, **100% pessoal**, que aplica efeitos visuais em imagens u
 **Export**
 - **JPG** (qualidade ajustável) e **PNG** (com transparência, quando houver).
 - Escala **1x ou 2x** do original (máximo 2x).
-- **O export fica igual ao preview, só mais nítido.** Todos os parâmetros de tamanho (pixel do dither, ponto do halftone, grain…) são relativos à imagem, então a textura mantém a mesma proporção em qualquer escala.
+- **O export fica igual ao preview, só mais nítido.** Todos os parâmetros de tamanho (pixel do dither, ponto do halftone, grain…) são **relativos**: medidos em pixels de uma imagem de referência de 1000 px no lado maior. Assim um preset fica igual em fotos de qualquer tamanho, e no preview, no export 1x e no 2x.
+- Testado: export 2x de 12032×12032 px com 4 efeitos em cerca de 10 s, usando 1,3 GB de memória.
 - **Copiar o resultado** para a área de transferência (⌘⇧C).
 - O export roda em segundo plano, com barra de progresso.
 
@@ -95,7 +96,7 @@ App nativo para macOS, **100% pessoal**, que aplica efeitos visuais em imagens u
   - **clássicas** prontas (Game Boy, CGA, EGA, PICO-8, C64, Mac Classic, 1-bit…);
   - **extraídas da imagem** (k-means, com N cores);
   - **customizadas** (editor de cores);
-  - **importar e exportar** (.hex / .gpl / .ase).
+  - **importar e exportar** (.hex / .gpl / .txt / .json). Formato .ase ficou para o backlog.
 
 ### 6.3 Grain
 - Mono ou colorido, tamanho, intensidade, aspereza, resposta por tons (mais nas sombras ou nos médios), seed.
@@ -211,7 +212,14 @@ Ao final, o app é instalado em `/Applications` e o usuário testa tudo e manda 
 
 ---
 
+## 9.1 Extras implementados além do escopo
+- Efeitos extras: Inverter, Posterizar, Limiar (Threshold), Desfoque (Blur), Ajustes Básicos completos.
+- Paleta de comandos (⌘K) para buscar efeitos, presets e comandos.
+- Modo Solo por layer; miniaturas dos efeitos e presets geradas a partir da imagem aberta.
+- 18 presets de fábrica.
+
 ## 10. Backlog futuro (não fazer agora)
+- Importar paletas .ase (Adobe)
 - Máscaras (luminância, gradiente, pincel)
 - Várias imagens abertas
 - Lote

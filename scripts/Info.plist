@@ -6,6 +6,9 @@
     <key>CFBundleDisplayName</key><string>EFFECTOR</string>
     <key>CFBundleIdentifier</key><string>com.davimelo.effector</string>
     <key>CFBundleExecutable</key><string>Effector</string>
+    <key>CFBundleDevelopmentRegion</key><string>en</string>
+    <key>CFBundleLocalizations</key><array><string>en</string><string>pt-BR</string></array>
+    <key>CFBundleAllowMixedLocalizations</key><true/>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>__VERSION__</string>
