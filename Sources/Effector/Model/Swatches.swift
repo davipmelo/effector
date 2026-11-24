@@ -58,12 +58,12 @@ enum PalettePresets {
     static func extract(from cg: CGImage, count: Int) -> PaletteSpec {
         let size = 96
         let w = size, h = max(1, Int(Double(size) * Double(cg.height) / Double(cg.width)))
-        var buf = [UInt8](repeating: 0, count: w * h * 4)
-        let ctx = CGContext(data: &buf, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+        let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
                             space: CGColorSpace(name: CGColorSpace.sRGB)!,
                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
         ctx.interpolationQuality = .medium
         ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        let buf = Array(UnsafeBufferPointer(start: ctx.data!.assumingMemoryBound(to: UInt8.self), count: w * h * 4))
         var pts: [SIMD3<Double>] = []
         pts.reserveCapacity(w * h)
         for i in 0..<(w * h) {
