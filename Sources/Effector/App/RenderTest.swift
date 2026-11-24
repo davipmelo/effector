@@ -13,7 +13,7 @@ enum RenderTest {
         let input = URL(fileURLWithPath: args[i + 1])
         let outDir = URL(fileURLWithPath: args[i + 2])
         try? FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
-        let specs = Array(args.dropFirst(i + 3))
+        let specs = Array(args.dropFirst(i + 3)).filter { !$0.hasPrefix("--") }
         do {
             let src = try SourceImage.load(url: input)
             let scale = min(1, 1200 / Double(max(src.width, src.height)))
@@ -42,6 +42,15 @@ enum RenderTest {
                 let t0 = Date()
                 let out = r.render(layers: layers, source: tex, sourceKey: 0)
                 let ms = Int(Date().timeIntervalSince(t0) * 1000)
+                if args.contains("--check-neutral") {
+                    let rc = RenderContext(scale: 1, source: out, isExport: true)
+                    let f = rc.readFloats(out)
+                    var maxDiff: Float = 0
+                    for i in stride(from: 0, to: f.count, by: 4) {
+                        maxDiff = max(maxDiff, abs(f[i] - f[i + 1]), abs(f[i + 1] - f[i + 2]))
+                    }
+                    print("neutral-check \(spec): max channel difference = \(maxDiff)")
+                }
                 let name = spec.replacingOccurrences(of: ":", with: "_").replacingOccurrences(of: ",", with: "_")
                     .replacingOccurrences(of: "=", with: "-").replacingOccurrences(of: "+", with: "__")
                 let url = outDir.appendingPathComponent(String(name.prefix(120)) + ".jpg")

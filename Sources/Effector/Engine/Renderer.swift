@@ -55,6 +55,10 @@ final class Renderer {
                 if out.width != current.width || out.height != current.height {
                     out = ctx.resize(out, current.width, current.height)
                 }
+                // Effects never change transparency: restore the exact input alpha.
+                if out !== current && !eff.producesAlpha {
+                    out = ctx.apply("k_withalpha", [out, current])
+                }
             } else {
                 continue
             }

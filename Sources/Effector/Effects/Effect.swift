@@ -42,6 +42,7 @@ protocol Effect {
 
 extension Effect {
     var symbol: String { category.symbol }
+    var producesAlpha: Bool { false }
 }
 
 enum EffectRegistry {

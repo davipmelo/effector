@@ -168,8 +168,10 @@ enum ShaderLibrary {
         float3 bb = clamp(b.rgb, 0.0, 1.0), tt = clamp(t.rgb, 0.0, 1.0);
         float3 r = blendMode(bb, tt, int(u[1]));
         // Respect alpha of the effect output (e.g. overlays).
-        float a = u[0] * t.a;
-        float3 c = mix(b.rgb, r, a);
+        // tolerate resampling error on alpha (keeps B&W results exactly neutral)
+        float ta = t.a >= 0.99 ? 1.0 : t.a;
+        float a = u[0] * ta;
+        float3 c = a >= 0.9999 ? r : mix(b.rgb, r, a);
         o.write(float4(c, max(b.a, t.a * u[0])), gid);
     }
     // Composite a straight-alpha overlay over base.
@@ -178,6 +180,11 @@ enum ShaderLibrary {
         float4 b = base.read(gid);
         float4 t = top.sample(sLin, UV);
         o.write(float4(mix(b.rgb, t.rgb, t.a), max(b.a, t.a)), gid);
+    }
+    // rgb from a, alpha from b
+    kernel void k_withalpha(KIN, texture2d<float> a [[texture(1)]], texture2d<float> b [[texture(2)]]) {
+        GUARD
+        o.write(float4(a.read(gid).rgb, b.read(gid).a), gid);
     }
     kernel void k_invert(KIN, texture2d<float> a [[texture(1)]]) {
         GUARD

@@ -176,12 +176,14 @@ final class RenderContext {
         if w < src.width || h < src.height {
             if !smooth {
                 let k = MPSImageLanczosScale(device: gpu.device)
+                k.edgeMode = .clamp
                 k.encode(commandBuffer: cb, sourceTexture: src, destinationTexture: out)
                 // Lanczos can ring below 0 / above 1.
                 return apply("k_clamp", [out])
             }
         }
         let k = MPSImageBilinearScale(device: gpu.device)
+        k.edgeMode = .clamp
         k.encode(commandBuffer: cb, sourceTexture: src, destinationTexture: out)
         return out
     }

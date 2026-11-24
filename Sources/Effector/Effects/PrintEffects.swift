@@ -111,7 +111,7 @@ struct HalftoneEffect: Effect {
         .slider("angY", "Yellow Angle", 0, 180, 0, unit: "°", section: "CMYK Angles", visible: when("mode", "cmyk")),
         .slider("angK", "Black Angle", 0, 180, 45, unit: "°", section: "CMYK Angles", visible: when("mode", "cmyk")),
         .slider("gcr", "Black Generation", 0, 100, 80, unit: "%", section: "CMYK Angles", visible: when("mode", "cmyk")),
-        .color("paper", "Paper", RGBA(hex: "#F4F1EA"), section: "Colors"),
+        .color("paper", "Paper", RGBA(hex: "#FFFFFF"), section: "Colors"),
         .color("ink", "Ink", RGBA(hex: "#111111"), section: "Colors", visible: when("mode", "bw")),
         .slider("contrast", "Contrast", -100, 100, 0, section: "Tone"),
         .slider("brightness", "Brightness", -100, 100, 0, section: "Tone"),
@@ -124,7 +124,7 @@ struct HalftoneEffect: Effect {
         let modeIdx: Float = ["bw": 0, "cmyk": 1, "color": 2][p.choice("mode", "bw")] ?? 0
         let shapeIdx: Float = ["circle": 0, "square": 1, "diamond": 2, "line": 3, "ellipse": 4, "cross": 5][p.choice("shape", "circle")] ?? 0
         let u: [Float] = [Float(cell), p.f("angle", 45), shapeIdx, modeIdx, p.f("dotScale", 100) / 100, p.f("softness", 10) / 100 * 0.5]
-            + p.color("paper", RGBA(hex: "#F4F1EA")).floats + p.color("ink", RGBA(hex: "#111111")).floats
+            + p.color("paper", RGBA(hex: "#FFFFFF")).floats + p.color("ink", RGBA(hex: "#111111")).floats
             + [p.f("angC", 15), p.f("angM", 75), p.f("angY", 0), p.f("angK", 45), p.f("gcr", 80) / 100]
         return ctx.apply("k_halftone", [smoothed], u)
     }

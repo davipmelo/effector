@@ -7,17 +7,9 @@ private struct StubEffect {
 }
 
 enum AsciiShaders { static let source = "" }
-enum GlowShaders { static let source = "" }
-enum FilmShaders { static let source = "" }
-enum TrailShaders { static let source = "" }
 enum VHSShaders { static let source = "" }
 enum BlobShaders { static let source = "" }
 
 struct AsciiEffect: Effect { let id = "ascii"; let name = "ASCII"; let category = EffectCategory.stylize; let params: [ParamDef] = []; func apply(_ i: MTLTexture, _ p: Params, _ c: RenderContext) -> MTLTexture { i } }
-struct GlowEffect: Effect { let id = "glow"; let name = "Glow"; let category = EffectCategory.light; let params: [ParamDef] = []; func apply(_ i: MTLTexture, _ p: Params, _ c: RenderContext) -> MTLTexture { i } }
-struct BloomEffect: Effect { let id = "bloom"; let name = "Bloom"; let category = EffectCategory.light; let params: [ParamDef] = []; func apply(_ i: MTLTexture, _ p: Params, _ c: RenderContext) -> MTLTexture { i } }
-struct HalationEffect: Effect { let id = "halation"; let name = "Halation"; let category = EffectCategory.light; let params: [ParamDef] = []; func apply(_ i: MTLTexture, _ p: Params, _ c: RenderContext) -> MTLTexture { i } }
-struct TrailEffect: Effect { let id = "trail"; let name = "Trail / Ghosting"; let category = EffectCategory.light; let params: [ParamDef] = []; func apply(_ i: MTLTexture, _ p: Params, _ c: RenderContext) -> MTLTexture { i } }
-struct FilmEffect: Effect { let id = "film"; let name = "Film Emulation"; let category = EffectCategory.film; let params: [ParamDef] = []; func apply(_ i: MTLTexture, _ p: Params, _ c: RenderContext) -> MTLTexture { i } }
 struct VHSEffect: Effect { let id = "vhs"; let name = "VHS"; let category = EffectCategory.glitch; let params: [ParamDef] = []; func apply(_ i: MTLTexture, _ p: Params, _ c: RenderContext) -> MTLTexture { i } }
 struct BlobTrackerEffect: Effect { let id = "blob"; let name = "Blob Tracker"; let category = EffectCategory.overlay; let params: [ParamDef] = []; func apply(_ i: MTLTexture, _ p: Params, _ c: RenderContext) -> MTLTexture { i } }
