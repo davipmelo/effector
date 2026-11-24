@@ -1,0 +1,37 @@
+{
+  "/Users/davimelo/Desktop/PROJETOS/dms-effector/Sources/Effector/Effects/Stubs.swift" : {
+    "const-values" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Stubs.swiftconstvalues",
+    "dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Stubs.d",
+    "diagnostics" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Stubs.dia",
+    "object" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Stubs.o",
+    "swift-dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Stubs.swiftdeps"
+  },
+  "/Users/davimelo/Desktop/PROJETOS/dms-effector/Sources/Effector/Engine/GPU.swift" : {
+    "const-values" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/GPU.swiftconstvalues",
+    "dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/GPU.d",
+    "diagnostics" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/GPU.dia",
+    "object" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/GPU.o",
+    "swift-dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/GPU.swiftdeps"
+  },
+  "/Users/davimelo/Desktop/PROJETOS/dms-effector/Sources/Effector/Engine/ImageIO.swift" : {
+    "const-values" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/ImageIO.swiftconstvalues",
+    "dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/ImageIO.d",
+    "diagnostics" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/ImageIO.dia",
+    "object" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/ImageIO.o",
+    "swift-dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/ImageIO.swiftdeps"
+  },
+  "/Users/davimelo/Desktop/PROJETOS/dms-effector/Sources/Effector/Engine/Renderer.swift" : {
+    "const-values" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Renderer.swiftconstvalues",
+    "dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Renderer.d",
+    "diagnostics" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Renderer.dia",
+    "object" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Renderer.o",
+    "swift-dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Renderer.swiftdeps"
+  },
+  "/Users/davimelo/Desktop/PROJETOS/dms-effector/Sources/Effector/Engine/Shaders/ShaderCommon.swift" : {
+    "const-values" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/ShaderCommon.swiftconstvalues",
+    "dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/ShaderCommon.d",
+    "diagnostics" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/ShaderCommon.dia",
+    "object" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/ShaderCommon.o",
+    "swift-dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/ShaderCommon.swiftdeps"
+  }
+}

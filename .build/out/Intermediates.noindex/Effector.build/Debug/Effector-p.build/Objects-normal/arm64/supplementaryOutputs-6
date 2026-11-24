@@ -1,0 +1,30 @@
+{
+  "/Users/davimelo/Desktop/PROJETOS/dms-effector/Sources/Effector/UI/Controls/GradientEditor.swift" : {
+    "const-values" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/GradientEditor.swiftconstvalues",
+    "dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/GradientEditor.d",
+    "diagnostics" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/GradientEditor.dia",
+    "object" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/GradientEditor.o",
+    "swift-dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/GradientEditor.swiftdeps"
+  },
+  "/Users/davimelo/Desktop/PROJETOS/dms-effector/Sources/Effector/UI/Controls/PaletteEditor.swift" : {
+    "const-values" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/PaletteEditor.swiftconstvalues",
+    "dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/PaletteEditor.d",
+    "diagnostics" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/PaletteEditor.dia",
+    "object" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/PaletteEditor.o",
+    "swift-dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/PaletteEditor.swiftdeps"
+  },
+  "/Users/davimelo/Desktop/PROJETOS/dms-effector/Sources/Effector/UI/Controls/ValueSlider.swift" : {
+    "const-values" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/ValueSlider.swiftconstvalues",
+    "dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/ValueSlider.d",
+    "diagnostics" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/ValueSlider.dia",
+    "object" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/ValueSlider.o",
+    "swift-dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/ValueSlider.swiftdeps"
+  },
+  "/Users/davimelo/Desktop/PROJETOS/dms-effector/Sources/Effector/UI/CropOverlay.swift" : {
+    "const-values" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/CropOverlay.swiftconstvalues",
+    "dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/CropOverlay.d",
+    "diagnostics" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/CropOverlay.dia",
+    "object" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/CropOverlay.o",
+    "swift-dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/CropOverlay.swiftdeps"
+  }
+}

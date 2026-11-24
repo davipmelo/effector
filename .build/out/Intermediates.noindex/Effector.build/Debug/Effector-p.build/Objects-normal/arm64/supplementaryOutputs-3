@@ -1,0 +1,30 @@
+{
+  "/Users/davimelo/Desktop/PROJETOS/dms-effector/Sources/Effector/Model/DocumentModel.swift" : {
+    "const-values" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/DocumentModel.swiftconstvalues",
+    "dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/DocumentModel.d",
+    "diagnostics" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/DocumentModel.dia",
+    "object" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/DocumentModel.o",
+    "swift-dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/DocumentModel.swiftdeps"
+  },
+  "/Users/davimelo/Desktop/PROJETOS/dms-effector/Sources/Effector/Model/Layer.swift" : {
+    "const-values" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Layer.swiftconstvalues",
+    "dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Layer.d",
+    "diagnostics" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Layer.dia",
+    "object" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Layer.o",
+    "swift-dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Layer.swiftdeps"
+  },
+  "/Users/davimelo/Desktop/PROJETOS/dms-effector/Sources/Effector/Model/Params.swift" : {
+    "const-values" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Params.swiftconstvalues",
+    "dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Params.d",
+    "diagnostics" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Params.dia",
+    "object" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Params.o",
+    "swift-dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Params.swiftdeps"
+  },
+  "/Users/davimelo/Desktop/PROJETOS/dms-effector/Sources/Effector/Model/Presets.swift" : {
+    "const-values" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Presets.swiftconstvalues",
+    "dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Presets.d",
+    "diagnostics" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Presets.dia",
+    "object" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Presets.o",
+    "swift-dependencies" : "/Users/davimelo/Desktop/PROJETOS/dms-effector/.build/out/Intermediates.noindex/Effector.build/Debug/Effector-p.build/Objects-normal/arm64/Presets.swiftdeps"
+  }
+}
