@@ -13,8 +13,13 @@ final class Renderer {
 
     func clearCache() { cache.removeAll() }
 
+    /// Size parameters are relative: expressed in pixels of a 1000 px (long side) reference image,
+    /// so a stack looks identical at any resolution (preview, export 1x/2x, thumbnails).
+    static let referenceSize = 1000.0
+
     /// `sourceKey` must change whenever the source texture content changes.
-    func render(layers: [LayerNode], source: MTLTexture, sourceKey: Int, scale: Double, isExport: Bool = false) -> MTLTexture {
+    func render(layers: [LayerNode], source: MTLTexture, sourceKey: Int, isExport: Bool = false) -> MTLTexture {
+        let scale = Double(max(source.width, source.height)) / Renderer.referenceSize
         let ctx = RenderContext(scale: scale, source: source, isExport: isExport)
         var newCache: [Int: MTLTexture] = [:]
         var h = Hasher()

@@ -21,7 +21,6 @@ struct LayersPanel: View {
                 .buttonStyle(.plain)
                 .disabled(!app.hasImage)
                 .opacity(app.hasImage ? 1 : 0.4)
-                .popover(isPresented: $app.showEffectBrowser, arrowEdge: .trailing) { EffectBrowser() }
                 Spacer()
                 IconButton(symbol: "folder.badge.plus", help: "Group (⌘G)") { app.groupSelected() }
                 IconButton(symbol: "plus.square.on.square", help: "Duplicate (⌘D)") { app.duplicateSelected() }

@@ -330,7 +330,7 @@ final class AppState: ObservableObject {
             guard let self else { return }
             let srcTex = self.sourceTexture(src, crop: crop, scale: scale)
             var h = Hasher(); h.combine(src.id); h.combine(crop)
-            let out = self.renderer.render(layers: layers, source: srcTex, sourceKey: h.finalize(), scale: scale)
+            let out = self.renderer.render(layers: layers, source: srcTex, sourceKey: h.finalize())
             DispatchQueue.main.async {
                 self.original = srcTex
                 self.output = out
@@ -395,7 +395,7 @@ final class AppState: ObservableObject {
             let effScale = 220.0 / 1000.0
             for eff in EffectRegistry.all {
                 let node = LayerNode.effect(eff.id)
-                let out = r.render(layers: [node], source: tex, sourceKey: 0, scale: effScale)
+                let out = r.render(layers: [node], source: tex, sourceKey: 0)
                 if let cg = ImageExport.cgImage(out) { thumbs[eff.id] = cg }
             }
             DispatchQueue.main.async { self.effectThumbs = thumbs }
@@ -407,7 +407,7 @@ final class AppState: ObservableObject {
         let (cw, ch) = src.croppedSize(state.crop)
         let s = size / Double(max(cw, ch))
         let tex = src.makeTexture(crop: state.crop, scale: s)
-        let out = Renderer(useCache: false).render(layers: layers, source: tex, sourceKey: 0, scale: size / 1000)
+        let out = Renderer(useCache: false).render(layers: layers, source: tex, sourceKey: 0)
         return ImageExport.cgImage(out)
     }
 
@@ -422,7 +422,7 @@ final class AppState: ObservableObject {
     func renderFull(scale: Int) -> MTLTexture? {
         guard let src = source else { return nil }
         let tex = src.makeTexture(crop: state.crop, scale: Double(scale))
-        return Renderer(useCache: false).render(layers: state.layers, source: tex, sourceKey: 0, scale: Double(scale), isExport: true)
+        return Renderer(useCache: false).render(layers: state.layers, source: tex, sourceKey: 0, isExport: true)
     }
 
     func export(format: ImageExport.Format, quality: Double, scale: Int) {

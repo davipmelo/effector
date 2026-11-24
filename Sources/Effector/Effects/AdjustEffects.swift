@@ -310,7 +310,7 @@ struct BlurEffect: Effect {
     let name = "Blur"
     let category = EffectCategory.light
     var symbol: String { "aqi.medium" }
-    let params: [ParamDef] = [.slider("radius", "Radius", 0, 200, 8, unit: " px")]
+    let params: [ParamDef] = [.slider("radius", "Radius", 0, 200, 8, unit: "")]
     func apply(_ input: MTLTexture, _ p: Params, _ ctx: RenderContext) -> MTLTexture {
         ctx.blur(input, sigma: ctx.px(p.num("radius", 8)) / 2)
     }

@@ -18,6 +18,22 @@ struct MainView: View {
                 .frame(width: 300)
         }
         .background(Theme.panelBG)
+        .overlay(alignment: .topLeading) {
+            if app.showEffectBrowser {
+                ZStack(alignment: .topLeading) {
+                    Color.black.opacity(0.18).ignoresSafeArea()
+                        .onTapGesture { app.showEffectBrowser = false }
+                    EffectBrowser()
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.separator))
+                        .shadow(color: .black.opacity(0.45), radius: 28, y: 10)
+                        .padding(.leading, 278)
+                        .padding(.top, 8)
+                        .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .topLeading)))
+                }
+            }
+        }
+        .animation(.snappy(duration: 0.18), value: app.showEffectBrowser)
         .overlay {
             if app.showCommandPalette {
                 ZStack(alignment: .top) {

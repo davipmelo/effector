@@ -1,4 +1,0 @@
-Target dependency graph (2 targets)
-Target 'AllExcludingTests' in project 'Aggregate'
-➜ Explicit dependency on target 'Effector-product' in project 'Effector'
-Target 'Effector-product' in project 'Effector' (no dependencies)

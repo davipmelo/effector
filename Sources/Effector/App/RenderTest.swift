@@ -40,7 +40,7 @@ enum RenderTest {
                     layers.insert(node, at: 0)
                 }
                 let t0 = Date()
-                let out = r.render(layers: layers, source: tex, sourceKey: 0, scale: scale * 1.0)
+                let out = r.render(layers: layers, source: tex, sourceKey: 0)
                 let ms = Int(Date().timeIntervalSince(t0) * 1000)
                 let name = spec.replacingOccurrences(of: ":", with: "_").replacingOccurrences(of: ",", with: "_")
                     .replacingOccurrences(of: "=", with: "-").replacingOccurrences(of: "+", with: "__")

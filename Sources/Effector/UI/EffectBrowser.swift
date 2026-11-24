@@ -20,6 +20,7 @@ struct EffectBrowser: View {
                     .font(.system(size: 13))
                     .focused($focused)
                     .onSubmit { if let f = filtered.first { add(f) } }
+                    .onKeyPress(.escape) { app.showEffectBrowser = false; return .handled }
             }
             .padding(10)
             .background(RoundedRectangle(cornerRadius: 8).fill(Theme.field))
@@ -43,7 +44,7 @@ struct EffectBrowser: View {
                 .padding(.bottom, 14)
             }
         }
-        .frame(width: 380, height: 520)
+        .frame(width: 400, height: 560)
         .background(Theme.panelBG)
         .onAppear { focused = true }
     }
