@@ -288,3 +288,31 @@ Ao final, o app é instalado em `/Applications` e o usuário testa tudo e manda 
 ## 9.6 Rumo à v1.0 (refinamento)
 - Presets agora ficam encaixados na metade de baixo da sidebar esquerda (divisória ajustável, estado lembrado), em vez de um painel lateral sobreposto. Permanecem abertos após aplicar; atalhos de uma tecla continuam funcionando com o painel aberto; teclas de seta só vão para os presets com o mouse sobre o painel ou a busca focada.
 - Biblioteca de presets refeita do zero (69 presets em 9 categorias), pensada como vitrine: cada preset mistura 3–8 efeitos (curvas, HSL, gradient map com modos de mesclagem, lentes, molduras com texto, grupos internos), grão fino e discreto, prévias conferidas em retrato escuro e foto colorida. Render-test aceita `presets=Categoria` e `--dump-params` lista todos os parâmetros.
+
+## 9.7 v0.6.0 — Base única em Rust (macOS + Windows)
+O app foi reescrito em **Rust** (wgpu + egui) e agora é **um único código para macOS e Windows**: mesmos efeitos, presets,
+atalhos, idiomas e interface nos dois sistemas. Os 63 shaders foram convertidos de Metal para GLSL e rodam em Metal (Mac)
+e DirectX 12 / Vulkan (Windows). Instaladores: `.dmg` (Mac, Apple Silicon e Intel, macOS 11+) e instalador `.exe` (Windows 10/11).
+
+**O que mudou por causa da troca de plataforma**
+- **Arquivo de projeto `.effector`:** antes era um *pacote* (pasta que o Finder mostra como arquivo), algo que não existe no
+  Windows. Agora é **um arquivo único** (zip com o mesmo conteúdo). Projetos antigos do Mac continuam abrindo.
+- **Fontes:** as fontes da Apple (SF Pro, SF Mono, Menlo, Noteworthy) não podem ser distribuídas. O app embute fontes abertas:
+  **Inter** (interface), **JetBrains Mono** (números, OSD, ASCII, datas) e **Caveat** (legenda da Polaroid). O texto nos efeitos
+  (VHS, Digicam, Blob Tracker, Moldura, ASCII) fica com outra fonte, igual nos dois sistemas.
+- **Ícones da interface:** SF Symbols só existem no Mac; foram trocados pelos ícones abertos **Phosphor**.
+- **RAW:** o decodificador da Apple (CIRAWFilter) foi trocado pelo **rawler** (código aberto). As cores de um RAW "cru" podem
+  ficar um pouco diferentes do app antigo, mas são iguais no Mac e no Windows.
+- **HEIC / AVIF:** decodificados pelo próprio sistema (ImageIO no Mac, Windows Imaging Component no Windows — no Windows é
+  preciso ter as "Extensões de Imagem HEIF" gratuitas da Microsoft Store).
+- **Blob Tracker — modos Contornos e Objetos:** usavam o Vision (só Mac). Agora usam algoritmos próprios (contornos por
+  limiar adaptativo e saliência por resíduo espectral). Os nomes no menu perderam "(Vision)".
+- **Desfoque e redimensionamento:** os filtros MPS da Apple foram reescritos como shaders (gaussiano e Lanczos-3).
+- **JPEG do Digicam:** codificador `jpeg-encoder` no lugar do ImageIO; os blocos de compressão podem variar levemente.
+- **Atalhos:** ⌘ vira **Ctrl** e ⌥ vira **Alt** no Windows. Os menus ficam no botão ☰ da barra (nos dois sistemas).
+- **Requisitos no Mac:** caiu de macOS 26 para **macOS 11** (Big Sur) ou mais novo.
+
+**Ainda não feito / limitações conhecidas**
+- No Mac, dar duplo clique num arquivo no Finder abre o app mas ainda não abre o arquivo (use Arquivo › Abrir ou arraste).
+- Instaladores sem assinatura digital: o Windows mostra "O Windows protegeu o computador" e o Mac pede clique direito › Abrir
+  na primeira vez.
