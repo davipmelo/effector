@@ -1,6 +1,8 @@
 // EFFECTOR — layer-based image effects for macOS and Windows.
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
+mod app;
+mod appicon;
 mod canvas;
 mod effects;
 mod gpu;
@@ -9,17 +11,22 @@ mod l10n;
 mod model;
 mod overlay;
 mod presets;
+mod project;
 mod raw;
 mod renderer;
 mod rendertest;
 mod settings;
+mod shortcuts;
 mod swatches;
+mod sysdecode;
+mod ui;
+mod worker;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let _ = settings::settings();
     if args.iter().any(|a| a == "--lint") {
-        lint_main();
+        rendertest::lint();
         return;
     }
     if args.iter().any(|a| a == "--dump-params") {
@@ -30,7 +37,23 @@ fn main() {
         rendertest::run(&args);
         return;
     }
-    eprintln!("UI not built yet");
+    // packaging helpers: --write-icons <dir> writes icon.ico / icon.icns / icon.png
+    if let Some(i) = args.iter().position(|a| a == "--write-icons") {
+        let dir = std::path::PathBuf::from(args.get(i + 1).cloned().unwrap_or_else(|| ".".into()));
+        let _ = std::fs::create_dir_all(&dir);
+        appicon::write_ico(&dir.join("icon.ico")).expect("ico");
+        appicon::write_icns(&dir.join("icon.icns")).expect("icns");
+        std::fs::write(dir.join("icon.png"), appicon::icon_png(1024)).expect("png");
+        println!("icons written to {}", dir.display());
+        return;
+    }
+    if args.iter().any(|a| a == "--version") {
+        println!("{}", ui::version_line());
+        return;
+    }
+    // files passed on the command line (double-click in Explorer / Finder "Open with")
+    let files: Vec<std::path::PathBuf> = args.iter().skip(1).filter(|a| !a.starts_with("--")).map(std::path::PathBuf::from).filter(|p| p.exists()).collect();
+    if let Err(e) = ui::run(files) {
+        eprintln!("EFFECTOR could not start: {e}");
+    }
 }
-
-fn lint_main() { rendertest::lint(); }

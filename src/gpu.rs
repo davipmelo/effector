@@ -42,7 +42,6 @@ pub struct Gpu {
     pub queue: wgpu::Queue,
     kernels: Mutex<HashMap<String, Arc<Kernel>>>,
     samplers: [wgpu::Sampler; 4],
-    pool: Mutex<Vec<T>>,
     dummy2d: T,
     dummy3d: T,
     /// rgba32float textures can be linearly filtered (else lookup tables fall back to rgba16float).
@@ -51,6 +50,12 @@ pub struct Gpu {
 }
 
 static GPU: OnceLock<Gpu> = OnceLock::new();
+
+thread_local! {
+    /// Recycled working textures. Per thread: a texture freed by one thread may still be read by that
+    /// thread's not-yet-submitted commands, so only the same thread (same queue order) may reuse it.
+    static POOL: std::cell::RefCell<Vec<T>> = const { std::cell::RefCell::new(Vec::new()) };
+}
 
 pub fn gpu() -> &'static Gpu {
     GPU.get().expect("GPU not initialised")
@@ -161,7 +166,6 @@ impl Gpu {
             queue,
             kernels: Mutex::new(HashMap::new()),
             samplers,
-            pool: Mutex::new(Vec::new()),
             dummy2d,
             dummy3d,
             f32_filterable,
@@ -277,9 +281,9 @@ impl Gpu {
     pub fn make_texture(&self, w: usize, h: usize) -> T {
         let (w, h) = ((w.max(1) as u32).min(self.max_dim), (h.max(1) as u32).min(self.max_dim));
         {
-            let pool = self.pool.lock().unwrap();
-            if let Some(t) = pool.iter().find(|t| t.w == w && t.h == h && Arc::strong_count(t) == 1) {
-                return t.clone();
+            let found = POOL.with(|p| p.borrow().iter().find(|t| t.w == w && t.h == h && Arc::strong_count(t) == 1).cloned());
+            if let Some(t) = found {
+                return t;
             }
         }
         let t = self.raw_texture(
@@ -292,19 +296,18 @@ impl Gpu {
                 | wgpu::TextureUsages::COPY_SRC
                 | wgpu::TextureUsages::COPY_DST,
         );
-        self.pool.lock().unwrap().push(t.clone());
+        POOL.with(|p| p.borrow_mut().push(t.clone()));
         t
     }
 
     /// Drops pooled textures nobody uses, keeping at most `keep_bytes` of idle ones.
     pub fn trim_pool(&self, keep_bytes: u64) {
-        let mut pool = self.pool.lock().unwrap();
         let mut kept = 0u64;
-        pool.retain(|t| {
+        POOL.with(|p| p.borrow_mut().retain(|t| {
             if Arc::strong_count(t) > 1 { return true; }
             let b = t.w as u64 * t.h as u64 * 8;
             if kept + b <= keep_bytes { kept += b; true } else { false }
-        });
+        }));
     }
 
     fn upload_bytes(&self, w: u32, h: u32, d: u32, format: wgpu::TextureFormat, bpp: u32, data: &[u8]) -> T {

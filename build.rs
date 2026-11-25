@@ -19,8 +19,16 @@ fn main() {
     }
     out += "];\n";
     fs::write(Path::new(&env::var("OUT_DIR").unwrap()).join("kernels.rs"), out).unwrap();
-    #[cfg(windows)]
-    {
-        println!("cargo:rerun-if-changed=assets/icon.ico");
+    // Windows: app icon + version info in the .exe
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+        println!("cargo:rerun-if-changed=assets/icons/icon.ico");
+        let mut res = winresource::WindowsResource::new();
+        res.set_icon("assets/icons/icon.ico");
+        res.set("ProductName", "EFFECTOR");
+        res.set("FileDescription", "EFFECTOR");
+        res.set("LegalCopyright", "EFFECTOR");
+        if let Err(e) = res.compile() {
+            println!("cargo:warning=could not embed the Windows icon: {e}");
+        }
     }
 }

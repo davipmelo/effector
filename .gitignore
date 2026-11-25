@@ -5,3 +5,4 @@ build/
 .build/
 *.xcuserstate
 /target/
+/dist/

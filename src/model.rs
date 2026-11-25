@@ -622,15 +622,20 @@ impl LayerNode {
     }
 }
 
-pub trait LayerTree {
+/// Read-only tree queries (work on slices and vectors).
+pub trait LayerTreeRead {
     fn find(&self, id: Uuid) -> Option<&LayerNode>;
-    fn update(&mut self, id: Uuid, body: &mut dyn FnMut(&mut LayerNode)) -> bool;
-    fn remove_node(&mut self, id: Uuid) -> Option<LayerNode>;
     fn location(&self, id: Uuid) -> Option<(Option<Uuid>, usize)>;
-    fn insert_node(&mut self, node: LayerNode, parent: Option<Uuid>, index: usize);
     fn contains_inside(&self, id: Uuid, ancestor: Uuid) -> bool;
     fn flattened(&self) -> Vec<(LayerNode, usize)>;
     fn all_effect_ids(&self) -> Vec<String>;
+}
+
+/// Tree edits.
+pub trait LayerTree: LayerTreeRead {
+    fn update(&mut self, id: Uuid, body: &mut dyn FnMut(&mut LayerNode)) -> bool;
+    fn remove_node(&mut self, id: Uuid) -> Option<LayerNode>;
+    fn insert_node(&mut self, node: LayerNode, parent: Option<Uuid>, index: usize);
 }
 
 fn location_in(nodes: &[LayerNode], id: Uuid, parent: Option<Uuid>) -> Option<(Option<Uuid>, usize)> {
@@ -648,7 +653,7 @@ fn flatten_into(nodes: &[LayerNode], depth: usize, out: &mut Vec<(LayerNode, usi
     }
 }
 
-impl LayerTree for Vec<LayerNode> {
+impl LayerTreeRead for [LayerNode] {
     fn find(&self, id: Uuid) -> Option<&LayerNode> {
         for n in self {
             if n.id == id { return Some(n); }
@@ -656,6 +661,29 @@ impl LayerTree for Vec<LayerNode> {
         }
         None
     }
+    fn location(&self, id: Uuid) -> Option<(Option<Uuid>, usize)> { location_in(self, id, None) }
+    fn contains_inside(&self, id: Uuid, ancestor: Uuid) -> bool {
+        self.find(ancestor).map(|a| a.children.find(id).is_some()).unwrap_or(false)
+    }
+    fn flattened(&self) -> Vec<(LayerNode, usize)> {
+        let mut v = vec![];
+        flatten_into(self, 0, &mut v);
+        v
+    }
+    fn all_effect_ids(&self) -> Vec<String> {
+        self.iter().flat_map(|n| if n.is_group { n.children.all_effect_ids() } else { vec![n.effect_id.clone()] }).collect()
+    }
+}
+
+impl LayerTreeRead for Vec<LayerNode> {
+    fn find(&self, id: Uuid) -> Option<&LayerNode> { self.as_slice().find(id) }
+    fn location(&self, id: Uuid) -> Option<(Option<Uuid>, usize)> { self.as_slice().location(id) }
+    fn contains_inside(&self, id: Uuid, ancestor: Uuid) -> bool { self.as_slice().contains_inside(id, ancestor) }
+    fn flattened(&self) -> Vec<(LayerNode, usize)> { self.as_slice().flattened() }
+    fn all_effect_ids(&self) -> Vec<String> { self.as_slice().all_effect_ids() }
+}
+
+impl LayerTree for Vec<LayerNode> {
     fn update(&mut self, id: Uuid, body: &mut dyn FnMut(&mut LayerNode)) -> bool {
         for n in self.iter_mut() {
             if n.id == id { body(n); return true; }
@@ -670,7 +698,6 @@ impl LayerTree for Vec<LayerNode> {
         }
         None
     }
-    fn location(&self, id: Uuid) -> Option<(Option<Uuid>, usize)> { location_in(self, id, None) }
     fn insert_node(&mut self, node: LayerNode, parent: Option<Uuid>, index: usize) {
         match parent {
             Some(p) => {
@@ -685,17 +712,6 @@ impl LayerTree for Vec<LayerNode> {
                 self.insert(i, node);
             }
         }
-    }
-    fn contains_inside(&self, id: Uuid, ancestor: Uuid) -> bool {
-        self.find(ancestor).map(|a| a.children.find(id).is_some()).unwrap_or(false)
-    }
-    fn flattened(&self) -> Vec<(LayerNode, usize)> {
-        let mut v = vec![];
-        flatten_into(self, 0, &mut v);
-        v
-    }
-    fn all_effect_ids(&self) -> Vec<String> {
-        self.iter().flat_map(|n| if n.is_group { n.children.all_effect_ids() } else { vec![n.effect_id.clone()] }).collect()
     }
 }
 

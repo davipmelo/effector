@@ -1,0 +1,82 @@
+# Builds the Windows installer and the macOS disk image, then publishes a GitHub release.
+# Runs when a version tag (v1.2.3) is pushed, or manually from the Actions tab.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to create / publish (e.g. v0.6.0)"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Lint (effects, presets, shaders)
+        run: cargo run --release -- --lint
+      - name: Build
+        run: cargo build --release
+      - name: Installer (Inno Setup)
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.*)"' | Select-Object -First 1).Matches.Groups[1].Value
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; }
+          & $iscc "/DAppVersion=$version" packaging\windows\effector.iss
+          Get-ChildItem dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*.exe
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+      - name: Lint (effects, presets, shaders)
+        run: cargo run --release -- --lint
+      - name: Build app + disk image
+        run: bash packaging/macos/build_app.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/*.dmg
+
+  release:
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: EFFECTOR ${{ github.event.inputs.tag || github.ref_name }}
+          draft: false
+          files: dist/*
+          body: |
+            EFFECTOR for macOS and Windows (same app, same effects, same presets).
+
+            **Windows** — download `EFFECTOR-…-Windows-Setup.exe` and run it. Windows may show "Windows protected your PC" because the installer is not code-signed: click *More info → Run anyway*.
+
+            **macOS** (Apple Silicon and Intel, macOS 11+) — open `EFFECTOR-…-macOS.dmg` and drag EFFECTOR to Applications. The app is not notarized: the first time, right-click the app → *Open* → *Open*.

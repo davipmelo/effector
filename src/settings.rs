@@ -9,6 +9,12 @@ use serde::{Deserialize, Serialize};
 use crate::imageio::Format;
 
 pub fn support_dir() -> PathBuf {
+    // tests use their own folder so they never touch the user's settings / session
+    if let Ok(d) = std::env::var("EFFECTOR_SUPPORT_DIR") {
+        let d = PathBuf::from(d);
+        let _ = std::fs::create_dir_all(&d);
+        return d;
+    }
     let base = dirs::data_dir().unwrap_or_else(std::env::temp_dir);
     let d = base.join("EFFECTOR");
     let _ = std::fs::create_dir_all(&d);

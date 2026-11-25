@@ -59,7 +59,13 @@ impl SourceImage {
         match decode_standard(&data) {
             Ok((img, kind)) => Ok(from_dynamic(img, data, file_name, kind)),
             Err(e) => {
-                // maybe a RAW without the right extension
+                // HEIC / AVIF… with the system codecs, or a RAW without the right extension
+                if let Ok((px, w, h)) = crate::sysdecode::decode(&data, file_name) {
+                    let mut s = from_rgba8(px, w, h, file_name);
+                    s.data = data;
+                    s.kind = ext.to_uppercase();
+                    return Ok(s);
+                }
                 crate::raw::decode(&data, file_name).map_err(|_| e)
             }
         }
