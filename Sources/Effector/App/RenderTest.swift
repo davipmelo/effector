@@ -7,6 +7,32 @@ import CoreText
 /// Effector --render-test <image> <outdir> [effectID[:key=value,...] ...]
 enum RenderTest {
     /// Consistency checks for every effect definition, look and factory preset.
+    /// Prints every effect's parameters (key, kind, range/default/options, section) and look ids.
+    static func dumpParams() {
+        for e in EffectRegistry.all {
+            print("== \(e.id) [\(e.category)] \(e.name)")
+            for d in e.params {
+                var k = ""
+                switch d.kind {
+                case .slider(let mn, let mx, let def, _, let u, _): k = "slider \(mn)…\(mx) def \(def)\(u)"
+                case .toggle(let def): k = "toggle def \(def)\(d.isSectionSwitch ? " (section switch)" : "")"
+                case .choice(let o, let def), .segmented(let o, let def): k = "choice def \(def) [\(o.map(\.id).joined(separator: ","))]"
+                case .color(let c): k = "color def \(c.hex)"
+                case .gradient: k = "gradient"
+                case .palette: k = "palette"
+                case .text(let t): k = "text def '\(t)'"
+                case .curves: k = "curves"
+                case .lut: k = "lut"
+                case .seed: k = "seed"
+                }
+                print("  \(d.key): \(k)\(d.section.map { "  §" + $0 } ?? "")")
+            }
+            if !e.looks.isEmpty { print("  looks: " + e.looks.map(\.id).joined(separator: ", ")) }
+        }
+        print("== gradients: " + GradientPresets.all.map(\.name).joined(separator: " | "))
+        print("== palettes: " + PalettePresets.all.map(\.name).joined(separator: " | "))
+    }
+
     static func lint() {
         var problems: [String] = []
         for e in EffectRegistry.all {
@@ -47,6 +73,7 @@ enum RenderTest {
         let outDir = URL(fileURLWithPath: args[i + 2])
         try? FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
         if args.contains("--lint") { lint(); return }
+        if args.contains("--dump-params") { dumpParams(); return }
         if args.contains("--multidoc") {
             let app = AppState.shared
             app.viewportSize = CGSize(width: 800, height: 600)
@@ -98,8 +125,9 @@ enum RenderTest {
             for spec in list {
                 // spec "a:k=v,k=v+b:k=v" -> stack (first = bottom)
                 var layers: [LayerNode] = []
-                if spec == "presets" {
-                    for pr in FactoryPresets.all {
+                if spec == "presets" || spec.hasPrefix("presets=") {
+                    let cat = spec.hasPrefix("presets=") ? String(spec.dropFirst(8)).replacingOccurrences(of: "_", with: " ") : nil
+                    for pr in FactoryPresets.all where cat == nil || pr.category == cat {
                         let out = r.render(layers: pr.layers, source: tex, sourceKey: 0)
                         if let cg = ImageExport.cgImage(out) { sheet.append((pr.name, cg)) }
                     }

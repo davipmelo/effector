@@ -33,7 +33,7 @@
 - **LUT**: arraste arquivos `.cube` para o campo da LUT (ou direto para a imagem, que cria um layer de LUT). Toda LUT carregada fica salva na sua biblioteca e aparece no menu.
 
 ## Presets
-- Botão **Presets** (ou **P**): abre os presets na **metade de baixo da sidebar**, dividindo o espaço com os layers (arraste a divisória para mudar a proporção; duplo clique volta para a metade). O painel fica aberto depois de aplicar e só fecha no **✕** ou no **P**; o app lembra se estava aberto. As setas navegam nos presets enquanto o mouse está sobre o painel ou a busca está ativa. Clique num preset para adicioná-lo **por cima como grupo**. Os presets estão separados por categoria (Filme, Y2K & Digital, Vídeo Analógico, Impressão & Papel, Dither & Pixel, Luz & Clima, Rastreio).
+- Botão **Presets** (ou **P**): abre os presets na **metade de baixo da sidebar**, dividindo o espaço com os layers (arraste a divisória para mudar a proporção; duplo clique volta para a metade). O painel fica aberto depois de aplicar e só fecha no **✕** ou no **P**; o app lembra se estava aberto. As setas navegam nos presets enquanto o mouse está sobre o painel ou a busca está ativa. Clique num preset para adicioná-lo **por cima como grupo**. São 69 presets do app, separados em Cinema, Filme, Retrato & Luz, Y2K & Digital, Vídeo Retrô, Impressão & Gráfico, Pixel & Código, Sonho & Surreal e Rastreio & HUD. Cada um combina de 3 a 8 efeitos (alguns organizados em grupos, como "Grade" e "Lens"), com grão fino e discreto.
 - O botão **+** salva a pilha atual como preset.
 - Menu ⋯: salvar a pilha atual, importar e exportar (`.effectorpreset`), mostrar ou ocultar os presets do app.
 

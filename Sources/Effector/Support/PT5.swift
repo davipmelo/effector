@@ -55,5 +55,7 @@ extension PT {
         "Straight-line motion blur at any angle, centred or trailing, optionally only on the edges.": "Desfoque de movimento em linha reta em qualquer ângulo, centralizado ou de rastro, opcionalmente só nas bordas.",
         "Invert Inside": "Inverter Dentro",
         "Close presets (P)": "Fechar presets (P)",
+        "Cinema": "Cinema", "Portrait & Light": "Retrato & Luz", "Retro Video": "Vídeo Retrô", "Print & Graphic": "Impressão & Gráfico",
+        "Pixel & Code": "Pixel & Código", "Dream & Surreal": "Sonho & Surreal", "Tracking & HUD": "Rastreio & HUD",
     ]
 }

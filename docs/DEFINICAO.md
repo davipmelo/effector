@@ -287,3 +287,4 @@ Ao final, o app é instalado em `/Applications` e o usuário testa tudo e manda 
 
 ## 9.6 Rumo à v1.0 (refinamento)
 - Presets agora ficam encaixados na metade de baixo da sidebar esquerda (divisória ajustável, estado lembrado), em vez de um painel lateral sobreposto. Permanecem abertos após aplicar; atalhos de uma tecla continuam funcionando com o painel aberto; teclas de seta só vão para os presets com o mouse sobre o painel ou a busca focada.
+- Biblioteca de presets refeita do zero (69 presets em 9 categorias), pensada como vitrine: cada preset mistura 3–8 efeitos (curvas, HSL, gradient map com modos de mesclagem, lentes, molduras com texto, grupos internos), grão fino e discreto, prévias conferidas em retrato escuro e foto colorida. Render-test aceita `presets=Categoria` e `--dump-params` lista todos os parâmetros.
