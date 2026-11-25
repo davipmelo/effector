@@ -287,7 +287,6 @@ make("Black Mist", "Portrait & Light", vec![
 fx("basic", None, 1.0, BlendMode::Normal, vals!["blacks" => 12.0, "highlights" => -18.0, "contrast" => -5.0]),
 film("vision500t", 6.0, 50.0, vals!["intensity" => 60.0]),
 fx("glow", None, 0.55, BlendMode::Normal, vals!["intensity" => 60.0, "radius" => 60.0, "threshold" => 40.0, "mode" => "soft"]),
-fx("halo", None, 0.4, BlendMode::Normal, vals!["intensity" => 90.0, "radius" => 50.0]),
 fx("vignette", None, 1.0, BlendMode::Normal, vals!["amount" => 30.0]),
 ]),
 make("Editorial Skin", "Portrait & Light", vec![
@@ -301,7 +300,6 @@ look("frame", "white", None, 1.0, BlendMode::Normal, vals!["size" => 45.0, "text
 make("Dream Portrait", "Portrait & Light", vec![
 look("lensblur", "portrait", None, 1.0, BlendMode::Normal, vals!["amount" => 10.0, "size" => 45.0, "falloff" => 45.0]),
 fx("basic", None, 1.0, BlendMode::Normal, vals!["exposure" => 0.1, "contrast" => -6.0, "temperature" => 8.0]),
-fx("halo", None, 0.45, BlendMode::Normal, vals![]),
 fx("bloom", None, 0.7, BlendMode::Normal, vals!["threshold" => 72.0, "intensity" => 60.0, "radius" => 60.0]),
 fx("vignette", None, 1.0, BlendMode::Normal, vals!["amount" => 15.0, "feather" => 80.0]),
 ]),
@@ -355,7 +353,6 @@ make("Frutiger Aero", "Y2K & Digital", vec![
 fx("basic", None, 1.0, BlendMode::Normal, vals!["exposure" => 0.35, "vibrance" => 40.0, "highlights" => -20.0, "shadows" => 25.0]),
 fx("gradientmap", None, 0.5, BlendMode::SoftLight, vals!["gradient" => swatches::gradient_named("Frutiger Aero")]),
 fx("bloom", None, 0.7, BlendMode::Normal, vals!["threshold" => 75.0, "intensity" => 70.0, "radius" => 40.0]),
-fx("halo", None, 0.4, BlendMode::Normal, vals!["radius" => 80.0]),
 fx("frame", None, 1.0, BlendMode::Normal, vals!["style" => "rounded", "color" => hex("#F4FAFF"), "radius" => 30.0]),
 ]),
 make("Holo Sticker", "Y2K & Digital", vec![
@@ -516,7 +513,6 @@ fx("vignette", None, 1.0, BlendMode::Normal, vals!["amount" => 40.0, "roundness"
 make("Mandala", "Dream & Surreal", vec![
 look("prism", "mandala", None, 1.0, BlendMode::Normal, vals![]),
 fx("gradientmap", None, 0.4, BlendMode::SoftLight, vals!["gradient" => swatches::gradient_named("Golden Hour")]),
-fx("halo", None, 0.6, BlendMode::Normal, vals![]),
 fx("vignette", None, 1.0, BlendMode::Normal, vals!["amount" => 50.0, "roundness" => 100.0]),
 ]),
 make("Glass Shards", "Dream & Surreal", vec![

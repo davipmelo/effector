@@ -1,0 +1,36 @@
+# Builds and lints on Windows and macOS for every push to main (no release).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Depth model
+        shell: bash
+        run: packaging/fetch_model.sh
+      - name: Build
+        run: cargo build --release
+      - name: Lint (effects, presets, shaders)
+        run: cargo run --release -- --lint
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --release
+      - name: Lint (effects, presets, shaders)
+        run: cargo run --release -- --lint
