@@ -67,6 +67,10 @@ fn main() {
         }
         return;
     }
+    if args.iter().any(|a| a == "--missing-pt") {
+        rendertest::missing_pt();
+        return;
+    }
     if args.iter().any(|a| a == "--slider-audit") {
         rendertest::slider_audit();
         return;

@@ -377,3 +377,34 @@ pub fn slider_audit() {
         }
     }
 }
+
+/// `--missing-pt`: UI strings of effects / looks / actions without a Portuguese translation (dev).
+pub fn missing_pt() {
+    crate::l10n::set_portuguese(true);
+    let mut seen = std::collections::BTreeSet::new();
+    let mut check = |s: &str| {
+        if !s.is_empty() && crate::l10n::tr(s) == s && s.chars().any(|c| c.is_ascii_alphabetic()) {
+            seen.insert(s.to_string());
+        }
+    };
+    for e in effects::all().iter().filter(|e| !e.hidden) {
+        check(e.name);
+        check(e.summary);
+        for d in &e.params {
+            check(&d.label);
+            if let Some(s) = &d.section { check(s); }
+            if let ParamKind::Choice(o, _) | ParamKind::Segmented(o, _) = &d.kind {
+                for x in o { check(&x.label); }
+            }
+        }
+        for l in &e.looks {
+            check(&l.name);
+            if let Some(g) = &l.group { check(g); }
+        }
+        for cs in crate::effects::palettes080::color_sets(e.id) {
+            for (g, n, _) in &cs.entries { check(g); check(n); }
+        }
+    }
+    for a in crate::shortcuts::Action::ALL { check(a.label()); }
+    for s in &seen { println!("{s}"); }
+}
