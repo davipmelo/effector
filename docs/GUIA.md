@@ -2,20 +2,21 @@
 
 ## Abrir imagens
 - **⌘O** (pode escolher várias), arrastar arquivos para a janela ou **⌘V** para colar. Cada imagem entra na **filmstrip** embaixo da tela, com os próprios efeitos, recorte, canvas e histórico de desfazer.
-- **← / →** trocam de imagem. **B** mostra ou esconde a filmstrip. **⌥⌘W** fecha a imagem atual.
-- Na filmstrip: clique abre; **⌘-clique** ou **⇧-clique** seleciona várias. O botão **⟳** (ou **⌥⌘S**) **sincroniza** os ajustes da imagem ativa nas selecionadas (layers — substituindo ou por cima —, recorte e canvas). Clique direito: copiar/colar ajustes, limpar, mostrar no Finder, fechar.
+- **← / →** trocam de imagem. **F6** mostra ou esconde a filmstrip. **⌘W** fecha a imagem atual. A rodinha do mouse (sem Shift) rola a filmstrip.
+- **⌫ (Delete)**: com fotos selecionadas na filmstrip (último clique nela), fecha essas fotos; pergunta antes se tiverem alterações. Fora da filmstrip, exclui os layers selecionados.
+- Na filmstrip: clique abre; **⌘-clique** ou **⇧-clique** seleciona várias. O botão **⟳** (ou **⇧⌘S**, como no Lightroom) **sincroniza** os ajustes da imagem ativa nas selecionadas (layers — substituindo ou por cima —, recorte e canvas). Clique direito: copiar/colar ajustes, limpar, mostrar no Finder, fechar. **⇧⌘C / ⇧⌘V** copiam e colam os ajustes, **⇧⌘R** redefine, **⌘A** (depois de clicar na filmstrip) seleciona todas.
 - **Exportar** com várias imagens: escolha "Esta imagem", "Selecionadas" ou "Todas"; cada uma sai com os próprios efeitos numa pasta, com sufixo no nome.
 - Formatos aceitos: JPG, PNG, HEIC, TIFF, RAW (CR3, ARW, NEF, DNG…) e projetos `.effector`.
 
 ## Layers
-- **Adicionar Efeito** (ou **⇧⌘A**) abre o navegador de efeitos ao lado dos layers, com miniaturas feitas a partir da sua imagem.
+- **Adicionar Efeito** (ou **⇧⌘A**) abre o navegador de efeitos na **metade de baixo da sidebar**, no lugar dos presets (que voltam quando você fecha os efeitos), com miniaturas feitas a partir da sua imagem.
 - **Prévia ao vivo:** passe o mouse sobre um efeito ou preset (ou use ↑ ↓ ← →) para vê-lo aplicado na imagem antes de adicionar. **↩** adiciona, **⎋** fecha. Dá para desligar em Configurações.
 - **Seleção múltipla:** **⇧-clique** seleciona um intervalo, **⌘-clique** adiciona ou remove um layer, **⌥⌘A** seleciona todos. Com vários selecionados aparecem ações em massa (agrupar, duplicar, ocultar, excluir), e o inspector muda opacidade e mesclagem de todos de uma vez. Arrastar qualquer layer selecionado move todos.
 - **⌘K** abre a paleta de comandos: digite o nome de qualquer efeito, preset ou comando.
-- O navegador ocupa a altura toda da janela. O botão no topo alterna entre **grade** e **lista** (a lista mostra uma descrição de cada efeito).
+- O botão no topo do navegador alterna entre **grade** e **lista** (a lista mostra uma descrição de cada efeito).
 - O layer **de cima** é aplicado **por último**, sobre tudo o que está abaixo.
 - Arraste para reordenar. Soltar no meio de um grupo coloca o layer **dentro** dele.
-- **⌘G** agrupa e **⇧⌘G** desagrupa. Cada grupo tem a própria opacidade e o próprio modo de mesclagem.
+- **⌘G** agrupa e **⇧⌘G** desagrupa. **⌘J** duplica (como no Photoshop) e **⌫** exclui. Cada grupo tem a própria opacidade e o próprio modo de mesclagem.
 - Olho = mostrar/ocultar (**H**). Lixeira (ao lado do olho) = excluir. **S** (ao passar o mouse) = solo: mostra só aquele layer.
 - O botão de salvar (no topo dos layers) guarda **a pilha inteira como preset**: ordem, grupos, parâmetros, opacidade e mesclagem.
 - Duplo clique no nome renomeia. Clique direito abre mais opções, como "Salvar como Preset".
@@ -24,12 +25,13 @@
 - Arraste o slider; segure **⌥** para ajuste fino.
 - **Duplo clique** no slider volta ao valor padrão.
 - Clique no número para digitar um valor exato.
-- O botão ↺ no topo do inspector redefine todos os parâmetros do layer. O **dado** (ou **R**) sorteia novos valores para explorar.
+- O botão ↺ no topo do inspector redefine todos os parâmetros do layer. O **dado** (ou **⇧R**) sorteia novos valores para explorar.
 - **Interruptores nas seções:** cada parte de um efeito (grão, halation, rótulos do blob tracker, borda preta do CRT, ruído, data…) tem um liga/desliga no título da seção.
 - **Copiar / colar layers:** ⌥⌘C e ⌥⌘V (funciona entre imagens diferentes).
 - **Duplo clique** em qualquer slider (ou no nome dele) volta ao valor padrão.
 - **Menus suspensos** (filmes, degradês, paletas, mesclagem, formatos, LUTs, Looks): clique e use **↑ ↓** ou **W / S** para ir passando com prévia ao vivo. **↩** mantém, **⎋** volta ao que estava antes. Com o menu fechado mas selecionado, ↑ ↓ também trocam a opção. A estrela ★ favorita: os favoritos aparecem no topo.
-- **Look**: vários efeitos (VHS, CRT, Papel, Poeira, Vazamento de Luz, Digicam) têm um seletor de Look no topo com pontos de partida prontos.
+- **Look**: todos os efeitos têm um seletor de Look no topo com pontos de partida prontos (de 3 a 20 por efeito).
+- **Paleta**: efeitos com cores escolhíveis (Light Leak, Threshold, Dither, Halftone, LED, Trail, Neblina…) têm um seletor de **Paleta** que troca todas as cores de uma vez, com combinações prontas para cada efeito.
 - **LUT**: arraste arquivos `.cube` para o campo da LUT (ou direto para a imagem, que cria um layer de LUT). Toda LUT carregada fica salva na sua biblioteca e aparece no menu.
 
 ## Presets
@@ -40,57 +42,70 @@
 ## Janela
 - No topo fica o nome do app e a versão. Na **barra fina embaixo da imagem** ficam o nome do arquivo, o tamanho, a proporção, os megapixels, o tipo, o número de layers, se há alterações não salvas e o **controle de zoom** (− % +, ajustar e tela cheia).
 - **F** abre a imagem em **tela cheia**, sem painéis. **F** ou **⎋** volta.
-- **/** liga a comparação **Antes / Depois dividida**: arraste a divisória para comparar.
+- **Y** liga a comparação **Antes / Depois dividida** (como no Lightroom): arraste a divisória para comparar.
+- **Tab** esconde as barras laterais; **⇧Tab** esconde todos os painéis.
+- **Clique direito fora da imagem** escolhe a cor de fundo da área central: branco, quatro cinzas ou preto.
 - As duas barras laterais são **redimensionáveis**: arraste a divisória. Duplo clique na divisória volta à largura padrão.
 - Passe o mouse sobre qualquer botão para ver o nome e o atalho.
 - O app **reabre a última imagem com todos os layers** ao ser aberto de novo (dá para desligar em Configurações). Configurações, atalhos, favoritos, presets, paletas, degradês e LUTs são sempre salvos.
 
 ## Visualização
-- **\\** (barra invertida) ou o botão na barra alterna **Antes / Depois**.
+- **]** ou o botão na barra alterna **Antes / Depois**.
+- **D** mostra o **mapa de profundidade** da foto.
 - Pinça ou **⌘ + rolagem** para zoom. Arraste ou role para mover a imagem.
 - Duplo clique na imagem ajusta à janela.
-- **Z** (ou **⌘0**) ajusta à janela e **⌘1** mostra em 100%.
+- **Z** alterna entre ajustar à janela e 100% (como no Lightroom); **⌘0** ajusta e **⌘1** mostra em 100%.
 
 ## Canvas & Bordas (Instagram)
 - Botão **Canvas** na barra de cima (ou no painel direito sem layer selecionado): encaixa a imagem numa proporção — 4:5, 1:1, 9:16, 3:4, 1.91:1, 16:9, impressão, A4 ou personalizada — com borda mínima, fundo de **cor**, **degradê** ou a **própria foto desfocada**, posição, cantos arredondados e sombra. O export sai no tamanho do canvas.
 
 ## Recorte
-- **C** ou o botão ✂︎ abre o recorte. Escolha a proporção (Livre, 1:1, 4:5, 16:9…) e clique em **Aplicar**.
+- **R** (como no Lightroom) ou o botão ✂︎ abre o recorte. Escolha a proporção (Livre, 1:1, 4:5, 16:9…) e clique em **Aplicar**.
 
 ## Salvar e exportar
 - **⌘S** salva o projeto `.effector` (imagem original + todos os layers editáveis).
-- **⌘E** exporta em PNG ou JPG, em 1× ou 2×. PNG mantém a transparência.
-- **⇧⌘C** copia o resultado para colar em outro app.
+- **⇧⌘E** exporta em PNG ou JPG, em 1× ou 2×. PNG mantém a transparência.
+- **⌥⇧⌘C** copia o resultado para colar em outro app.
 
 ## Configurações (⌘, ou a engrenagem na barra)
 - Idioma (English / Português / Sistema), tema (Escuro / Claro / Sistema), atalhos personalizáveis e padrões de exportação.
+- **Atualizações**: **Verificar Atualizações** procura uma versão nova no GitHub, baixa e instala (o app fecha, atualiza e abre de novo). Também verifica sozinho uma vez por dia (dá para desligar).
 
 ## Todos os atalhos (padrão, personalizáveis)
+Baseados no **Lightroom Classic** quando a função existe lá, e no **Photoshop** para layers. No Windows, ⌘ = Ctrl e ⌥ = Alt.
+
 | Ação | Atalho |
 |---|---|
 | Abrir | ⌘O |
-| Salvar / Salvar como | ⌘S / ⇧⌘S |
-| Exportar | ⌘E |
-| Copiar resultado | ⇧⌘C |
+| Salvar / Salvar como | ⌘S / ⌥⌘S |
+| Exportar | ⇧⌘E |
+| Copiar resultado | ⌥⇧⌘C |
 | Colar imagem | ⌘V |
 | Desfazer / Refazer | ⌘Z / ⇧⌘Z |
 | Paleta de comandos | ⌘K |
 | Adicionar efeito | ⇧⌘A |
-| Antes / Depois | \ |
-| Recortar | C |
+| Antes / Depois | ] |
+| Antes / Depois dividido | Y |
+| Recortar | R |
+| Mapa de profundidade | D |
 | Agrupar / Desagrupar | ⌘G / ⇧⌘G |
-| Duplicar layer | ⌘D |
-| Excluir layer | ⌘⌫ |
+| Duplicar layer | ⌘J |
+| Excluir layers (ou fechar fotos na filmstrip) | ⌫ |
 | Mostrar / ocultar layer | H |
 | Mover layer para cima / baixo | ⌘] / ⌘[ |
-| Zoom + / − | ⌘= / ⌘- |
-| Ajustar à janela / 100% | Z (ou ⌘0) / ⌘1 |
-| Fechar painéis / Presets | L / P |
+| Selecionar tudo / Desmarcar | ⌘A / ⌘D |
 | Selecionar todos os layers | ⌥⌘A |
-| Tela cheia | F |
-| Antes / Depois dividido | / |
-| Aleatorizar layer | R |
+| Copiar / colar / redefinir ajustes | ⇧⌘C / ⇧⌘V / ⇧⌘R |
+| Sincronizar ajustes | ⇧⌘S |
 | Copiar / colar layers | ⌥⌘C / ⌥⌘V |
+| Zoom + / − | ⌘= / ⌘- |
+| Ajustar ↔ 100% / 100% | Z / ⌘1 |
+| Filmstrip | F6 |
+| Esconder barras laterais / todos os painéis | Tab / ⇧Tab |
+| Fechar painéis / Presets | L / P |
+| Tela cheia | F |
+| Fechar imagem | ⌘W |
+| Aleatorizar layer | ⇧R |
 
 ## Glow × Bloom × Halation
 - **Glow**: difusão suave da imagem inteira acima de um limiar baixo. Dá aquela névoa sonhadora (filtro de difusão).
@@ -123,3 +138,18 @@
 ## Desfoque
 - **Desfoque** (gaussiano ou "superfície", que preserva bordas), **Desfoque Radial** (zoom/giro com centro nítido, como no Resolve), **Desfoque de Movimento** e **Desfoque de Lente & Tilt-Shift**. Desfoque e Movimento podem atuar em tudo, só nas bordas ou só no centro. Olho de Peixe e Vinheta também têm desfoque de borda.
 - **Distorção de Borda**: mantém o centro intacto e distorce só as bordas (curvar, esticar, redemoinho, ondulação, líquido, comprimir).
+
+## Novos na 0.8
+- **Mapa de profundidade (IA no próprio computador)**: o app estima o que está perto e longe em cada foto (cerca de 1 s, só quando algum layer precisa). **D** mostra o mapa.
+- **Máscara de Profundidade** em qualquer layer: limite o efeito a uma faixa de distância (Fundo, Meio, Assunto ou personalizado), com suavidade e inverter.
+- **Onde (Profundidade)**: Glow, Bloom, Halation, Light Leak, Grão, Estrela, Anamórfico, Prisma, Trail, Camcorder e Color Grading podem ficar mais fortes no fundo ou no primeiro plano.
+- **Desfoque de Profundidade**: bokeh de verdade (redondo, de lâminas, oval anamórfico, espiral, olho de gato). O **conta-gotas** "Escolher na imagem" define o foco clicando na foto.
+- **Emulação de Lentes**: lentes inteiras (Cinema Prime, Anamórfica 2x, Helios 44, Petzval, Zoom anos 70, Black Pro-Mist, câmera de brinquedo…).
+- **Neblina e Névoa** (engrossa com a distância) e **Paralaxe e Relevo** (experimental).
+- **Camcorder** substitui VHS e Digicam: lente de filmadora, cor de CCD, contornos brancos, NightShot, fita, TV filmada, compressão e **carimbo de data** que vem da data da foto (editável).
+- **Color Grading** (substitui o Split Tone): rodas de cor para sombras, meios-tons, altas luzes e global, com Mescla e Equilíbrio.
+- **Prisma**: novos tipos Prisma Linear (degraus/ecos) e Meio Prisma (dioptria dividida); o **Cristal** virou um filtro de facetas de verdade.
+- **Trail**: trajetos em arco, onda, tremido de mão e espiral, cópias em arco-íris ou degradê e rastro só das luzes.
+- **Estrela** e **Anamórfico**: controles para afetar só as luzes mais fortes, densidade e intensidade bem sutil; novo filtro de riscos.
+- **Vidro Canelado** refeito com base em vidro real; **Poeira** bem mais fina e densa; **Halo** removido.
+- Sliders revisados: números limpos, passo fino perto do zero (o Min Size do Blob Tracker não pula mais), curvas melhores.

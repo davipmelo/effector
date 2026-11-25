@@ -333,3 +333,20 @@ e DirectX 12 / Vulkan (Windows). Instaladores: `.dmg` (Mac, Apple Silicon e Inte
   fantasma em movimento, negativo cromado, estúdio azul, mapas ácidos, vidro canelado, parede de LED, granulado espectral,
   scanner de linhas, borrões azul/laranja/riso).
 - Teste: `effector --fuzz <imagem> [iterações]` renderiza todos os efeitos com parâmetros aleatórios/extremos e acusa pânicos.
+
+## 9.9 v0.8.0
+- **Usabilidade:** filmstrip rola com a rodinha sem Shift; clique direito fora da imagem escolhe o fundo (branco, 4 cinzas,
+  preto); ⌫ exclui layers ou fecha fotos da filmstrip (pergunta se editadas); menu de efeitos na metade de baixo da sidebar
+  (substitui os presets enquanto aberto); atalhos do Lightroom Classic (R recorte, ] antes/depois, Y dividido, ⇧⌘S
+  sincronizar, ⇧⌘C/V/R ajustes, ⇧⌘E exportar, F6 filmstrip, Tab/⇧Tab painéis, Z ajustar↔100%, ⌘A/⌘D) e do Photoshop
+  (⌘J duplicar).
+- **Profundidade:** Depth Anything V2 Small no próprio computador; Máscara de Profundidade por layer; "Onde" (fundo /
+  primeiro plano) em vários efeitos; D mostra o mapa; conta-gotas de foco.
+- **Efeitos novos:** Camcorder (substitui VHS e Digicam, data EXIF editável), Color Grading com rodas (substitui Split
+  Tone), Emulação de Lentes, Desfoque de Profundidade, Neblina e Névoa, Paralaxe e Relevo.
+- **Refeitos:** Cristal (filtro de facetas) + Prisma Linear + Meio Prisma; Trail (arco, onda, tremido, espiral, cor por
+  cópia, só luzes); Vidro Canelado; Estrela e Anamórfico com controle fino; Poeira menor e muito mais densa; Halo removido.
+- **Looks em todos os efeitos** (3 a 20), **paletas prontas** para todo efeito com cores e mais grupos de degradês/paletas.
+- **Sliders:** passo fino perto do zero em sliders com curva, curvas simétricas em −/+, números sem ".0".
+- **Atualizações pelo app** (Configurações › Atualizações); repositório agora público (e-mails dos commits escondidos).
+- **Não feito:** usar o mapa de profundidade gravado pelo iPhone no modo Retrato (o app sempre estima com IA).

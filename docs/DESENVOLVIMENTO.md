@@ -22,6 +22,25 @@
 - **Teste da interface:** variáveis `EFFECTOR_SHOT=<png>` e `EFFECTOR_SHOT_SCRIPT="effect:vhs,select:0,browser,..."`
   abrem o app, executam os passos, salvam um screenshot da janela e fecham. Use `EFFECTOR_SUPPORT_DIR=<pasta>` para não
   mexer nas configurações / sessão reais.
+- **Profundidade (0.8):** `src/depth.rs` roda o Depth Anything V2 Small (Apache-2.0) com candle **no CPU** (o Metal do
+  candle não tem layer-norm) numa thread dedicada (o modelo não é `Send`), ~0,9 s por foto em 518×518, só quando
+  `depth::layers_need_depth` diz que algum layer usa. Mapa normalizado 0..1 (1 = perto) da imagem inteira; `Ctx::depth()`
+  recorta e amplia para o tamanho do render com filtro bilateral guiado pela foto (`k_depthup`). `LayerNode.depth_mask`
+  e o parâmetro padrão `depthBias` (via `.depth_bias()`) viram máscara em `renderer::layer_mask` (`k_depthmask`, `k_blendm`).
+  Efeito que lê profundidade declara `.depth(|p| …)`. Pesos: `assets/models/depth_anything_v2_vits_f16.safetensors`
+  (fora do git) baixado por `packaging/fetch_model.sh` do release `depth-model-v1`; vai em `EFFECTOR.app/Contents/Resources/models`
+  e `{app}\models` no Windows. `effector --depth-view <img> <out.png>` testa.
+- **Extras do render:** `renderer::Extras` leva profundidade + data EXIF (`src/exif.rs`, DateTimeOriginal) para `Ctx`.
+- **Atualizações (0.8):** `src/updater.rs` lê `releases/latest` do GitHub (repo público), baixa o asset da plataforma e instala
+  (Windows: Inno Setup `/SILENT`, o `[Run] Check: WizardSilent` reabre o app; Mac: script que espera o app fechar, troca o
+  `.app` pelo do DMG e reabre). Testes: `--check-update [--install]` com `EFFECTOR_FAKE_VERSION=0.6.0` e
+  `EFFECTOR_UPDATE_NO_REOPEN=1` num `.app` falso.
+- **Looks e paletas (0.8):** looks extras em `effects/looks080.rs`; combinações de cores por efeito e grupos novos de
+  degradês/paletas em `effects/palettes080.rs` (o inspector mostra o seletor "Paleta" na seção da primeira cor).
+- **Ferramentas de dev:** `--list-looks`, `--slider-audit`, `--missing-pt` (textos sem tradução), `look=<id>` e
+  `dm=from/to/feather[/inv]` nas specs do `--render-test`, passos `dm:` e `depth` no script de screenshot.
+- **CI:** `.github/workflows/ci.yml` compila e roda o lint no Windows e no Mac a cada push na `main`.
+- **Traduções 0.8:** `src/l10n_pt_080.rs` (sobrepõe `PT`).
 - **Unidades de tamanho:** relativas a 1000 px no lado maior (`renderer::REFERENCE_SIZE`).
 - **Regra P&B:** saída com R=G=B exato; o renderer restaura o alfa de entrada (`k_withalpha`).
 - **Dados do usuário:** pasta `EFFECTOR` em Application Support (Mac) / `%APPDATA%` (Windows): `settings.json`,
