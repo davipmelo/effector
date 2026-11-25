@@ -234,7 +234,7 @@ final class ShortcutStore: ObservableObject {
         if editing && (!combo.hasModifier || action.isTextEditingStandard) { return false }
         // while a browser panel is open, plain letters belong to its search field
         let app = AppState.shared
-        if (app.showEffectBrowser || app.showPresetBrowser) && !combo.hasModifier && action != .showPresets { return false }
+        if app.showEffectBrowser && !combo.hasModifier && action != .showPresets { return false }
         DispatchQueue.main.async { Actions.perform(action) }
         return true
     }
@@ -279,7 +279,7 @@ enum Actions {
         case .randomize: if let id = app.selectedID, !app.isMultiSelection { app.randomizeParams(id) }
         case .copyLayers: app.copyLayers()
         case .pasteLayers: app.pasteLayers()
-        case .showLayers: app.showEffectBrowser = false; app.showPresetBrowser = false
+        case .showLayers: app.showEffectBrowser = false
         case .showPresets: if app.hasImage { app.showPresetBrowser.toggle() }
         }
     }

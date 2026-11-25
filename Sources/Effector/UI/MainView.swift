@@ -62,14 +62,12 @@ struct MainView: View {
 
     @ViewBuilder
     private func panels(left: Double) -> some View {
-        if app.showEffectBrowser || app.showPresetBrowser {
+        if app.showEffectBrowser {
             ZStack(alignment: .topLeading) {
                 Color.black.opacity(0.18).ignoresSafeArea()
                     .padding(.leading, left)
-                    .onTapGesture { app.showEffectBrowser = false; app.showPresetBrowser = false }
-                Group {
-                    if app.showEffectBrowser { EffectBrowser() } else { PresetBrowser() }
-                }
+                    .onTapGesture { app.showEffectBrowser = false }
+                EffectBrowser()
                 .frame(maxHeight: .infinity)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.separator))
@@ -92,9 +90,25 @@ struct MainView: View {
         return "\(w) × \(h)" + (app.isDirty ? " · " + tr("Edited") : "")
     }
 
+    @AppStorage("presetsDockFraction") private var presetsFraction = 0.5
+
+    /// Layers on top; when Presets is open it takes the lower part (split adjustable by dragging).
     private var sidebar: some View {
-        VStack(spacing: 0) {
-            LayersPanel()
+        GeometryReader { g in
+            let docked = app.showPresetBrowser && app.hasImage
+            let h = g.size.height
+            let presetsH = min(max(h * presetsFraction, 180), max(180, h - 160))
+            VStack(spacing: 0) {
+                LayersPanel()
+                    .frame(maxHeight: .infinity)
+                if docked {
+                    SplitHandle(fraction: $presetsFraction, total: h)
+                    PresetBrowser()
+                        .frame(height: presetsH)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .clipped()
         }
         .background(Theme.panelBG)
     }
@@ -296,6 +310,38 @@ struct ResizeHandle: View {
                         }
                         .onEnded { _ in start = nil })
                     .onTapGesture(count: 2) { width = sign > 0 ? 270 : 300 }
+                    .help(tr("Drag to resize · double-click to reset"))
+            )
+            .zIndex(5)
+    }
+}
+
+/// Horizontal divider between layers and docked presets; drag to change the split, double-click for half.
+struct SplitHandle: View {
+    @Binding var fraction: Double
+    let total: Double
+    @State private var start: Double?
+    @State private var hover = false
+
+    var body: some View {
+        Rectangle().fill(hover || start != nil ? Theme.accent.opacity(0.6) : Theme.separator)
+            .frame(height: 1)
+            .overlay(
+                Color.clear
+                    .frame(height: 9)
+                    .contentShape(Rectangle())
+                    .onHover { h in
+                        hover = h
+                        if h { NSCursor.resizeUpDown.push() } else { NSCursor.pop() }
+                    }
+                    .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                        .onChanged { g in
+                            if start == nil { start = fraction }
+                            let f = (start ?? fraction) - g.translation.height / max(total, 1)
+                            fraction = min(max(f, 0.2), 0.85)
+                        }
+                        .onEnded { _ in start = nil })
+                    .onTapGesture(count: 2) { fraction = 0.5 }
                     .help(tr("Drag to resize · double-click to reset"))
             )
             .zIndex(5)

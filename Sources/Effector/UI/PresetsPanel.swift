@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Presets panel: opens beside the layers (like Add Effect) so the stack stays visible.
+/// Presets panel docked in the lower half of the left sidebar. Stays open after applying;
+/// arrow keys browse it only while the pointer is over it or its search field has focus.
 struct PresetBrowser: View {
     @ObservedObject var app = AppState.shared
     @ObservedObject var store = PresetStore.shared
@@ -12,6 +13,7 @@ struct PresetBrowser: View {
     /// Mouse position at the last keyboard navigation: hovers are ignored until the mouse really moves
     /// (scrolling the list under a still pointer must not steal the highlight).
     @State private var keyNavMouse: CGPoint?
+    @State private var hovering = false
 
     private var list: [Preset] {
         let q = query.lowercased()
@@ -52,8 +54,9 @@ struct PresetBrowser: View {
                 .menuIndicator(.hidden)
                 .fixedSize()
                 .help(tr("More preset options"))
+                IconButton(symbol: "xmark", help: "Close presets (P)") { app.showPresetBrowser = false }
             }
-            .padding(12)
+            .padding(.horizontal, 10).padding(.vertical, 8)
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 6, pinnedViews: [.sectionHeaders]) {
@@ -67,7 +70,7 @@ struct PresetBrowser: View {
                                             }
                                         }
                                     } else {
-                                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 10)], spacing: 12) {
+                                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 105), spacing: 8)], spacing: 10) {
                                             ForEach(items) { p in
                                                 PresetCard(preset: p, highlighted: highlight == p.id, hover: { hover(p) }) { apply(p) }.id(p.id)
                                             }
@@ -95,12 +98,15 @@ struct PresetBrowser: View {
                 }
                 .onChange(of: highlight) { _, h in if let h { withAnimation(.linear(duration: 0.1)) { proxy.scrollTo(h) } } }
             }
-            BrowserFooter(text: tr("Hover or ↑↓ to preview · click or ↩ to add on top as a group · ⎋ close"))
         }
-        .frame(width: 440)
-        .frame(maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.panelBG)
-        .onAppear { DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { focused = true }; keys.install(); store.regenerateThumbs() }
+        .help(tr("Hover or ↑↓ to preview · click or ↩ to add on top as a group · ⎋ close"))
+        .onHover { inside in
+            hovering = inside
+            if !inside && !focused { highlight = nil; app.hoverPreview(nil) }
+        }
+        .onAppear { keys.install(); store.regenerateThumbs() }
         .onDisappear { keys.remove(); app.previewLayers = nil }
         .onChange(of: app.source?.id) { _, _ in store.regenerateThumbs() }
         .onChange(of: store.user.count) { _, _ in store.regenerateThumbs() }
@@ -114,8 +120,13 @@ struct PresetBrowser: View {
     }
 
     private func handleKey(_ code: UInt16, _ flat: [Preset]) -> Bool {
+        // docked panel: only take keys while it is the thing being used
+        guard !app.showEffectBrowser, hovering || focused else { return false }
         switch code {
-        case KeyCode.escape: app.showPresetBrowser = false; return true
+        case KeyCode.escape:
+            if highlight != nil || focused { highlight = nil; focused = false; app.hoverPreview(nil) }
+            else { app.showPresetBrowser = false }
+            return true
         case KeyCode.up, KeyCode.down, KeyCode.left, KeyCode.right:
             guard !flat.isEmpty else { return true }
             let d = (code == KeyCode.up || code == KeyCode.left) ? -1 : 1
@@ -134,7 +145,7 @@ struct PresetBrowser: View {
     private func apply(_ p: Preset) {
         app.previewLayers = nil
         app.applyPreset(p)
-        app.showPresetBrowser = false
+        highlight = nil
     }
 }
 

@@ -284,3 +284,6 @@ Ao final, o app é instalado em `/Applications` e o usuário testa tudo e manda 
 - Export SVG (dither/halftone)
 - Vídeo e animação
 - Remover os presets de fábrica, se o usuário quiser
+
+## 9.6 Rumo à v1.0 (refinamento)
+- Presets agora ficam encaixados na metade de baixo da sidebar esquerda (divisória ajustável, estado lembrado), em vez de um painel lateral sobreposto. Permanecem abertos após aplicar; atalhos de uma tecla continuam funcionando com o painel aberto; teclas de seta só vão para os presets com o mouse sobre o painel ou a busca focada.

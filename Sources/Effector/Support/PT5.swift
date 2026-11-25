@@ -54,5 +54,6 @@ extension PT {
         "Zoom or spin blur around a point, with a sharp protected centre — like Resolve's radial blur.": "Desfoque de zoom ou giro em volta de um ponto, com centro nítido protegido — como o radial blur do Resolve.",
         "Straight-line motion blur at any angle, centred or trailing, optionally only on the edges.": "Desfoque de movimento em linha reta em qualquer ângulo, centralizado ou de rastro, opcionalmente só nas bordas.",
         "Invert Inside": "Inverter Dentro",
+        "Close presets (P)": "Fechar presets (P)",
     ]
 }

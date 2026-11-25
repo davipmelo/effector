@@ -58,8 +58,15 @@ final class AppState: ObservableObject {
     @Published var isCropping = false
     @Published var cropDraft = CropRect.full
     @Published var cropAspect: String = "free"
-    @Published var showEffectBrowser = false { didSet { if !showEffectBrowser { previewLayers = nil }; if showEffectBrowser { showPresetBrowser = false } } }
-    @Published var showPresetBrowser = false { didSet { if !showPresetBrowser { previewLayers = nil }; if showPresetBrowser { showEffectBrowser = false } } }
+    @Published var showEffectBrowser = false { didSet { if !showEffectBrowser { previewLayers = nil } } }
+    /// Presets docked in the lower half of the left sidebar (stays open until closed; remembered).
+    @Published var showPresetBrowser = UserDefaults.standard.bool(forKey: "showPresetsDock") {
+        didSet {
+            if !showPresetBrowser { previewLayers = nil }
+            if showPresetBrowser { showEffectBrowser = false }
+            UserDefaults.standard.set(showPresetBrowser, forKey: "showPresetsDock")
+        }
+    }
     @Published var showCommandPalette = false
     @Published var showExport = false
     @Published var isExporting = false
@@ -941,7 +948,7 @@ final class AppState: ObservableObject {
 
     func togglePresentation() {
         guard hasImage || presenting else { return }
-        showEffectBrowser = false; showPresetBrowser = false; showCommandPalette = false
+        showEffectBrowser = false; showCommandPalette = false
         presenting.toggle()
         let w = NSApp.windows.first { $0.identifier?.rawValue.hasPrefix("main") == true } ?? NSApp.mainWindow
         if let w {
