@@ -18,6 +18,7 @@ pub mod copy;
 pub mod digital;
 pub mod distort;
 pub mod dither;
+pub mod extra;
 pub mod film;
 pub mod frame;
 pub mod grain;
@@ -93,6 +94,8 @@ pub struct Effect {
     /// Colour dot shown next to section titles (e.g. HSL bands).
     pub section_colors: Vec<(String, Rgba)>,
     pub produces_alpha: bool,
+    /// Kept only so older projects / presets still render; not offered in the browser.
+    pub hidden: bool,
     pub apply: ApplyFn,
 }
 
@@ -108,6 +111,7 @@ impl Effect {
             looks: vec![],
             section_colors: vec![],
             produces_alpha: false,
+            hidden: false,
             apply,
         }
     }
@@ -116,6 +120,7 @@ impl Effect {
     pub fn params(mut self, p: Vec<ParamDef>) -> Self { self.params = p; self }
     pub fn looks(mut self, l: Vec<Look>) -> Self { self.looks = l; self }
     pub fn section_colors(mut self, c: Vec<(String, Rgba)>) -> Self { self.section_colors = c; self }
+    pub fn hidden(mut self) -> Self { self.hidden = true; self }
 
     pub fn id(&self) -> &'static str { self.id }
     pub fn name(&self) -> &'static str { self.name }
@@ -167,10 +172,10 @@ pub fn all() -> &'static [Effect] {
     REGISTRY.get_or_init(|| {
         vec![
             // Adjust & color
-            adjust::basic(), adjust::curves(), adjust::hsl(), adjust::huesat(), adjust::bw(), color::gradient_map(), color::lut(),
+            adjust::basic(), adjust::curves(), adjust::hsl(), adjust::huesat(), adjust::bw(), extra::split_tone(), color::gradient_map(), color::lut(),
             lens::sharpen(), adjust::invert(), adjust::posterize(), adjust::threshold(),
             // Print & pixel
-            dither::dither(), print::halftone(), ascii::ascii(), copy::photocopy(), copy::thermal(),
+            dither::dither(), print::halftone(), ascii::ascii(), extra::print_wear(), copy::photocopy(), copy::thermal(),
             // Film & light
             film::film(), grain::grain(), light::glow(), light::bloom(), light::halation(), texture::light_leak(),
             // Lens filters
@@ -179,9 +184,9 @@ pub fn all() -> &'static [Effect] {
             // Blur
             blur::blur(), blur::radial(), blur::motion(), lensfilters::lens_blur(),
             // Distort
-            distort::fisheye(), distort::edge_distort(), distort::mirror(), distort::stretch(),
+            distort::fisheye(), distort::edge_distort(), extra::reeded_glass(), distort::mirror(), distort::stretch(),
             // Glitch & retro
-            vhs::vhs(), lens::crt(), digital::digicam(), light::trail(),
+            vhs::vhs(), lens::crt(), extra::led_display(), digital::digicam(), light::trail(),
             // Overlays & tracking
             texture::dust(), frame::frame(), blob::blob_tracker(),
         ]

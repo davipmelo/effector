@@ -42,7 +42,7 @@ fn ordered_effects(query: &str) -> Vec<&'static Effect> {
     let q = query.trim().to_lowercase();
     let mut all: Vec<&'static Effect> = vec![];
     for c in Category::ALL {
-        all.extend(effects::all().iter().filter(|e| e.category == c));
+        all.extend(effects::all().iter().filter(|e| e.category == c && !e.hidden));
     }
     if q.is_empty() {
         return all;
@@ -514,7 +514,7 @@ pub fn command_palette(ctx: &egui::Context, app: &mut AppState) {
     let id = Id::new("cmd-palette");
     let (mut query, mut index): (String, usize) = ctx.data(|d| d.get_temp(id).unwrap_or_default());
     let mut items: Vec<PaletteItem> = vec![];
-    for e in effects::all() {
+    for e in effects::all().iter().filter(|e| !e.hidden) {
         items.push(PaletteItem { title: tr(e.name), subtitle: format!("{} · {}", tr("Add effect"), tr(e.category.label())), symbol: e.symbol, run: Cmd::Effect(e.id) });
     }
     for p in presets::all() {

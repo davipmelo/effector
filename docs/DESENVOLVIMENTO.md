@@ -13,6 +13,9 @@
   `app.rs` é o equivalente do AppState (documentos, undo, sessão, projeto, export).
 - **Novo efeito:** criar a função em `src/effects/<grupo>.rs` com `Effect::new(...)`, `.params(...)` e o `apply`,
   colocar o kernel em `src/shaders/kernels/k_<nome>.glsl`, registrar em `effects::all()` e traduzir os textos (`src/l10n_pt.rs`).
+- **Fuzz:** `effector --fuzz <img> [iterações]` (parâmetros aleatórios/extremos em todos os efeitos, acusa pânicos).
+- **Log de erros:** `effector.log` na pasta de suporte (erros de GPU, pânicos, reinícios da thread de render).
+- **Efeitos ocultos:** `.hidden()` mantém um efeito só para projetos antigos (fora do navegador e da paleta).
 - **Teste headless:** `effector --render-test <img> <outdir> [specs] [--check-neutral] [--full|--full2x]`
   (`spec`: `efeito:chave=valor,...`, `+` empilha, `presets` ou `presets=Categoria`); `--lint` verifica chaves, padrões,
   looks, presets e compila os shaders; `--dump-params` lista todos os parâmetros.

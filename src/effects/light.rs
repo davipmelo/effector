@@ -57,19 +57,49 @@ pub fn bloom() -> Effect {
     ])
 }
 
+/// Film halation: red-channel driven, added in linear light (white cores stay white, the fringe goes
+/// orange then deep red), with a tight / wide balance and an optional neutral bloom.
+pub fn halation_apply(input: &T, p: &Params, ctx: &mut Ctx) -> T {
+    let r = ctx.px(p.num("radius", 18.0)).max(0.5);
+    let f = ((r / 8.0) as usize).max(1);
+    let small = ctx.resize(input, (input.width() / f).max(1), (input.height() / f).max(1), false);
+    let source = if p.choice_or("source", "red") == "luma" { 1.0 } else { 0.0 };
+    let src = ctx.apply("k_halo_src", &[&small], &[p.fd("threshold", 84.0) / 100.0, p.fd("softness", 15.0) / 100.0 * 0.5, 0.0, source]);
+    let sr = r / f as f64;
+    let b1 = ctx.blur(&src, sr * 0.3);
+    let b2 = ctx.blur(&src, sr * 1.0);
+    let b3 = ctx.blur(&src, sr * 2.6);
+    let mut u = vec![p.fd("intensity", 100.0) / 100.0 * 1.8, p.fd("spread", 50.0) / 100.0];
+    u.extend(linear_rgb(p.color_or("color", hex("#FF2A0A"))));
+    u.extend(linear_rgb(p.color_or("inner", hex("#FF7A2E"))));
+    u.push(p.f("bloom") / 100.0 * 0.8);
+    ctx.apply("k_halation", &[input, &b1, &b2, &b3], &u)
+}
+
+/// sRGB colour -> linear floats.
+pub fn linear_rgb(c: Rgba) -> [f32; 3] {
+    let f = |v: f64| -> f32 {
+        let v = v.clamp(0.0, 1.0);
+        (if v <= 0.04045 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) }) as f32
+    };
+    [f(c.r), f(c.g), f(c.b)]
+}
+
 pub fn halation() -> Effect {
-    Effect::new("halation", "Halation", Category::Film, |input, p, ctx| {
-        glow_pipeline(input, ctx, p.fd("threshold", 65.0) / 100.0, 0.15, p.num("radius", 10.0), p.fd("intensity", 70.0) / 100.0,
-            p.color_or("color", hex("#FF3D14")), true, 1.0, 0.0, true, false)
-    })
-    .symbol("circle.dotted.and.circle")
-    .summary("Red-orange fringe around highlights, from light bouncing in the film base.")
-    .params(vec![
-        s("intensity", "Intensity", 0.0, 200.0, 70.0).step(1.0).unit("%"),
-        s("radius", "Radius", 1.0, 100.0, 10.0).step(1.0).curve(2.0),
-        s("threshold", "Threshold", 0.0, 100.0, 65.0).step(1.0).unit("%"),
-        ParamDef::color("color", "Color", hex("#FF3D14")),
-    ])
+    Effect::new("halation", "Halation", Category::Film, halation_apply)
+        .symbol("circle.dotted.and.circle")
+        .summary("Film halation: lights get an orange-to-red fringe while their cores stay white.")
+        .params(vec![
+            s("intensity", "Intensity", 0.0, 300.0, 100.0).step(1.0).unit("%").sec("Halation"),
+            s("radius", "Radius", 1.0, 200.0, 18.0).step(1.0).curve(2.0).sec("Halation"),
+            s("spread", "Spread", 0.0, 100.0, 50.0).step(1.0).unit("%").sec("Halation"),
+            s("threshold", "Threshold", 0.0, 100.0, 84.0).step(1.0).unit("%").sec("Halation"),
+            s("softness", "Softness", 0.0, 100.0, 15.0).step(1.0).unit("%").sec("Halation"),
+            ParamDef::choice("source", "Source", &[("red", "Red Layer (film)"), ("luma", "All Bright Lights")], "red").sec("Halation"),
+            ParamDef::color("inner", "Inner Color", hex("#FF7A2E")).sec("Color"),
+            ParamDef::color("color", "Outer Color", hex("#FF2A0A")).sec("Color"),
+            s("bloom", "Bloom", 0.0, 100.0, 0.0).step(1.0).unit("%").sec("Color"),
+        ])
 }
 
 pub fn trail() -> Effect {

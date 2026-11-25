@@ -271,3 +271,50 @@ fn project_roundtrip(input: &Path, out_dir: &Path) {
         Err(e) => println!("roundtrip error: {e}"),
     }
 }
+
+/// `--fuzz <image> [iterations]`: renders every effect with random / extreme settings through a
+/// cached renderer (like the preview worker) and reports panics and GPU validation errors.
+pub fn fuzz(args: &[String]) {
+    let Some(i) = args.iter().position(|a| a == "--fuzz") else { return };
+    if let Err(e) = crate::gpu::init_headless() {
+        println!("error: {e}");
+        return;
+    }
+    let Some(path) = args.get(i + 1) else { return };
+    let iters: usize = args.get(i + 2).and_then(|s| s.parse().ok()).unwrap_or(4);
+    let src = SourceImage::load_path(Path::new(path)).expect("image");
+    let mut rng = crate::swatches::SplitMix::new(7);
+    let mut failures = 0;
+    for it in 0..iters {
+        let scale = [0.25, 0.5, 1.0][it % 3];
+        let tex = src.make_texture(&CropRect::default(), scale);
+        let mut r = Renderer::new(true);
+        for e in effects::all() {
+            let mut node = LayerNode::effect(e.id, None, None);
+            for d in &e.params {
+                match &d.kind {
+                    ParamKind::Slider { min, max, .. } => {
+                        let v = match rng.next() % 4 { 0 => *min, 1 => *max, _ => min + (max - min) * (rng.next() % 1000) as f64 / 1000.0 };
+                        node.params.set(&d.key, ParamValue::Number(v));
+                    }
+                    ParamKind::Choice(o, _) | ParamKind::Segmented(o, _) if !o.is_empty() => {
+                        node.params.set(&d.key, ParamValue::Choice(o[(rng.next() % o.len() as u64) as usize].id.clone()));
+                    }
+                    ParamKind::Toggle(_) => node.params.set(&d.key, ParamValue::Bool(rng.next() % 2 == 0)),
+                    _ => {}
+                }
+            }
+            let layers = vec![node.clone()];
+            let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let out = r.render(&layers, &tex, it as u64, false, None);
+                let _ = imageio::read_rgba8(&out);
+            }));
+            if res.is_err() {
+                failures += 1;
+                println!("PANIC effect={} scale={scale} params={}", e.id, serde_json::to_string(&node.params).unwrap_or_default());
+            }
+        }
+        println!("iteration {it} done");
+    }
+    println!("fuzz finished: {failures} failures");
+}

@@ -83,6 +83,11 @@ pub fn wanted_limits(adapter: &wgpu::Adapter) -> wgpu::Limits {
 
 /// Initialise from an existing device (the window's) or create a headless one.
 pub fn init(device: wgpu::Device, queue: wgpu::Queue) {
+    // wgpu's default handler panics on any validation / out-of-memory error, which killed the
+    // render thread (the preview then froze for good). Log the error and keep going instead.
+    device.on_uncaptured_error(Arc::new(|e: wgpu::Error| {
+        crate::settings::log_error(&format!("GPU error: {e}"));
+    }));
     let _ = GPU.set(Gpu::new(device, queue));
 }
 

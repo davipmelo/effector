@@ -95,7 +95,15 @@
 ## Glow × Bloom × Halation
 - **Glow**: difusão suave da imagem inteira acima de um limiar baixo. Dá aquela névoa sonhadora (filtro de difusão).
 - **Bloom**: só as **luzes mais fortes** vazam, em vários tamanhos ao mesmo tempo, como a luz estourando numa lente. As sombras e os meios-tons ficam intactos.
-- **Halation**: um halo **vermelho-alaranjado** em volta das luzes, que imita a luz rebatendo na base do filme.
+- **Halation**: imita a luz rebatendo na base do filme e reexpondo a camada vermelha. O centro das luzes continua branco e a franja vai do **laranja** (perto da luz) ao **vermelho** (mais longe). *Espalhamento* equilibra franja justa × halo largo, *Origem* escolhe entre a camada vermelha (fiel ao filme: luzes azuis não fazem halo) e todas as luzes fortes, e *Bloom* soma um brilho neutro. Desde a 0.7 o Film Emulation não tem mais halation embutido: use uma camada de Halation embaixo dele.
+
+## Novos na 0.7
+- **Split Tone**: uma cor nas sombras e outra nas altas luzes (ex.: sombras azuladas, luzes quentes).
+- **Vidro Canelado**: a imagem atrás de um vidro com frisos verticais (largura, refração, curvatura, dispersão, "derretido").
+- **Painel de LED**: a imagem refeita com LEDs (tamanho, altura do ponto — pontos altos viram barras —, limiar, níveis, brilho).
+- **Desgaste de Impressão**: toner desbotado, riscos do cilindro, faixas, linhas mortas do cabeçote, sujeira e sombra nas bordas, sobre qualquer imagem.
+- **Fotocópia** e **Cupom Térmico** viraram presets (em *Print & Graphic*), montados com Threshold/Dither + Desgaste de Impressão. Projetos antigos que usam os efeitos continuam abrindo.
+- Categoria de presets **DM'S SPECIALS** (17 looks) no topo da lista.
 
 ## Filtros de lente
 - **Prisma & Caleidoscópio**: três tipos — Prisma (fantasmas com arco-íris), Caleidoscópio (segmentos, espelho, rotação, zoom, torção, anéis, origem) e Cristal (facetas). Veja os Looks: Mandala, Vórtice, Viagem Psicodélica, Cacos de Vidro…

@@ -21,6 +21,21 @@ pub fn support_dir() -> PathBuf {
     d
 }
 
+/// Appends a line to `effector.log` in the support folder (errors that would otherwise be lost:
+/// the Windows build has no console). The log is restarted when it grows past 1 MB.
+pub fn log_error(msg: &str) {
+    use std::io::Write;
+    eprintln!("{msg}");
+    let path = support_dir().join("effector.log");
+    if std::fs::metadata(&path).map(|m| m.len() > 1 << 20).unwrap_or(false) {
+        let _ = std::fs::remove_file(&path);
+    }
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+        let t = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+        let _ = writeln!(f, "[{t}] v{} {msg}", env!("CARGO_PKG_VERSION"));
+    }
+}
+
 /// Writes through a temp file so a crash never leaves a half-written file.
 pub fn write_atomic(path: &Path, data: &[u8]) {
     let tmp = path.with_extension("tmp~");

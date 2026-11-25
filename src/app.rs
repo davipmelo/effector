@@ -17,7 +17,7 @@ use crate::model::*;
 use crate::presets::{self, Preset};
 use crate::settings;
 use crate::shortcuts::Action;
-use crate::worker::{RenderRequest, RenderWorker, ThumbJob, ThumbResult, ThumbWorker};
+use crate::worker::{RenderMsg, RenderRequest, RenderWorker, ThumbJob, ThumbResult, ThumbWorker};
 
 /// One open image in the workspace: its original file, its edits and its undo history.
 pub struct DocSlot {
@@ -198,6 +198,8 @@ pub struct AppState {
     thumbs: ThumbWorker,
     render_pending: bool,
     render_running: bool,
+    /// When the in-flight render was sent (watchdog).
+    render_started: Instant,
     render_gen: u64,
     pub preview_scale: f64,
     interactive_until: Instant,
@@ -267,6 +269,7 @@ impl AppState {
             thumbs: ThumbWorker::start(ctx.clone()),
             render_pending: false,
             render_running: false,
+            render_started: Instant::now(),
             render_gen: 0,
             preview_scale: 0.25,
             interactive_until: Instant::now(),
@@ -796,6 +799,10 @@ impl AppState {
     }
 
     fn state_changed(&mut self, old: &DocumentState) {
+        // A real edit always shows the real stack: a hover preview left behind (e.g. a preset
+        // highlighted while its search field kept focus) would be drawn on top and hide the edit.
+        self.hover_pending = None;
+        self.preview_layers = None;
         let new = self.state();
         if let Some(d) = self.doc_mut() {
             d.is_dirty = true;
@@ -1195,6 +1202,36 @@ impl AppState {
 
     pub fn request_render(&mut self) { self.render_pending = true; }
 
+    /// Dev/test: one frame of a simulated slider drag on the selected layer.
+    pub fn debug_drag_step(&mut self, n: u64) {
+        let Some(id) = self.selected_id else { return };
+        let Some(node) = self.layers().find(id).cloned() else { return };
+        let Some(eff) = effects::effect(&node.effect_id) else { return };
+        let sliders: Vec<_> = eff.params.iter().filter_map(|d| match &d.kind {
+            ParamKind::Slider { min, max, .. } => Some((d.key.clone(), *min, *max)),
+            _ => None,
+        }).collect();
+        if sliders.is_empty() { return; }
+        let (k, min, max) = &sliders[(n / 40) as usize % sliders.len()];
+        let t = ((n % 40) as f64) / 39.0;
+        self.set_param(id, k, ParamValue::Number(min + (max - min) * t), true);
+    }
+
+    /// Dev/test: browse to gradient number `n` on the selected layer (like the gradient picker).
+    pub fn debug_gradient_step(&mut self, n: usize) {
+        let Some(id) = self.selected_id else { return };
+        let all = crate::swatches::all_gradients();
+        let g = all[n % all.len()].clone();
+        self.set_param(id, "gradient", ParamValue::Gradient(g), false);
+    }
+
+    pub fn debug_render_state(&self) -> String {
+        format!(
+            "render: gen={} pending={} running={} is_rendering={} display_gen={} has_output={}",
+            self.render_gen, self.render_pending, self.render_running, self.is_rendering, self.display_gen, self.output.is_some()
+        )
+    }
+
     fn current_scale(&mut self) -> f64 {
         let mut s = self.preview_scale;
         if Instant::now() < self.interactive_until && s > 0.3 {
@@ -1211,6 +1248,7 @@ impl AppState {
         let Some(src) = self.source() else { return };
         self.render_pending = false;
         self.render_running = true;
+        self.render_started = Instant::now();
         self.is_rendering = true;
         let st = self.state();
         let mut layers = st.layers.clone();
@@ -1298,8 +1336,23 @@ impl AppState {
     pub fn tick(&mut self, ctx: &egui::Context) {
         let now = Instant::now();
         // render results
-        while let Ok(r) = self.render.results.try_recv() {
+        // Watchdog: a render thread that died or hangs must never freeze the preview for good.
+        if self.render_running && (self.render.is_dead() || now.duration_since(self.render_started) > Duration::from_secs(20)) {
+            settings::log_error(if self.render.is_dead() { "render thread died, restarting it" } else { "render took over 20 s, restarting the render thread" });
+            self.render = RenderWorker::start(ctx.clone());
             self.render_running = false;
+            self.render_pending = true;
+        }
+        while let Ok(msg) = self.render.results.try_recv() {
+            self.render_running = false;
+            let r = match msg {
+                RenderMsg::Done(r) => r,
+                RenderMsg::Failed(generation) => {
+                    settings::log_error(&format!("render {generation} failed"));
+                    self.is_rendering = self.render_pending;
+                    continue;
+                }
+            };
             if r.generation == self.render_gen || self.output.is_none() {
                 self.output = Some(r.output);
                 self.original = Some(r.original);

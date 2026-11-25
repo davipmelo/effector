@@ -1,4 +1,3 @@
-use super::light::glow_pipeline;
 use super::*;
 
 #[derive(Clone)]
@@ -119,14 +118,8 @@ pub fn film() -> Effect {
         u.extend(st.bw_weights);
         u.extend([intensity, p.f("exposure"), if st.bw { 0.0 } else { p.f("warmth") }]);
         u.extend(st.matrix);
-        // Halation from the original highlights, before tone mapping
-        let mut img = input.clone();
-        let hal = if p.bool_or("halationOn", true) { p.fd("halation", 30.0) / 100.0 * st.halation * intensity } else { 0.0 };
-        if hal > 0.001 {
-            let tint = if st.bw { Rgba::WHITE } else { hex("#FF4418") };
-            img = glow_pipeline(&img, ctx, 0.68, 0.15, 9.0, hal * 1.2, tint, true, 1.0, 0.0, true, st.bw);
-        }
-        img = ctx.apply("k_film", &[&img], &u);
+        // (halation is its own effect since 0.7: add a Halation layer under the film)
+        let mut img = ctx.apply("k_film", &[input], &u);
         let g = if p.bool_or("grainOn", true) { p.num("grain", 35.0) / 100.0 * st.grain as f64 * intensity as f64 } else { 0.0 };
         if g > 0.001 {
             let mut gp = Params::default();
@@ -162,7 +155,5 @@ pub fn film() -> Effect {
         s("grain", "Amount", 0.0, 100.0, 35.0).step(1.0).unit("%").sec("Grain"),
         s("grainSize", "Size", 0.25, 4.0, 1.0).step(0.05).curve(1.8).sec("Grain"),
         ParamDef::seed("seed").sec("Grain"),
-        ParamDef::section_switch("halationOn", "Halation", true),
-        s("halation", "Amount", 0.0, 100.0, 30.0).step(1.0).unit("%").sec("Halation"),
     ])
 }

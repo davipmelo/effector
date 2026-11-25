@@ -11,6 +11,6 @@ void main() {
     vec2 cell = floor(p / u[4]);
     float ch = fmodc(cell.x + cell.y, 2.0) < 1.0 ? 0.28 : 0.36;
     vec3 col = mix(vec3(ch), clamp(c.rgb, 0.0, 1.0), clamp(c.a, 0.0, 1.0));
-    // egui samples textures as linear light: store linear so the UI shows the exact sRGB values.
-    imageStore(o, ivec2(gid), vec4(toLinear(col), 1.0));
+    // egui samples textures as sRGB-gamma values: store them as-is.
+    imageStore(o, ivec2(gid), vec4(col, 1.0));
 }

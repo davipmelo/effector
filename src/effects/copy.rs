@@ -25,6 +25,7 @@ pub fn photocopy() -> Effect {
         }
         img
     })
+    .hidden()
     .symbol("doc.on.doc")
     .summary("High-contrast toner copy with streaks, specks and dark edges (zines, flyers).")
     .params(vec![
@@ -68,6 +69,7 @@ pub fn thermal() -> Effect {
         }
         ctx.apply("k_thermal", &[&d], &u)
     })
+    .hidden()
     .symbol("scroll")
     .summary("Receipt printer: 1-bit dots, faded thermal ink, dead print-head lines.")
     .params(vec![

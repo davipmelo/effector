@@ -316,3 +316,20 @@ e DirectX 12 / Vulkan (Windows). Instaladores: `.dmg` (Mac, Apple Silicon e Inte
 - No Mac, dar duplo clique num arquivo no Finder abre o app mas ainda não abre o arquivo (use Arquivo › Abrir ou arraste).
 - Instaladores sem assinatura digital: o Windows mostra "O Windows protegeu o computador" e o Mac pede clique direito › Abrir
   na primeira vez.
+
+## 9.8 v0.7.0
+- **Correções:** o canvas aparecia mais escuro que a miniatura (a gama era aplicada duas vezes na textura de exibição do egui).
+  O preview podia parar de atualizar para sempre: qualquer erro de GPU (que o wgpu transforma em pânico) ou pânico num efeito
+  matava a thread de render. Agora erros de GPU são registrados em `effector.log` (pasta de suporte), a thread de render se
+  recupera de pânicos, um vigia reinicia a thread se ela morrer ou travar (20 s), e qualquer edição descarta pré-visualizações
+  de hover que tenham ficado presas por cima da pilha.
+- **Halation refeito:** guiado pela camada vermelha, somado em luz linear (núcleo branco, franja laranja → vermelha), com
+  espalhamento, suavidade, origem, cor interna/externa e bloom. O halation embutido no Film Emulation foi removido; presets
+  que tinham halation forte ganharam uma camada de Halation.
+- **Efeitos novos:** Split Tone, Vidro Canelado, Painel de LED e Desgaste de Impressão.
+- **Fotocópia e Cupom Térmico** viraram presets (efeitos antigos ficam ocultos, só para abrir projetos antigos); novo preset
+  Fotocópia.
+- **Categoria DM'S SPECIALS** com 17 presets criados a partir de referências (metrô com halation, olho de peixe, flash,
+  fantasma em movimento, negativo cromado, estúdio azul, mapas ácidos, vidro canelado, parede de LED, granulado espectral,
+  scanner de linhas, borrões azul/laranja/riso).
+- Teste: `effector --fuzz <imagem> [iterações]` renderiza todos os efeitos com parâmetros aleatórios/extremos e acusa pânicos.

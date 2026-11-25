@@ -25,12 +25,22 @@ mod worker;
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let _ = settings::settings();
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let thread = std::thread::current().name().unwrap_or("main").to_string();
+        settings::log_error(&format!("panic in thread '{thread}': {info}"));
+        default_hook(info);
+    }));
     if args.iter().any(|a| a == "--lint") {
         rendertest::lint();
         return;
     }
     if args.iter().any(|a| a == "--dump-params") {
         rendertest::dump_params();
+        return;
+    }
+    if args.iter().any(|a| a == "--fuzz") {
+        rendertest::fuzz(&args);
         return;
     }
     if args.iter().any(|a| a == "--render-test") {

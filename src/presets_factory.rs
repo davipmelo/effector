@@ -1,6 +1,123 @@
 // Generated from the macOS app's FactoryPresets.all (Presets.swift).
 pub fn all() -> Vec<Preset> {
     vec![
+make("Metro Halation", "DM'S SPECIALS", vec![
+fx("basic", None, 1.0, BlendMode::Normal, vals!["contrast" => 18.0, "highlights" => -12.0, "blacks" => -18.0, "temperature" => -14.0, "vibrance" => 12.0]),
+fx("splittone", None, 1.0, BlendMode::Normal, vals!["shadow" => hex("#0E3A66"), "shadowAmt" => 50.0, "highlight" => hex("#FFC9A0"), "highlightAmt" => 15.0]),
+fx("halation", None, 1.0, BlendMode::Normal, vals!["intensity" => 150.0, "radius" => 22.0, "spread" => 55.0, "threshold" => 88.0, "bloom" => 15.0]),
+fx("film", None, 1.0, BlendMode::Normal, vals!["stock" => "cinestill800t", "intensity" => 70.0, "grain" => 14.0, "grainSize" => 0.8]),
+fx("vignette", None, 1.0, BlendMode::Normal, vals!["amount" => 30.0, "feather" => 70.0]),
+]),
+make("Elevator Fisheye", "DM'S SPECIALS", vec![
+fx("basic", None, 1.0, BlendMode::Normal, vals!["exposure" => -0.2, "contrast" => 22.0, "blacks" => -20.0, "saturation" => -45.0, "temperature" => -8.0, "tint" => -35.0]),
+fx("splittone", None, 1.0, BlendMode::Normal, vals!["shadow" => hex("#12281A"), "shadowAmt" => 60.0, "highlight" => hex("#D9E9C2"), "highlightAmt" => 25.0]),
+fx("fisheye", None, 1.0, BlendMode::Normal, vals!["projection" => "fisheye", "fov" => 190.0, "circle" => true, "fringe" => 15.0]),
+fx("grain", None, 1.0, BlendMode::Normal, vals!["amount" => 30.0, "size" => 1.2]),
+fx("vignette", None, 1.0, BlendMode::Normal, vals!["amount" => 45.0, "feather" => 60.0]),
+]),
+make("Flash Underpass", "DM'S SPECIALS", vec![
+fx("basic", None, 1.0, BlendMode::Normal, vals!["exposure" => 0.15, "contrast" => 12.0, "highlights" => -25.0, "blacks" => -22.0, "temperature" => -18.0, "tint" => -22.0, "saturation" => -8.0]),
+fx("splittone", None, 1.0, BlendMode::Normal, vals!["shadow" => hex("#0F3B36"), "shadowAmt" => 55.0, "highlight" => hex("#F6E7CF"), "highlightAmt" => 18.0]),
+fx("halation", None, 1.0, BlendMode::Normal, vals!["intensity" => 60.0, "radius" => 14.0, "threshold" => 92.0]),
+fx("grain", None, 1.0, BlendMode::Normal, vals!["amount" => 22.0, "size" => 0.9, "color" => true]),
+fx("vignette", None, 1.0, BlendMode::Normal, vals!["amount" => 40.0, "midpoint" => 40.0, "feather" => 80.0]),
+]),
+make("Fisheye Street B&W", "DM'S SPECIALS", vec![
+fx("bw", None, 1.0, BlendMode::Normal, vals!["contrast" => 35.0, "blues" => 0.0, "yellows" => 70.0]),
+fx("curves", None, 1.0, BlendMode::Normal, vals!["curves" => curves(&[(0.2, 0.14), (0.8, 0.88)], &[], &[], &[])]),
+fx("sharpen", None, 1.0, BlendMode::Normal, vals!["amount" => 70.0, "radius" => 1.2]),
+fx("fisheye", None, 1.0, BlendMode::Normal, vals!["projection" => "fisheye", "fov" => 200.0, "circle" => true, "fringe" => 0.0]),
+fx("grain", None, 1.0, BlendMode::Normal, vals!["amount" => 15.0, "size" => 0.8]),
+]),
+make("Shaken Portrait", "DM'S SPECIALS", vec![
+fx("basic", None, 1.0, BlendMode::Normal, vals!["contrast" => 10.0, "highlights" => -15.0, "temperature" => 8.0]),
+fx("blur", None, 1.0, BlendMode::Normal, vals!["radius" => 3.0]),
+fx("trail", None, 1.0, BlendMode::Normal, vals!["style" => "copies", "mode" => "dir", "centered" => true, "angle" => 0.0, "distance" => 70.0, "copies" => 6.0, "decay" => 55.0, "opacity" => 65.0, "blend" => "lighten"]),
+fx("splittone", None, 1.0, BlendMode::Normal, vals!["shadow" => hex("#0B3A3E"), "shadowAmt" => 65.0, "highlight" => hex("#F2D9B8"), "highlightAmt" => 20.0]),
+fx("grain", None, 1.0, BlendMode::Normal, vals!["amount" => 28.0, "size" => 1.3]),
+fx("vignette", None, 1.0, BlendMode::Normal, vals!["amount" => 30.0]),
+]),
+make("Chrome Negative", "DM'S SPECIALS", vec![
+fx("bw", None, 1.0, BlendMode::Normal, vals!["contrast" => 30.0]),
+fx("invert", None, 1.0, BlendMode::Normal, vals![]),
+fx("curves", None, 1.0, BlendMode::Normal, vals!["curves" => curves(&[(0.35, 0.06), (0.6, 0.3), (0.85, 0.82)], &[], &[], &[])]),
+fx("gradientmap", None, 1.0, BlendMode::Normal, vals!["gradient" => GradientSpec::from("Chrome Ice", &["#000000", "#070B14", "#4A5A78", "#D9E4F5", "#FFFFFF"])]),
+fx("glow", None, 1.0, BlendMode::Normal, vals!["intensity" => 40.0, "radius" => 14.0, "threshold" => 85.0, "tint" => hex("#DCE7FF")]),
+fx("star", None, 1.0, BlendMode::Normal, vals!["points" => "4", "intensity" => 160.0, "threshold" => 93.0, "length" => 18.0, "smallLights" => 30.0]),
+fx("vignette", None, 1.0, BlendMode::Normal, vals!["amount" => 40.0]),
+]),
+make("Ice Studio", "DM'S SPECIALS", vec![
+fx("basic", None, 1.0, BlendMode::Normal, vals!["contrast" => 12.0, "shadows" => 10.0]),
+fx("gradientmap", None, 1.0, BlendMode::Normal, vals!["gradient" => GradientSpec::from("Ice Studio", &["#03081A", "#0A2A63", "#2869B5", "#8DC1EB", "#EAF6FF"])]),
+fx("glow", None, 1.0, BlendMode::Normal, vals!["intensity" => 45.0, "radius" => 40.0, "threshold" => 60.0]),
+fx("grain", None, 1.0, BlendMode::Normal, vals!["amount" => 22.0, "size" => 1.0]),
+fx("vignette", None, 1.0, BlendMode::Normal, vals!["amount" => 35.0, "color" => hex("#020814")]),
+]),
+make("Studio Pop", "DM'S SPECIALS", vec![
+fx("basic", None, 1.0, BlendMode::Normal, vals!["contrast" => 20.0, "highlights" => -10.0, "vibrance" => 35.0, "temperature" => -10.0]),
+fx("hsl", None, 1.0, BlendMode::Normal, vals!["red_s" => 30.0, "orange_s" => 15.0, "blue_s" => 30.0, "blue_l" => -10.0, "purple_h" => -20.0]),
+fx("splittone", None, 1.0, BlendMode::Normal, vals!["shadow" => hex("#1A2F8C"), "shadowAmt" => 50.0, "highlight" => hex("#FFE3CC"), "highlightAmt" => 10.0]),
+fx("glow", None, 1.0, BlendMode::Normal, vals!["intensity" => 25.0, "radius" => 30.0, "threshold" => 70.0]),
+fx("grain", None, 1.0, BlendMode::Normal, vals!["amount" => 10.0, "size" => 0.8]),
+]),
+make("Acid Blue", "DM'S SPECIALS", vec![
+fx("basic", None, 1.0, BlendMode::Normal, vals!["contrast" => 15.0, "shadows" => 15.0]),
+fx("blur", None, 1.0, BlendMode::Normal, vals!["radius" => 1.5]),
+fx("gradientmap", None, 1.0, BlendMode::Normal, vals!["gradient" => GradientSpec::from("Acid Blue", &["#00031A", "#0A1FB0", "#1F5BFF", "#36D1E8", "#C6F04A", "#F4FF9A"])]),
+fx("glow", None, 1.0, BlendMode::Normal, vals!["intensity" => 30.0, "radius" => 30.0, "threshold" => 60.0]),
+fx("grain", None, 1.0, BlendMode::Normal, vals!["amount" => 40.0, "size" => 1.6, "roughness" => 70.0]),
+]),
+make("Reeded Blue", "DM'S SPECIALS", vec![
+fx("basic", None, 1.0, BlendMode::Normal, vals!["contrast" => 20.0, "highlights" => 10.0]),
+fx("gradientmap", None, 1.0, BlendMode::Normal, vals!["gradient" => GradientSpec::from("Reeded Blue", &["#020A3A", "#0B2FA8", "#3D7BFF", "#C9DCFF", "#FFFFFF"])]),
+fx("reeded", None, 1.0, BlendMode::Normal, vals!["width" => 10.0, "refraction" => 45.0, "curvature" => 60.0, "dispersion" => 10.0, "shading" => 20.0, "wave" => 55.0, "waveScale" => 45.0]),
+fx("glow", None, 1.0, BlendMode::Normal, vals!["intensity" => 40.0, "radius" => 25.0, "threshold" => 65.0]),
+]),
+make("LED Wall", "DM'S SPECIALS", vec![
+fx("basic", None, 1.0, BlendMode::Normal, vals!["contrast" => 30.0, "shadows" => 10.0]),
+fx("led", None, 1.0, BlendMode::Normal, vals!["cell" => 9.0, "dotSize" => 62.0, "dotHeight" => 260.0, "threshold" => 38.0, "levels" => 3.0, "color" => hex("#3FD0FF"), "unlit" => 18.0, "glow" => 90.0, "glowRadius" => 10.0]),
+]),
+make("Spectral Glow", "DM'S SPECIALS", vec![
+fx("basic", None, 1.0, BlendMode::Normal, vals!["exposure" => 0.2, "contrast" => 20.0]),
+fx("gradientmap", None, 1.0, BlendMode::Normal, vals!["gradient" => GradientSpec::from("Spectral", &["#01030F", "#071A5E", "#1A55C8", "#3FD9E8", "#E8FFFF"])]),
+fx("bloom", None, 1.0, BlendMode::Normal, vals!["intensity" => 140.0, "radius" => 40.0, "threshold" => 55.0]),
+fx("grain", None, 1.0, BlendMode::Normal, vals!["amount" => 80.0, "size" => 2.4, "roughness" => 80.0, "highlights" => 80.0]),
+]),
+make("Long Exposure Ghost", "DM'S SPECIALS", vec![
+fx("basic", None, 1.0, BlendMode::Normal, vals!["contrast" => 25.0, "blacks" => -20.0]),
+fx("trail", None, 1.0, BlendMode::Normal, vals!["style" => "copies", "mode" => "dir", "centered" => true, "angle" => 0.0, "distance" => 120.0, "copies" => 16.0, "decay" => 70.0, "opacity" => 75.0, "blend" => "lighten"]),
+fx("splittone", None, 1.0, BlendMode::Normal, vals!["shadow" => hex("#0A1A2A"), "shadowAmt" => 55.0, "highlight" => hex("#F2E6DA"), "highlightAmt" => 25.0]),
+fx("halftone", None, 0.3, BlendMode::Multiply, vals!["mode" => "bw", "shape" => "line", "cell" => 4.0, "angle" => 0.0]),
+fx("grain", None, 1.0, BlendMode::Normal, vals!["amount" => 30.0, "size" => 1.2]),
+]),
+make("Line Scan Noir", "DM'S SPECIALS", vec![
+fx("bw", None, 1.0, BlendMode::Normal, vals!["contrast" => 40.0]),
+fx("basic", None, 1.0, BlendMode::Normal, vals!["exposure" => -0.2, "shadows" => -10.0]),
+fx("dither", None, 1.0, BlendMode::Normal, vals!["algorithm" => "lines", "pixelSize" => 1.5, "contrast" => 25.0, "dark" => hex("#000000"), "light" => hex("#FFFFFF")]),
+]),
+make("Blue Smear", "DM'S SPECIALS", vec![
+fx("basic", None, 1.0, BlendMode::Normal, vals!["contrast" => 15.0]),
+fx("edgewarp", None, 1.0, BlendMode::Normal, vals!["mode" => "liquid", "strength" => 120.0, "scale" => 80.0, "protect" => 25.0]),
+fx("motionblur", None, 1.0, BlendMode::Normal, vals!["angle" => 0.0, "distance" => 80.0, "amount" => 70.0, "area" => "edges", "protect" => 25.0]),
+fx("gradientmap", None, 1.0, BlendMode::Normal, vals!["gradient" => GradientSpec::from("Blue Smear", &["#05091A", "#133A7A", "#6B9BD0", "#F1E6CF", "#FFF8EC"])]),
+fx("grain", None, 1.0, BlendMode::Normal, vals!["amount" => 50.0, "size" => 1.8]),
+fx("vignette", None, 1.0, BlendMode::Normal, vals!["amount" => 20.0]),
+]),
+make("Orange Dream", "DM'S SPECIALS", vec![
+fx("blur", None, 1.0, BlendMode::Normal, vals!["radius" => 6.0]),
+fx("basic", None, 1.0, BlendMode::Normal, vals!["contrast" => 15.0, "saturation" => 30.0, "temperature" => 25.0]),
+fx("gradientmap", None, 0.65, BlendMode::Color, vals!["gradient" => GradientSpec::from("Orange Dream", &["#0A1E24", "#2C4A4C", "#FF6A1F", "#FFD2A6"])]),
+fx("splittone", None, 1.0, BlendMode::Normal, vals!["shadow" => hex("#0B2A33"), "shadowAmt" => 45.0, "highlight" => hex("#FF7A2A"), "highlightAmt" => 50.0]),
+fx("glow", None, 1.0, BlendMode::Normal, vals!["intensity" => 50.0, "radius" => 40.0, "threshold" => 50.0]),
+fx("grain", None, 1.0, BlendMode::Normal, vals!["amount" => 70.0, "size" => 2.0]),
+]),
+make("Riso Smear", "DM'S SPECIALS", vec![
+fx("basic", None, 1.0, BlendMode::Normal, vals!["contrast" => 20.0]),
+fx("trail", None, 1.0, BlendMode::Normal, vals!["style" => "smooth", "mode" => "dir", "angle" => 90.0, "distance" => 80.0, "opacity" => 70.0, "decay" => 70.0, "blend" => "lighten"]),
+fx("gradientmap", None, 1.0, BlendMode::Normal, vals!["gradient" => GradientSpec::from("Riso Smear", &["#1A0E0B", "#3A1A12", "#FF5A1F", "#FFB27A"])]),
+fx("splittone", None, 1.0, BlendMode::Normal, vals!["shadow" => hex("#1F6F8A"), "shadowAmt" => 70.0, "highlightAmt" => 0.0]),
+fx("grain", None, 1.0, BlendMode::Normal, vals!["amount" => 45.0, "size" => 1.4]),
+]),
 make("Neon Noir", "Cinema", vec![
 grp("Grade", 1.0, BlendMode::Normal, vec![
 fx("basic", None, 1.0, BlendMode::Normal, vals!["contrast" => 12.0, "highlights" => -30.0, "shadows" => 8.0, "blacks" => -10.0, "temperature" => -18.0]),
@@ -306,7 +423,7 @@ make("Risograph Duo", "Print & Graphic", vec![
 fx("basic", None, 1.0, BlendMode::Normal, vals!["exposure" => 0.6, "shadows" => 40.0, "contrast" => 10.0]),
 fx("gradientmap", None, 1.0, BlendMode::Normal, vals!["gradient" => swatches::gradient_named("Duotone · Riso")]),
 fx("halftone", None, 0.5, BlendMode::Multiply, vals!["mode" => "bw", "cell" => 5.0, "angle" => 22.0]),
-fx("xerox", None, 0.25, BlendMode::Multiply, vals!["threshold" => 80.0, "streaks" => 50.0, "noise" => 40.0]),
+fx("printwear", None, 1.0, BlendMode::Normal, vals!["fade" => 8.0, "uneven" => 35.0, "streaks" => 40.0, "noise" => 30.0, "specks" => 15.0, "paper" => hex("#F3EEE2")]),
 look("dust", "print", None, 1.0, BlendMode::Normal, vals!["opacity" => 25.0]),
 ]),
 make("Comic Newsprint", "Print & Graphic", vec![
@@ -318,13 +435,24 @@ look("frame", "white", None, 1.0, BlendMode::Normal, vals!["size" => 45.0, "colo
 ]),
 make("Zine Xerox", "Print & Graphic", vec![
 fx("basic", None, 1.0, BlendMode::Normal, vals!["exposure" => 0.5, "shadows" => 40.0, "contrast" => 15.0]),
-fx("xerox", None, 1.0, BlendMode::Normal, vals!["threshold" => 45.0, "dither" => true, "generations" => 2.0]),
+fx("bw", None, 1.0, BlendMode::Normal, vals!["contrast" => 30.0]),
+fx("blur", None, 1.0, BlendMode::Normal, vals!["radius" => 0.8]),
+fx("threshold", None, 1.0, BlendMode::Normal, vals!["level" => 55.0, "softness" => 6.0, "dark" => hex("#111111"), "light" => hex("#F2F2F2")]),
+fx("printwear", None, 1.0, BlendMode::Normal, vals!["fade" => 5.0, "uneven" => 40.0, "streaks" => 45.0, "noise" => 35.0, "specks" => 30.0, "edge" => 45.0]),
 look("dust", "scan", None, 1.0, BlendMode::Normal, vals!["style" => "dark", "opacity" => 40.0]),
 fx("frame", None, 1.0, BlendMode::Normal, vals!["style" => "border", "color" => hex("#F2F2F2"), "size" => 110.0, "textOn" => true, "caption" => ParamValue::Text("ISSUE #03 — NO FUTURE".into()), "textColor" => hex("#111111"), "textSize" => 22.0]),
 ]),
+make("Photocopy", "Print & Graphic", vec![
+fx("basic", None, 1.0, BlendMode::Normal, vals!["exposure" => 0.3, "shadows" => 30.0, "contrast" => 10.0]),
+fx("bw", None, 1.0, BlendMode::Normal, vals!["contrast" => 25.0]),
+fx("blur", None, 1.0, BlendMode::Normal, vals!["radius" => 0.8]),
+fx("threshold", None, 1.0, BlendMode::Normal, vals!["level" => 40.0, "softness" => 6.0, "dark" => hex("#111111"), "light" => hex("#F2F2F2")]),
+fx("printwear", None, 1.0, BlendMode::Normal, vals!["fade" => 0.0, "uneven" => 40.0, "streaks" => 35.0, "noise" => 35.0, "specks" => 30.0, "edge" => 45.0]),
+]),
 make("Thermal Receipt", "Print & Graphic", vec![
 fx("basic", None, 1.0, BlendMode::Normal, vals!["exposure" => 0.3, "shadows" => 25.0, "contrast" => 10.0]),
-fx("receipt", None, 1.0, BlendMode::Normal, vals!["dead" => 8.0, "banding" => 20.0]),
+fx("dither", None, 1.0, BlendMode::Normal, vals!["algorithm" => "atkinson", "pixelSize" => 1.4, "brightness" => 10.0, "contrast" => 20.0, "dark" => hex("#232323"), "light" => hex("#F4F4F4")]),
+fx("printwear", None, 1.0, BlendMode::Normal, vals!["fade" => 25.0, "uneven" => 0.0, "roll" => 15.0, "banding" => 25.0, "dead" => 10.0, "streaks" => 0.0, "noise" => 10.0, "specks" => 0.0, "paper" => hex("#F4F4F4"), "toner" => hex("#232323")]),
 fx("vignette", None, 1.0, BlendMode::Normal, vals!["amount" => 15.0]),
 ]),
 make("Cyanotype", "Print & Graphic", vec![
@@ -344,7 +472,7 @@ fx("frame", None, 1.0, BlendMode::Normal, vals!["style" => "border", "color" => 
 make("Fax Machine", "Print & Graphic", vec![
 fx("basic", None, 1.0, BlendMode::Normal, vals!["exposure" => 0.5, "shadows" => 40.0]),
 fx("dither", None, 1.0, BlendMode::Normal, vals!["algorithm" => "atkinson", "pixelSize" => 2.0, "contrast" => 20.0, "brightness" => 20.0, "dark" => hex("#101010"), "light" => hex("#F4F4F4")]),
-fx("xerox", None, 0.5, BlendMode::Multiply, vals!["threshold" => 70.0, "edge" => 20.0, "streaks" => 60.0]),
+fx("printwear", None, 1.0, BlendMode::Normal, vals!["fade" => 0.0, "uneven" => 20.0, "streaks" => 60.0, "edge" => 20.0, "noise" => 15.0, "paper" => hex("#F4F4F4"), "toner" => hex("#101010")]),
 fx("stretch", None, 0.35, BlendMode::Multiply, vals!["dir" => "down", "position" => 92.0, "jitter" => 40.0]),
 ]),
 make("Game Boy Camera", "Pixel & Code", vec![

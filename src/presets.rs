@@ -43,8 +43,8 @@ struct PresetFile {
 fn one() -> i64 { 1 }
 fn app() -> String { "EFFECTOR".into() }
 
-pub const CATEGORIES: [&str; 9] = [
-    "Cinema", "Film", "Portrait & Light", "Y2K & Digital", "Retro Video", "Print & Graphic", "Pixel & Code", "Dream & Surreal", "Tracking & HUD",
+pub const CATEGORIES: [&str; 10] = [
+    "DM'S SPECIALS", "Cinema", "Film", "Portrait & Light", "Y2K & Digital", "Retro Video", "Print & Graphic", "Pixel & Code", "Dream & Surreal", "Tracking & HUD",
 ];
 
 // MARK: - Factory DSL (mirrors FactoryPresets in the macOS app)
@@ -110,13 +110,17 @@ fn s_curve() -> ParamValue { curves(&[(0.25, 0.20), (0.75, 0.80)], &[], &[], &[]
 fn soft_s() -> ParamValue { curves(&[(0.25, 0.22), (0.75, 0.78)], &[], &[], &[]) }
 
 /// Film layer with grain kept fine and subtle.
+/// Film halation is its own Halation layer since 0.7: strong amounts (40 and up) become a Film
+/// group with a Halation layer under the film; small amounts are dropped.
 fn film(stock: &str, grain: f64, halation: f64, extra: Vec<(String, ParamValue)>) -> LayerNode {
-    let mut v = vals![
-        "stock" => stock, "grainOn" => grain > 0.0, "grain" => grain, "grainSize" => 0.8,
-        "halationOn" => halation > 0.0, "halation" => halation
-    ];
+    let mut v = vals!["stock" => stock, "grainOn" => grain > 0.0, "grain" => grain, "grainSize" => 0.8];
     v.extend(extra);
-    fx("film", None, 1.0, BlendMode::Normal, v)
+    let f = fx("film", None, 1.0, BlendMode::Normal, v);
+    if halation >= 40.0 {
+        let h = fx("halation", None, 1.0, BlendMode::Normal, vals!["intensity" => halation * 1.2, "radius" => 16.0, "threshold" => 72.0]);
+        return grp("Film", 1.0, BlendMode::Normal, vec![h, f]);
+    }
+    f
 }
 
 fn hex(s: &str) -> Rgba { Rgba::hex(s) }

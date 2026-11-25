@@ -73,6 +73,9 @@ pub struct EffectorUi {
     shot: Option<(PathBuf, String)>,
     shot_start: Option<std::time::Instant>,
     shot_step: usize,
+    /// Dev/test: frames left of simulated slider dragging (`drag:N` script step).
+    shot_drag: usize,
+    shot_grad: usize,
 }
 
 impl EffectorUi {
@@ -108,6 +111,8 @@ impl EffectorUi {
             shot: std::env::var("EFFECTOR_SHOT").ok().map(|p| (PathBuf::from(p), std::env::var("EFFECTOR_SHOT_SCRIPT").unwrap_or_default())),
             shot_start: None,
             shot_step: 0,
+            shot_drag: 0,
+            shot_grad: 0,
         }
     }
 
@@ -704,6 +709,17 @@ impl EffectorUi {
                         self.app.apply_preset(&p);
                     }
                 }
+                "drag" => self.shot_drag = arg.parse().unwrap_or(60),
+                "grad" => {
+                    self.shot_grad = arg.parse().unwrap_or(60);
+                    self.app.begin_browse();
+                }
+                "doc" => {
+                    let i: usize = arg.parse().unwrap_or(0);
+                    if let Some(id) = self.app.docs.get(i).map(|d| d.id) {
+                        self.app.activate(id);
+                    }
+                }
                 "browser" => self.app.show_effect_browser = true,
                 "presets" => self.app.set_show_presets(true),
                 "palette" => self.app.show_command_palette = true,
@@ -722,6 +738,22 @@ impl EffectorUi {
                 _ => {}
             }
             self.shot_step += 1;
+        }
+        if self.shot_grad > 0 {
+            self.shot_grad -= 1;
+            if self.shot_grad % 3 == 0 {
+                self.app.debug_gradient_step(self.shot_grad / 3);
+            }
+            if self.shot_grad == 0 {
+                self.app.end_browse();
+            }
+            self.shot_start = Some(start + std::time::Duration::from_millis(16));
+        }
+        if self.shot_drag > 0 {
+            self.shot_drag -= 1;
+            self.app.debug_drag_step(self.shot_drag as u64);
+            // keep the step clock paused while dragging
+            self.shot_start = Some(start + std::time::Duration::from_millis(16));
         }
         let done_at = 3.0 + steps.len() as f32 * 1.2 + 2.5;
         if t > done_at && self.shot_step != usize::MAX {
