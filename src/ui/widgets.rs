@@ -273,28 +273,57 @@ impl<'a> SliderSpec<'a> {
     pub fn track(mut self, t: Option<&'a [Rgba]>) -> Self { self.track = t; self }
 
     fn span(&self) -> f64 { self.max - self.min }
+    /// Bipolar sliders (min < 0 < max) curve symmetrically around zero.
+    fn bipolar(&self) -> bool { self.curve != 1.0 && self.min < 0.0 && self.max > 0.0 }
+    fn zero_pos(&self) -> f64 { -self.min / self.span() }
     fn position(&self, v: f64) -> f64 {
+        if self.bipolar() {
+            let z = self.zero_pos();
+            return if v >= 0.0 { z + (1.0 - z) * (v / self.max).clamp(0.0, 1.0).powf(1.0 / self.curve) } else { z - z * (v / self.min).clamp(0.0, 1.0).powf(1.0 / self.curve) };
+        }
         let lin = ((v - self.min) / self.span()).clamp(0.0, 1.0);
         if self.curve == 1.0 { lin } else { lin.powf(1.0 / self.curve) }
     }
     fn value_at(&self, pos: f64) -> f64 {
         let t = pos.clamp(0.0, 1.0);
+        if self.bipolar() {
+            let z = self.zero_pos();
+            return if t >= z { self.max * ((t - z) / (1.0 - z).max(1e-9)).powf(self.curve) } else { self.min * ((z - t) / z.max(1e-9)).powf(self.curve) };
+        }
         self.min + self.span() * if self.curve == 1.0 { t } else { t.powf(self.curve) }
+    }
+    /// Step used around `v`: curved sliders get 10× finer steps near their low end, so the first
+    /// part of the track is never dead and values don't jump.
+    fn step_at(&self, v: f64) -> f64 {
+        if self.step <= 0.0 {
+            return 0.0;
+        }
+        let low = if self.bipolar() { v.abs() } else { v - self.min };
+        if self.curve > 1.0 && low < self.step * 10.0 { self.step / 10.0 } else { self.step }
     }
     fn clamp_value(&self, v: f64) -> f64 {
         let mut v = v.clamp(self.min, self.max);
-        if self.step > 0.0 {
-            v = (v / self.step).round() * self.step;
+        let st = self.step_at(v);
+        if st > 0.0 {
+            v = (v / st).round() * st;
         }
         v.clamp(self.min, self.max)
     }
     fn formatted(&self) -> String {
         let span = self.span();
         let v = self.value;
-        let decimals = if self.step >= 1.0 {
+        let st = self.step_at(v);
+        let decimals = if st >= 1.0 {
             0
-        } else if self.step > 0.0 {
-            if self.step >= 0.1 { 1 } else { 2 }
+        } else if st > 0.0 {
+            // as many decimals as the step needs (0.25 → 2, 0.5 → 1, 0.05 → 2, 0.01 → 2)
+            let mut d = 0;
+            let mut x = st;
+            while d < 3 && (x - x.round()).abs() > 1e-9 {
+                x *= 10.0;
+                d += 1;
+            }
+            d
         } else if span <= 4.0 || (self.curve > 1.0 && v < 1.0 && span < 30.0) {
             2
         } else if span <= 20.0 || (self.curve > 1.0 && v < 10.0) {
@@ -302,7 +331,15 @@ impl<'a> SliderSpec<'a> {
         } else {
             0
         };
-        format!("{:.*}{}", decimals, v, self.unit)
+        let mut t = format!("{:.*}", decimals, v);
+        if t.contains('.') {
+            // 14.0 → 14, 1.50 → 1.5
+            t = t.trim_end_matches('0').trim_end_matches('.').to_string();
+        }
+        if t == "-0" {
+            t = "0".into();
+        }
+        format!("{t}{}", self.unit)
     }
 }
 
@@ -351,7 +388,7 @@ pub fn value_slider(ui: &mut Ui, id: Id, spec: SliderSpec) -> Option<f64> {
                         .sense(Sense::click()),
                 );
                 if vr.clicked() {
-                    mem.text = if spec.step >= 1.0 { format!("{:.0}", spec.value) } else { format!("{:.2}", spec.value) };
+                    mem.text = spec.formatted().trim_end_matches(spec.unit).to_string();
                     mem.editing = true;
                 }
                 vr.on_hover_text(tr("Click to type a value"));
@@ -879,3 +916,44 @@ pub fn keys_hint(s: &str) -> String {
 }
 
 pub fn theme_dark() -> bool { theme::is_dark() }
+
+#[cfg(test)]
+mod slider_tests {
+    use super::SliderSpec;
+
+    fn rt(s: &SliderSpec, v: f64) -> f64 { s.value_at(s.position(v)) }
+
+    #[test]
+    fn round_trips() {
+        for (min, max, curve) in [(0.0, 100.0, 1.0), (0.0, 20.0, 3.0), (-200.0, 300.0, 1.4), (-150.0, 150.0, 1.5), (5.0, 400.0, 1.6)] {
+            let s = SliderSpec::new("x", 0.0, min, max, 0.0).curve(curve);
+            for i in 0..=20 {
+                let v = min + (max - min) * i as f64 / 20.0;
+                assert!((rt(&s, v) - v).abs() < 1e-6, "{min}..{max} c{curve}: {v} -> {}", rt(&s, v));
+            }
+        }
+    }
+
+    #[test]
+    fn bipolar_zero_stays_put() {
+        let s = SliderSpec::new("x", 0.0, -200.0, 300.0, 0.0).curve(1.4);
+        assert!((s.position(0.0) - 0.4).abs() < 1e-9);
+        assert!(s.position(10.0) > 0.4 && s.position(-10.0) < 0.4);
+    }
+
+    #[test]
+    fn fine_steps_near_zero() {
+        let s = SliderSpec::new("x", 0.0, 0.0, 10.0, 0.3).step(0.05).curve(2.5);
+        assert!((s.clamp_value(0.123) - 0.125).abs() < 1e-9);
+        assert!((s.clamp_value(3.12) - 3.1).abs() < 1e-9);
+    }
+
+    #[test]
+    fn formatting() {
+        let f = |v: f64, step: f64, unit: &'static str| SliderSpec { value: v, ..SliderSpec::new("x", v, 0.0, 100.0, 0.0).step(step).unit(unit) }.formatted();
+        assert_eq!(f(14.0, 0.5, "%"), "14%");
+        assert_eq!(f(14.5, 0.5, "%"), "14.5%");
+        assert_eq!(f(1.5, 0.05, ""), "1.5");
+        assert_eq!(f(42.0, 1.0, "°"), "42°");
+    }
+}

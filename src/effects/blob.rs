@@ -463,7 +463,7 @@ pub fn blob_tracker() -> Effect {
         ParamDef::color("target", "Target Color", hex("#E03020")).sec("Detection").vis(when("detect", "color")),
         s("tolerance", "Tolerance", 1.0, 100.0, 25.0).step(1.0).unit("%").sec("Detection").vis(when("detect", "color")),
         s("maxBlobs", "Max Blobs", 1.0, 60.0, 14.0).step(1.0).sec("Detection"),
-        s("minSize", "Min Size", 0.0, 20.0, 0.3).step(0.1).unit("%").curve(3.0).sec("Detection"),
+        s("minSize", "Min Size", 0.0, 10.0, 0.3).step(0.05).unit("%").curve(2.5).sec("Detection"),
         s("maxSize", "Max Size", 1.0, 100.0, 40.0).step(1.0).unit("%").curve(2.0).sec("Detection"),
         s("detail", "Detail", 40.0, 400.0, 160.0).step(10.0).sec("Detection"),
         ParamDef::section_switch("markersOn", "Markers", true),

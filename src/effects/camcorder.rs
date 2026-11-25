@@ -251,8 +251,8 @@ pub fn camcorder() -> Effect {
             s("vigRound", "Vignette Roundness", 0.0, 100.0, 70.0).step(1.0).unit("%").sec("Lens"),
             // sharpening
             ParamDef::section_switch("sharpOn", "Edge Enhance", true),
-            s("sharpen", "Sharpening", 0.0, 300.0, 120.0).step(1.0).unit("%").sec("Edge Enhance"),
-            s("ringing", "Halo Outlines", 0.0, 300.0, 80.0).step(1.0).unit("%").sec("Edge Enhance"),
+            s("sharpen", "Sharpening", 0.0, 300.0, 120.0).step(1.0).unit("%").curve(1.4).sec("Edge Enhance"),
+            s("ringing", "Halo Outlines", 0.0, 300.0, 80.0).step(1.0).unit("%").curve(1.4).sec("Edge Enhance"),
             s("halo", "White Halos", 0.0, 100.0, 40.0).step(1.0).unit("%").sec("Edge Enhance"),
             s("edgeFringe", "Edge Color Fringe", 0.0, 100.0, 35.0).step(1.0).unit("%").sec("Edge Enhance"),
             // chroma

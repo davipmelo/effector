@@ -45,6 +45,10 @@ fn main() {
         rendertest::fuzz(&args);
         return;
     }
+    if args.iter().any(|a| a == "--slider-audit") {
+        rendertest::slider_audit();
+        return;
+    }
     if args.iter().any(|a| a == "--list-looks") {
         rendertest::list_looks();
         return;

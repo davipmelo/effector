@@ -125,7 +125,7 @@ pub fn lens_emulation() -> Effect {
             s("cornerSoft", "Soft Corners", 0.0, 100.0, 15.0).step(1.0).unit("%").sec("Optics"),
             s("vignette", "Vignette", 0.0, 100.0, 25.0).step(1.0).unit("%").sec("Optics"),
             s("vigRound", "Vignette Roundness", 0.0, 100.0, 80.0).step(1.0).unit("%").sec("Optics"),
-            s("glow", "Glow", 0.0, 150.0, 0.0).step(1.0).unit("%").sec("Rendering"),
+            s("glow", "Glow", 0.0, 150.0, 0.0).step(1.0).unit("%").curve(1.4).sec("Rendering"),
             s("glowRadius", "Glow Radius", 2.0, 120.0, 30.0).step(1.0).curve(1.6).sec("Rendering"),
             s("glowThreshold", "Glow Threshold", 0.0, 100.0, 55.0).step(1.0).unit("%").sec("Rendering"),
             ParamDef::color("glowTint", "Glow Tint", Rgba::WHITE).sec("Rendering"),
@@ -224,7 +224,7 @@ pub fn relief() -> Effect {
     .depth(|_| true)
     .params(vec![
         ParamDef::segmented("mode", "Mode", &[("parallax", "Parallax"), ("relief", "Relief"), ("tint", "Depth Tint")], "parallax").sec("Depth"),
-        s("shift", "Shift", -150.0, 150.0, 20.0).step(1.0).sec("Depth").vis(when("mode", "parallax")),
+        s("shift", "Shift", -150.0, 150.0, 20.0).step(1.0).curve(1.5).sec("Depth").vis(when("mode", "parallax")),
         s("angle", "Direction", -180.0, 180.0, 0.0).step(1.0).unit("°").sec("Depth").vis(when("mode", "parallax")),
         s("pivot", "Pivot Depth", 0.0, 100.0, 50.0).step(1.0).unit("%").sec("Depth").vis(when("mode", "parallax")).pick(),
         s("amount", "Amount", 0.0, 100.0, 70.0).step(1.0).unit("%").sec("Depth").vis(when_not("mode", "parallax")),

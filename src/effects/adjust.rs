@@ -72,7 +72,7 @@ pub fn basic() -> Effect {
     .symbol("slider.horizontal.3")
     .summary("Exposure, contrast, highlights, shadows, white balance and saturation.")
     .params(vec![
-        s("exposure", "Exposure", -4.0, 4.0, 0.0).step(0.05).unit(" EV").sec("Tone"),
+        s("exposure", "Exposure", -4.0, 4.0, 0.0).step(0.01).unit(" EV").sec("Tone"),
         s("contrast", "Contrast", -100.0, 100.0, 0.0).step(1.0).sec("Tone"),
         s("highlights", "Highlights", -100.0, 100.0, 0.0).step(1.0).sec("Tone"),
         s("shadows", "Shadows", -100.0, 100.0, 0.0).step(1.0).sec("Tone"),

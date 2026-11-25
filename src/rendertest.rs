@@ -366,3 +366,14 @@ pub fn list_looks() {
         println!("{:3} {:14} {}", e.looks.len(), e.id, e.name);
     }
 }
+
+/// `--slider-audit`: every visible slider with its range, step and curve (dev).
+pub fn slider_audit() {
+    for e in effects::all().iter().filter(|e| !e.hidden) {
+        for d in &e.params {
+            if let ParamKind::Slider { min, max, def, step, unit, curve } = &d.kind {
+                println!("{:12} {:16} {:>8}..{:<8} def {:<7} step {:<5} curve {:<4} {}", e.id, d.key, min, max, def, step, curve, unit);
+            }
+        }
+    }
+}

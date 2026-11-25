@@ -71,7 +71,7 @@ pub fn reeded_glass() -> Effect {
     .params(vec![
         ParamDef::segmented("profile", "Rib Shape", &[("round", "Round"), ("concave", "Fluted"), ("prism", "Prism"), ("wave", "Wave")], "round").sec("Glass"),
         s("width", "Rib Width", 2.0, 200.0, 12.0).step(0.5).curve(1.8).sec("Glass"),
-        s("refraction", "Refraction", -200.0, 200.0, 100.0).step(1.0).unit("%").sec("Glass"),
+        s("refraction", "Refraction", -200.0, 200.0, 100.0).step(1.0).unit("%").curve(1.4).sec("Glass"),
         s("angle", "Angle", -90.0, 90.0, 0.0).step(1.0).unit("°").sec("Glass"),
         s("irregular", "Irregular Ribs", 0.0, 100.0, 15.0).step(1.0).unit("%").sec("Glass"),
         s("smear", "Smear Across Ribs", 0.0, 80.0, 24.0).step(0.5).curve(1.5).sec("Behind the Glass"),
@@ -140,7 +140,7 @@ pub fn led_display() -> Effect {
         ParamDef::color("color", "LED Color", hex("#38C6FF")).sec("Color"),
         ParamDef::color("bg", "Panel", hex("#04080F")).sec("Color"),
         s("unlit", "Unlit LEDs", 0.0, 100.0, 12.0).step(1.0).unit("%").sec("Color"),
-        s("glow", "Glow", 0.0, 200.0, 80.0).step(1.0).unit("%").sec("Glow"),
+        s("glow", "Glow", 0.0, 200.0, 80.0).curve(1.4).step(1.0).unit("%").sec("Glow"),
         s("glowRadius", "Glow Radius", 1.0, 60.0, 10.0).step(1.0).curve(1.6).sec("Glow"),
     ])
 }

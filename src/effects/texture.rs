@@ -132,7 +132,7 @@ pub fn light_leak() -> Effect {
     .params(vec![
         ParamDef::choice("edge", "From", &[("left", "Left Edge"), ("right", "Right Edge"), ("top", "Top Edge"), ("bottom", "Bottom Edge"), ("tl", "Top-Left Corner"), ("br", "Bottom-Right Corner"), ("random", "Random Spot")], "right"),
         s("size", "Size", 5.0, 100.0, 45.0).step(1.0).unit("%"),
-        s("intensity", "Intensity", 0.0, 200.0, 90.0).step(1.0).unit("%"),
+        s("intensity", "Intensity", 0.0, 200.0, 90.0).step(1.0).unit("%").curve(1.4),
         s("warp", "Irregularity", 0.0, 100.0, 45.0).step(1.0).unit("%"),
         ParamDef::color("colorA", "Color A", hex("#FF4A1C")),
         ParamDef::color("colorB", "Color B", hex("#FFC23A")),

@@ -31,7 +31,7 @@ pub fn glow() -> Effect {
     .symbol("sun.max")
     .summary("Soft diffusion: the whole image (above a low threshold) gets a dreamy haze.")
     .params(vec![
-        s("intensity", "Intensity", 0.0, 200.0, 60.0).step(1.0).unit("%"),
+        s("intensity", "Intensity", 0.0, 200.0, 60.0).step(1.0).unit("%").curve(1.5),
         s("radius", "Radius", 1.0, 200.0, 20.0).step(1.0).curve(2.0),
         s("threshold", "Threshold", 0.0, 100.0, 30.0).step(1.0).unit("%"),
         s("saturation", "Saturation", 0.0, 200.0, 100.0).step(1.0).unit("%"),
@@ -49,7 +49,7 @@ pub fn bloom() -> Effect {
     .symbol("sparkles")
     .summary("Only the brightest highlights spill light, in several sizes, like a lens.")
     .params(vec![
-        s("intensity", "Intensity", 0.0, 300.0, 100.0).step(1.0).unit("%"),
+        s("intensity", "Intensity", 0.0, 300.0, 100.0).step(1.0).unit("%").curve(1.6),
         s("radius", "Radius", 1.0, 200.0, 30.0).step(1.0).curve(2.0),
         s("threshold", "Threshold", 0.0, 100.0, 70.0).step(1.0).unit("%"),
         s("knee", "Softness", 0.0, 50.0, 15.0).step(1.0).unit("%"),
@@ -92,7 +92,7 @@ pub fn halation() -> Effect {
         .symbol("circle.dotted.and.circle")
         .summary("Film halation: lights get an orange-to-red fringe while their cores stay white.")
         .params(vec![
-            s("intensity", "Intensity", 0.0, 300.0, 100.0).step(1.0).unit("%").sec("Halation"),
+            s("intensity", "Intensity", 0.0, 300.0, 100.0).step(1.0).unit("%").curve(1.6).sec("Halation"),
             s("radius", "Radius", 1.0, 200.0, 18.0).step(1.0).curve(2.0).sec("Halation"),
             s("spread", "Spread", 0.0, 100.0, 50.0).step(1.0).unit("%").sec("Halation"),
             s("threshold", "Threshold", 0.0, 100.0, 84.0).step(1.0).unit("%").sec("Halation"),
