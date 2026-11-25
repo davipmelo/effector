@@ -84,6 +84,9 @@ pub struct Settings {
     pub presets_list: bool,
     /// Favourite items in pickers (keys "picker:id").
     pub favorites: Vec<String>,
+    /// Look for a new version on GitHub at launch (at most once a day).
+    pub check_updates: bool,
+    pub last_update_check: u64,
     /// Background around the image in the central canvas ("" = theme default, else a swatch id).
     pub canvas_backdrop: String,
     /// Custom shortcuts: action id → shortcut string.
@@ -110,6 +113,8 @@ impl Default for Settings {
             presets_list: false,
             favorites: vec![],
             canvas_backdrop: String::new(),
+            check_updates: true,
+            last_update_check: 0,
             shortcuts: Default::default(),
         }
     }

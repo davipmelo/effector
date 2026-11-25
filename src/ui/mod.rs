@@ -570,6 +570,14 @@ impl eframe::App for EffectorUi {
         self.app.pixels_per_point = ctx.pixels_per_point() as f64;
         if self.first_frame {
             self.first_frame = false;
+            // automatic update check (at most once a day, never in test runs)
+            let st = settings::get();
+            let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+            if st.check_updates && self.shot.is_none() && now.saturating_sub(st.last_update_check) > 20 * 3600 {
+                settings::update(|s| s.last_update_check = now);
+                let c = ctx.clone();
+                crate::updater::check(move || c.request_repaint());
+            }
             let files = std::mem::take(&mut self.pending_open);
             if files.is_empty() {
                 self.app.restore_session();
@@ -598,6 +606,12 @@ impl eframe::App for EffectorUi {
             }
         }
         self.app.tick(&ctx);
+        if self.app.quit_for_update {
+            self.app.quit_for_update = false;
+            self.app.save_session(true);
+            self.allow_close = true;
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        }
         self.handle_keys(&ctx);
 
         // GPU textures → egui

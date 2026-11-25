@@ -65,3 +65,5 @@ Root: HKA; Subkey: "Software\Classes\Applications\EFFECTOR.exe\SupportedTypes"; 
 
 [Run]
 Filename: "{app}\EFFECTOR.exe"; Description: "{cm:LaunchProgram,EFFECTOR}"; Flags: nowait postinstall skipifsilent
+; in-app updates install silently and reopen the app
+Filename: "{app}\EFFECTOR.exe"; Flags: nowait; Check: WizardSilent

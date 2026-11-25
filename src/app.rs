@@ -164,6 +164,9 @@ pub struct AppState {
     pub hide_side_panels: bool,
     /// Canvas shows the depth map instead of the image.
     pub show_depth: bool,
+    /// The update installer was started: quit now (the UI closes the window).
+    pub quit_for_update: bool,
+    update_announced: bool,
     /// Eyedropper armed: the next click on the image sets this layer slider to the depth there.
     pub depth_pick: Option<(Uuid, String)>,
     depth_gen: u64,
@@ -247,6 +250,8 @@ impl AppState {
             hide_side_panels: false,
             show_depth: false,
             depth_pick: None,
+            quit_for_update: false,
+            update_announced: false,
             depth_gen: 0,
             depth_missing_warned: false,
             hide_all_panels: false,
@@ -1507,6 +1512,12 @@ impl AppState {
             }
         }
         self.tick_depth(ctx);
+        if !self.update_announced {
+            if let crate::updater::State::Available { version, .. } = crate::updater::current() {
+                self.update_announced = true;
+                self.flash(&trf("EFFECTOR %@ is available — Settings › Updates", &[&version]));
+            }
+        }
         self.kick_render();
         if self.render_running || self.render_pending {
             ctx.request_repaint_after(Duration::from_millis(30));

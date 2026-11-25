@@ -31,6 +31,7 @@ serde = { version = "1.0.229", features = ["derive", "rc"] }
 serde_json = { version = "1.0.154", features = ["float_roundtrip"] }
 sys-locale = "0.3.2"
 tiny-skia = "0.12.0"
+ureq = { version = "3.5.2", features = ["json"] }
 uuid = { version = "1.29.3", features = ["v4", "serde"] }
 wgpu = { version = "30.0.2", features = ["glsl", "naga-ir"] }
 zip = "9.8.2"

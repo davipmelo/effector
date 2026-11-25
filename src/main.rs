@@ -22,6 +22,7 @@ mod shortcuts;
 mod swatches;
 mod sysdecode;
 mod ui;
+mod updater;
 mod worker;
 
 fn main() {
@@ -43,6 +44,27 @@ fn main() {
     }
     if args.iter().any(|a| a == "--fuzz") {
         rendertest::fuzz(&args);
+        return;
+    }
+    if args.iter().any(|a| a == "--check-update") {
+        updater::check(|| {});
+        while matches!(updater::current(), updater::State::Checking) {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        match updater::current() {
+            updater::State::Available { version, url, size, .. } => {
+                println!("available {version} {url} {size}");
+                if args.iter().any(|a| a == "--install") {
+                    updater::download(|| {});
+                    while matches!(updater::current(), updater::State::Downloading { .. }) {
+                        std::thread::sleep(std::time::Duration::from_millis(200));
+                    }
+                    println!("{:?}", updater::current());
+                    println!("install: {:?}", updater::install());
+                }
+            }
+            s => println!("{s:?}"),
+        }
         return;
     }
     if args.iter().any(|a| a == "--slider-audit") {

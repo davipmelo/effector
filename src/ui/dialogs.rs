@@ -343,6 +343,8 @@ pub fn settings_window(ctx: &egui::Context, app: &mut AppState) {
                         settings::update(|s| s.factory_presets_visible = v);
                         app.regenerate_preset_thumbs();
                     }
+                    ui.add_space(10.0);
+                    update_section(ui, app);
                 }
                 1 => shortcut_settings(ui),
                 _ => {
@@ -363,6 +365,80 @@ pub fn settings_window(ctx: &egui::Context, app: &mut AppState) {
     ctx.data_mut(|d| d.insert_temp(id.with("tab"), tab));
     if !open {
         app.show_settings = false;
+    }
+}
+
+/// "Updates" block of the General tab: check GitHub, download and install new versions.
+fn update_section(ui: &mut Ui, app: &mut AppState) {
+    use crate::updater::State;
+    ui.label(egui::RichText::new(spaced_upper(&tr("Updates"))).font(section_font()).color(text_dim()));
+    ui.add_space(4.0);
+    let st = crate::updater::current();
+    let repaint = ui.ctx().clone();
+    let notify = move || repaint.request_repaint();
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new(trf("You have version %@", &[&crate::ui::VERSION])).font(regular(12.0)).color(text()));
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let busy = matches!(st, State::Checking | State::Downloading { .. } | State::Installing);
+            if ui.add_enabled(!busy, egui::Button::new(format!("{}  {}", icon_text("arrow.triangle.2.circlepath"), tr("Check for Updates")))).clicked() {
+                crate::updater::check(notify.clone());
+            }
+        });
+    });
+    ui.add_space(4.0);
+    let small = |ui: &mut Ui, t: &str, c: egui::Color32| {
+        ui.label(egui::RichText::new(t).font(regular(11.5)).color(c));
+    };
+    match &st {
+        State::Idle => {}
+        State::Checking => {
+            ui.horizontal(|ui| {
+                ui.add(egui::Spinner::new().size(11.0));
+                small(ui, &tr("Checking GitHub…"), text_dim());
+            });
+        }
+        State::UpToDate => small(ui, &tr("EFFECTOR is up to date."), text_dim()),
+        State::Failed(e) => small(ui, &format!("{} {e}", tr("Update failed:")), egui::Color32::from_rgb(235, 90, 80)),
+        State::Available { version, notes, size, page, .. } => {
+            small(ui, &trf("Version %@ is available (%@ MB).", &[version, &format!("{:.0}", *size as f64 / 1e6)]), accent_text());
+            if !notes.is_empty() {
+                egui::CollapsingHeader::new(tr("What's new")).id_salt("upd-notes").show(ui, |ui| {
+                    egui::ScrollArea::vertical().max_height(160.0).show(ui, |ui| {
+                        ui.label(egui::RichText::new(notes.as_str()).font(regular(11.0)).color(text_dim()));
+                    });
+                });
+            }
+            ui.horizontal(|ui| {
+                if pill_button(ui, &tr("Download and Install"), true).clicked() {
+                    crate::updater::download(notify.clone());
+                }
+                if !page.is_empty() && pill_button(ui, &tr("Open Release Page"), false).clicked() {
+                    let _ = open::that(page);
+                }
+            });
+        }
+        State::Downloading { done, total, .. } => {
+            let f = if *total > 0 { *done as f32 / *total as f32 } else { 0.0 };
+            ui.add(egui::ProgressBar::new(f).desired_width(ui.available_width()).text(format!("{:.0} / {:.0} MB", *done as f64 / 1e6, *total as f64 / 1e6)));
+            ui.ctx().request_repaint_after(std::time::Duration::from_millis(150));
+        }
+        State::Ready { version, .. } => {
+            small(ui, &trf("Version %@ is downloaded. EFFECTOR will close, update and reopen.", &[version]), accent_text());
+            if app.is_dirty() && !settings::get().reopen_last_session {
+                small(ui, &tr("Save your project first: unsaved changes will be lost."), egui::Color32::from_rgb(235, 160, 60));
+            }
+            if pill_button(ui, &tr("Install and Restart"), true).clicked() {
+                match crate::updater::install() {
+                    Ok(true) => app.quit_for_update = true,
+                    Ok(false) => app.flash(&tr("Opened the downloaded update")),
+                    Err(e) => app.alert(&tr("Update failed:"), &e),
+                }
+            }
+        }
+        State::Installing => small(ui, &tr("Installing…"), text_dim()),
+    }
+    if let Some(v) = toggle_row(ui, "Check for updates automatically", settings::get().check_updates) {
+        settings::update(|s| s.check_updates = v);
     }
 }
 
