@@ -70,7 +70,7 @@ fx("grain", None, 1.0, BlendMode::Normal, vals!["amount" => 40.0, "size" => 1.6,
 make("Reeded Blue", "DM'S SPECIALS", vec![
 fx("basic", None, 1.0, BlendMode::Normal, vals!["contrast" => 20.0, "highlights" => 10.0]),
 fx("gradientmap", None, 1.0, BlendMode::Normal, vals!["gradient" => GradientSpec::from("Reeded Blue", &["#020A3A", "#0B2FA8", "#3D7BFF", "#C9DCFF", "#FFFFFF"])]),
-fx("reeded", None, 1.0, BlendMode::Normal, vals!["width" => 10.0, "refraction" => 45.0, "curvature" => 60.0, "dispersion" => 10.0, "shading" => 20.0, "wave" => 55.0, "waveScale" => 45.0]),
+fx("reeded", None, 1.0, BlendMode::Normal, vals!["width" => 10.0, "refraction" => 45.0, "dispersion" => 10.0, "shading" => 20.0, "wave" => 55.0, "waveScale" => 45.0]),
 fx("glow", None, 1.0, BlendMode::Normal, vals!["intensity" => 40.0, "radius" => 25.0, "threshold" => 65.0]),
 ]),
 make("LED Wall", "DM'S SPECIALS", vec![

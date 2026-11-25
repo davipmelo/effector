@@ -3,6 +3,11 @@
 pub fn sf(name: &str) -> char {
     match name {
         "aqi.high" => '\u{e1fc}',
+        "eyedropper" => '\u{e568}',
+        "video" => '\u{e4da}',
+        "cloud.fog" => '\u{e53c}',
+        "cube.transparent" => '\u{ec7c}',
+        "arrow.down.circle" => '\u{e20a}',
         "aqi.low" => '\u{e192}',
         "aqi.medium" => '\u{e210}',
         "arrow.counterclockwise" => '\u{e038}',

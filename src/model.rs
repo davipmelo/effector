@@ -372,6 +372,8 @@ pub struct ParamDef {
     pub track: Option<Vec<Rgba>>,
     /// A boolean shown as an on/off switch in its section header.
     pub is_section_switch: bool,
+    /// Slider (0..100) that can be set by clicking the image: takes the depth there (focus picker).
+    pub pick_depth: bool,
 }
 
 impl ParamDef {
@@ -391,7 +393,7 @@ impl ParamDef {
     }
 
     fn base(key: &str, label: &str, kind: ParamKind) -> ParamDef {
-        ParamDef { key: key.into(), label: label.into(), kind, section: None, visible: None, track: None, is_section_switch: false }
+        ParamDef { key: key.into(), label: label.into(), kind, section: None, visible: None, track: None, is_section_switch: false, pick_depth: false }
     }
 
     /// Slider. Chain `.step()`, `.unit()`, `.curve()`, `.sec()`, `.track()`, `.vis()`.
@@ -442,6 +444,8 @@ impl ParamDef {
     pub fn sec(mut self, s: &str) -> Self { self.section = Some(s.into()); self }
     pub fn sec_opt(mut self, s: Option<&str>) -> Self { self.section = s.map(|s| s.into()); self }
     pub fn track(mut self, t: Vec<Rgba>) -> Self { self.track = Some(t); self }
+    /// Adds an eyedropper that sets this 0..100 slider from the depth at a clicked point.
+    pub fn pick(mut self) -> Self { self.pick_depth = true; self }
     pub fn vis(mut self, v: Visible) -> Self { self.visible = Some(v); self }
     pub fn is_visible(&self, p: &Params) -> bool { self.visible.as_ref().map(|f| f(p)).unwrap_or(true) }
 }

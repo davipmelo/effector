@@ -16,6 +16,7 @@ pub mod blur;
 pub mod camcorder;
 pub mod color;
 pub mod copy;
+pub mod depthfx;
 pub mod digital;
 pub mod distort;
 pub mod dither;
@@ -197,14 +198,14 @@ pub fn all() -> &'static [Effect] {
             // Print & pixel
             dither::dither(), print::halftone(), ascii::ascii(), extra::print_wear(), copy::photocopy(), copy::thermal(),
             // Film & light
-            film::film(), grain::grain(), light::glow(), light::bloom(), light::halation(), texture::light_leak(),
+            film::film(), grain::grain(), light::glow(), light::bloom(), light::halation(), texture::light_leak(), depthfx::fog(),
             // Lens filters
-            lensfilters::anamorphic(), lensfilters::star(), lensfilters::prism(), lensfilters::halo(),
+            depthfx::lens_emulation(), lensfilters::anamorphic(), lensfilters::star(), lensfilters::prism(), lensfilters::halo(),
             lens::chromatic(), lens::vignette(),
             // Blur
-            blur::blur(), blur::radial(), blur::motion(), lensfilters::lens_blur(),
+            depthfx::depth_blur(), blur::blur(), blur::radial(), blur::motion(), lensfilters::lens_blur(),
             // Distort
-            distort::fisheye(), distort::edge_distort(), extra::reeded_glass(), distort::mirror(), distort::stretch(),
+            distort::fisheye(), distort::edge_distort(), extra::reeded_glass(), distort::mirror(), distort::stretch(), depthfx::relief(),
             // Glitch & retro
             camcorder::camcorder(), vhs::vhs(), lens::crt(), extra::led_display(), digital::digicam(), light::trail(),
             // Overlays & tracking

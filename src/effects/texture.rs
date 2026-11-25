@@ -139,6 +139,7 @@ pub fn light_leak() -> Effect {
         ParamDef::choice("blend", "Blend", &[("screen", "Screen"), ("add", "Add"), ("lighten", "Lighten")], "screen"),
         ParamDef::seed("seed"),
     ])
+    .depth_bias()
     .looks(vec![
         look("amber", "Amber Leak", vals!["colorA" => hex("#FF4A1C"), "colorB" => hex("#FFC23A")]),
         look("magenta", "Magenta Burn", vals!["colorA" => hex("#FF1E6E"), "colorB" => hex("#FF8A3D"), "edge" => "left"]),

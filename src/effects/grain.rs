@@ -32,4 +32,5 @@ pub fn grain() -> Effect {
         s("midtones", "Midtones", 0.0, 100.0, 100.0).step(1.0).unit("%").sec("Response"),
         s("highlights", "Highlights", 0.0, 100.0, 40.0).step(1.0).unit("%").sec("Response"),
     ])
+    .depth_bias()
 }

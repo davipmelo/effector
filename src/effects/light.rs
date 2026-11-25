@@ -38,6 +38,7 @@ pub fn glow() -> Effect {
         ParamDef::choice("mode", "Blend", &[("screen", "Screen"), ("add", "Add"), ("soft", "Soft Light")], "screen"),
         ParamDef::color("tint", "Tint", Rgba::WHITE),
     ])
+    .depth_bias()
 }
 
 pub fn bloom() -> Effect {
@@ -55,6 +56,7 @@ pub fn bloom() -> Effect {
         s("saturation", "Saturation", 0.0, 200.0, 100.0).step(1.0).unit("%"),
         ParamDef::color("tint", "Tint", Rgba::WHITE),
     ])
+    .depth_bias()
 }
 
 /// Film halation: red-channel driven, added in linear light (white cores stay white, the fringe goes
@@ -100,6 +102,7 @@ pub fn halation() -> Effect {
             ParamDef::color("color", "Outer Color", hex("#FF2A0A")).sec("Color"),
             s("bloom", "Bloom", 0.0, 100.0, 0.0).step(1.0).unit("%").sec("Color"),
         ])
+    .depth_bias()
 }
 
 pub fn trail() -> Effect {

@@ -95,6 +95,10 @@ pub fn canvas(ui: &mut Ui, app: &mut AppState, tex: &CanvasTextures) {
             }
             split_divider(ui, app, rect);
         }
+        // focus eyedropper: click the image to set a slider to the depth at that point
+        if app.depth_pick.is_some() {
+            depth_pick(ui, app, &resp, img_rect);
+        }
         // right-click outside the image: background colour of the canvas (Lightroom-style)
         if !app.presenting {
             backdrop_menu(ui, &resp, img_rect);
@@ -465,4 +469,44 @@ fn backdrop_menu(ui: &mut Ui, resp: &egui::Response, img_rect: Rect) {
                 }
             }
         });
+}
+
+fn depth_pick(ui: &mut Ui, app: &mut AppState, resp: &egui::Response, img_rect: Rect) {
+    if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+        app.depth_pick = None;
+        return;
+    }
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::Crosshair);
+    }
+    if !resp.clicked() {
+        return;
+    }
+    let (Some(pos), Some(src)) = (resp.interact_pointer_pos(), app.source()) else { return };
+    if !img_rect.contains(pos) {
+        return;
+    }
+    let st = app.state();
+    // output uv -> image uv (inside the canvas borders) -> source uv (crop)
+    let (mut u, mut v) = (((pos.x - img_rect.left()) / img_rect.width()) as f64, ((pos.y - img_rect.top()) / img_rect.height()) as f64);
+    if let Some(c) = st.active_canvas() {
+        let (cw, ch) = src.cropped_size(&st.crop);
+        let ((ow, oh), (ix, iy, iw, ih)) = c.layout(cw as f64, ch as f64);
+        u = (u * ow - ix) / iw;
+        v = (v * oh - iy) / ih;
+        if !(0.0..=1.0).contains(&u) || !(0.0..=1.0).contains(&v) {
+            return;
+        }
+    }
+    let (su, sv) = (st.crop.x + u * st.crop.w, st.crop.y + v * st.crop.h);
+    match crate::depth::get(src.id) {
+        Some(map) => {
+            let d = (map.sample(su, sv) as f64 * 100.0).round();
+            if let Some((lid, key)) = app.depth_pick.take() {
+                app.set_param(lid, &key, crate::model::ParamValue::Number(d), false);
+                app.flash(&crate::l10n::trf("Focus set to %d%%", &[&(d as i64)]));
+            }
+        }
+        None => app.flash(&tr("Calculating depth…")),
+    }
 }

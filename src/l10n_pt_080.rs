@@ -52,4 +52,8 @@ pub const PT_080: &[(&str, &str)] = &[
     ("Blending", "Mescla"),
     ("Balance", "Equilíbrio"),
     ("Drag to pick hue and strength · Shift for fine control · double-click to reset", "Arraste para escolher matiz e intensidade · Shift para ajuste fino · clique duplo para zerar"),
+    ("Click the image… (Esc cancels)", "Clique na imagem… (Esc cancela)"),
+    ("Pick on image", "Escolher na imagem"),
+    ("Click a point of the photo to use its distance", "Clique num ponto da foto para usar a distância dele"),
+    ("Focus set to %d%%", "Foco ajustado para %d%%"),
 ];

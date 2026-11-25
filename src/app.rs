@@ -164,6 +164,8 @@ pub struct AppState {
     pub hide_side_panels: bool,
     /// Canvas shows the depth map instead of the image.
     pub show_depth: bool,
+    /// Eyedropper armed: the next click on the image sets this layer slider to the depth there.
+    pub depth_pick: Option<(Uuid, String)>,
     depth_gen: u64,
     depth_missing_warned: bool,
     pub hide_all_panels: bool,
@@ -244,6 +246,7 @@ impl AppState {
             presenting: false,
             hide_side_panels: false,
             show_depth: false,
+            depth_pick: None,
             depth_gen: 0,
             depth_missing_warned: false,
             hide_all_panels: false,
@@ -1295,7 +1298,7 @@ impl AppState {
     /// Starts the depth map of the active image when something needs it; re-renders when it lands.
     fn tick_depth(&mut self, ctx: &egui::Context) {
         let Some(src) = self.source() else { return };
-        let mut needs = self.show_depth || crate::depth::layers_need_depth(self.layers());
+        let mut needs = self.show_depth || self.depth_pick.is_some() || crate::depth::layers_need_depth(self.layers());
         if let Some(pv) = &self.preview_layers {
             needs |= crate::depth::layers_need_depth(pv);
         }
