@@ -64,19 +64,25 @@ jobs:
     needs: [windows, macos]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
+      - name: Release notes (docs/releases/<tag>.md)
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          if [ -f "docs/releases/$TAG.md" ]; then
+            cp "docs/releases/$TAG.md" notes.md
+          else
+            echo "::warning::docs/releases/$TAG.md not found, using the default text"
+            printf '%s\n' "EFFECTOR $TAG para macOS e Windows." > notes.md
+          fi
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           name: EFFECTOR ${{ github.event.inputs.tag || github.ref_name }}
           draft: false
           files: dist/*
-          body: |
-            EFFECTOR for macOS and Windows (same app, same effects, same presets).
-
-            **Windows** — download `EFFECTOR-…-Windows-Setup.exe` and run it. Windows may show "Windows protected your PC" because the installer is not code-signed: click *More info → Run anyway*.
-
-            **macOS** (Apple Silicon and Intel, macOS 11+) — open `EFFECTOR-…-macOS.dmg` and drag EFFECTOR to Applications. The app is not notarized: the first time, right-click the app → *Open* → *Open*.
+          body_path: notes.md

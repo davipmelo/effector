@@ -26,6 +26,9 @@
 - **Regra P&B:** saída com R=G=B exato; o renderer restaura o alfa de entrada (`k_withalpha`).
 - **Dados do usuário:** pasta `EFFECTOR` em Application Support (Mac) / `%APPDATA%` (Windows): `settings.json`,
   `presets.json`, `swatches.json`, `LUTs/`, `Session/`. Os formatos de presets e paletas são os mesmos do app Swift.
+- **Patch notes (obrigatório):** antes de cada release, escrever `docs/releases/vX.Y.Z.md` em PT-BR explicando tudo
+  o que mudou (correções, efeitos, presets, bastidores) + instruções de instalação. O workflow publica esse arquivo como
+  texto do release. Modelo: `docs/releases/v0.7.0.md`.
 - **Release:** criar a tag `vX.Y.Z` e dar push → `.github/workflows/release.yml` compila no Windows (instalador Inno Setup)
   e no Mac (`.app` universal + `.dmg`) e publica o release. Versão em `Cargo.toml`.
 - **Mac local:** `packaging/macos/build_app.sh [--install]`.
