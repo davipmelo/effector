@@ -1,0 +1,32 @@
+EFFECTOR — COMO ABRIR NO MAC
+============================
+
+1. Arraste o EFFECTOR para a pasta Aplicativos (Applications).
+2. Abra o EFFECTOR. O macOS vai dizer que não pôde verificar o app e não vai abri-lo.
+   Isso é normal: o app não é distribuído pela App Store nem notarizado pela Apple.
+   Clique em "OK" ou "Concluído" (NÃO clique em "Mover para o Lixo").
+3. Abra Ajustes do Sistema → Privacidade e Segurança.
+4. Role até o fim. Vai aparecer "O EFFECTOR foi bloqueado...". Clique em "Abrir Mesmo Assim".
+5. Confirme com a senha do Mac ou o Touch ID e clique em "Abrir Mesmo Assim" de novo.
+
+Isso só precisa ser feito uma vez.
+
+Alternativa pelo Terminal (faz o mesmo de uma vez):
+    xattr -dr com.apple.quarantine /Applications/EFFECTOR.app
+
+
+EFFECTOR — HOW TO OPEN ON A MAC
+===============================
+
+1. Drag EFFECTOR into the Applications folder.
+2. Open EFFECTOR. macOS will say it could not verify the app and will not open it.
+   This is expected: the app is not from the App Store and is not notarized by Apple.
+   Click "Done" (do NOT click "Move to Trash").
+3. Open System Settings → Privacy & Security.
+4. Scroll to the bottom. You will see "EFFECTOR was blocked...". Click "Open Anyway".
+5. Confirm with your Mac password or Touch ID, then click "Open Anyway" again.
+
+You only need to do this once.
+
+Terminal alternative (does the same in one step):
+    xattr -dr com.apple.quarantine /Applications/EFFECTOR.app

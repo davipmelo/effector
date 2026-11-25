@@ -25,7 +25,8 @@ touch "$APP/Contents/Resources/en.lproj/InfoPlist.strings" "$APP/Contents/Resour
 cp -R assets/fonts "$APP/Contents/Resources/licenses" 2>/dev/null || true
 find "$APP/Contents/Resources/licenses" -name '*.ttf' -delete 2>/dev/null || true
 
-# ad-hoc signature (no Apple Developer account): Gatekeeper asks once, right-click → Open
+# ad-hoc signature (no Apple Developer account, not notarized). Since macOS 15 the right-click → Open bypass is gone:
+# users must allow it once in System Settings → Privacy & Security → Open Anyway (see the how-to-open file in the DMG).
 codesign --force --deep --sign - "$APP"
 echo "Built $APP ($VERSION build $BUILD)"
 
@@ -36,6 +37,7 @@ rm -rf "$STAGE" "$DMG"
 mkdir -p "$STAGE"
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
+cp "packaging/macos/COMO ABRIR - HOW TO OPEN.txt" "$STAGE/"
 hdiutil create -volname "EFFECTOR $VERSION" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
 rm -rf "$STAGE"
 echo "Built $DMG"
