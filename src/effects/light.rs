@@ -104,26 +104,80 @@ pub fn halation() -> Effect {
 
 pub fn trail() -> Effect {
     Effect::new("trail", "Trail & Motion Blur", Category::Glitch, |input, p, ctx| {
-        let mode = match p.choice_or("mode", "dir").as_str() { "zoom" => 1.0, "spin" => 2.0, _ => 0.0 };
-        let blend = match p.choice_or("blend", "lighten").as_str() { "screen" => 1.0, "normal" => 2.0, "difference" => 3.0, "darken" => 4.0, _ => 0.0 };
-        ctx.apply("k_trail", &[input], &[mode, p.f("angle"), ctx.px(p.num("distance", 60.0)) as f32, p.fd("copies", 8.0),
-            p.fd("decay", 75.0) / 100.0, blend, p.f("rgbShift") / 100.0 * 0.5, p.fd("cx", 50.0) / 100.0, p.fd("cy", 50.0) / 100.0,
-            p.fd("opacity", 60.0) / 100.0, if p.choice_or("style", "copies") == "smooth" { 1.0 } else { 0.0 }, p.b("centered")])
+        let mode = match p.choice_or("mode", "dir").as_str() {
+            "zoom" => 1.0,
+            "spin" => 2.0,
+            "arc" => 3.0,
+            "wave" => 4.0,
+            "shake" => 5.0,
+            "spiral" => 6.0,
+            _ => 0.0,
+        };
+        let blend = match p.choice_or("blend", "lighten").as_str() {
+            "screen" => 1.0,
+            "normal" => 2.0,
+            "difference" => 3.0,
+            "darken" => 4.0,
+            "add" => 5.0,
+            _ => 0.0,
+        };
+        let cm = match p.choice_or("colorMode", "off").as_str() { "rainbow" => 1.0, "gradient" => 2.0, _ => 0.0 };
+        let (ca, cb) = (p.color_or("colorA", hex("#FF3D7F")), p.color_or("colorB", hex("#3DA9FF")));
+        let thr = if p.bool("lightsOnly") { p.fd("lightThreshold", 80.0) / 100.0 } else { 0.0 };
+        ctx.apply("k_trail", &[input], &[
+            mode, p.f("angle"), ctx.px(p.num("distance", 60.0)) as f32, p.fd("copies", 8.0), p.fd("decay", 75.0) / 100.0, blend,
+            p.f("rgbShift") / 100.0 * 0.5, p.fd("cx", 50.0) / 100.0, p.fd("cy", 50.0) / 100.0, p.fd("opacity", 60.0) / 100.0,
+            if p.choice_or("style", "copies") == "smooth" { 1.0 } else { 0.0 }, p.b("centered"), p.fd("bend", 60.0),
+            ctx.px(p.num("amplitude", 20.0)) as f32, p.fd("waves", 2.0), p.fd("seed", 1.0) * 3.1, cm,
+            ca.r as f32, ca.g as f32, ca.b as f32, cb.r as f32, cb.g as f32, cb.b as f32, thr, p.fd("hueCycles", 1.0),
+            p.fd("turn", 90.0), p.fd("colorAmount", 70.0) / 100.0,
+        ])
     })
     .symbol("wind")
-    .summary("Ghost copies or a smooth trail: directional, zoom or spin. Smooth + both directions = motion blur.")
+    .summary("Ghost copies or a smooth trail along a line, zoom, spin, arc, wave, hand shake or spiral — with rainbow copies and light-only trails.")
     .params(vec![
         ParamDef::segmented("style", "Style", &[("copies", "Copies"), ("smooth", "Smooth")], "copies").sec("Trail"),
-        ParamDef::segmented("mode", "Mode", &[("dir", "Directional"), ("zoom", "Zoom"), ("spin", "Spin")], "dir").sec("Trail"),
-        ParamDef::toggle("centered", "Both Directions (Motion Blur)", false).sec("Trail").vis(when("style", "smooth")),
-        s("angle", "Angle", -180.0, 180.0, 0.0).step(1.0).unit("°").sec("Trail"),
+        ParamDef::choice("mode", "Path", &[
+            ("dir", "Straight"), ("zoom", "Zoom"), ("spin", "Spin"), ("arc", "Arc"), ("wave", "Wave"), ("shake", "Hand Shake"), ("spiral", "Spiral"),
+        ], "dir").sec("Trail"),
+        ParamDef::toggle("centered", "Both Directions", false).sec("Trail"),
+        s("angle", "Angle", -180.0, 180.0, 0.0).step(1.0).unit("°").sec("Trail").vis(when_not("mode", "zoom")),
         s("distance", "Distance", 0.0, 400.0, 60.0).step(1.0).curve(1.8).sec("Trail"),
-        s("copies", "Copies", 1.0, 48.0, 8.0).step(1.0).sec("Trail").vis(when_not("style", "smooth")),
+        s("copies", "Copies", 1.0, 64.0, 8.0).step(1.0).curve(1.4).sec("Trail").vis(when_not("style", "smooth")),
         s("decay", "Decay", 0.0, 100.0, 75.0).step(1.0).unit("%").sec("Trail"),
         s("opacity", "Ghost Opacity", 0.0, 100.0, 60.0).step(1.0).unit("%").sec("Trail"),
-        ParamDef::choice("blend", "Ghost Blend", &[("lighten", "Lighten"), ("screen", "Screen"), ("normal", "Normal"), ("difference", "Difference"), ("darken", "Darken")], "lighten").sec("Trail"),
-        s("rgbShift", "RGB Split", 0.0, 100.0, 0.0).step(1.0).unit("%").sec("Trail"),
-        s("cx", "Center X", 0.0, 100.0, 50.0).step(1.0).unit("%").sec("Center").vis(when_not("mode", "dir")),
-        s("cy", "Center Y", 0.0, 100.0, 50.0).step(1.0).unit("%").sec("Center").vis(when_not("mode", "dir")),
+        ParamDef::choice("blend", "Ghost Blend", &[("lighten", "Lighten"), ("screen", "Screen"), ("add", "Add"), ("normal", "Normal"), ("difference", "Difference"), ("darken", "Darken")], "lighten").sec("Trail"),
+        // path shape
+        s("bend", "Bend", -360.0, 360.0, 60.0).step(1.0).unit("°").sec("Path").vis(when("mode", "arc")),
+        s("amplitude", "Amplitude", 0.0, 200.0, 20.0).step(1.0).curve(1.5).sec("Path").vis(when_any("mode", &["wave", "shake"])),
+        s("waves", "Waves", 0.5, 12.0, 2.0).step(0.5).sec("Path").vis(when("mode", "wave")),
+        s("turn", "Turn", -720.0, 720.0, 90.0).step(1.0).unit("°").sec("Path").vis(when("mode", "spiral")),
+        ParamDef::seed("seed").sec("Path").vis(when("mode", "shake")),
+        s("cx", "Center X", 0.0, 100.0, 50.0).step(1.0).unit("%").sec("Path").vis(when_any("mode", &["zoom", "spin", "spiral"])),
+        s("cy", "Center Y", 0.0, 100.0, 50.0).step(1.0).unit("%").sec("Path").vis(when_any("mode", &["zoom", "spin", "spiral"])),
+        // colour
+        ParamDef::segmented("colorMode", "Copy Color", &[("off", "Off"), ("rainbow", "Rainbow"), ("gradient", "Gradient")], "off").sec("Color"),
+        s("colorAmount", "Color Strength", 0.0, 100.0, 70.0).step(1.0).unit("%").sec("Color").vis(when_not("colorMode", "off")),
+        s("hueCycles", "Rainbow Cycles", 0.2, 6.0, 1.0).step(0.1).sec("Color").vis(when("colorMode", "rainbow")),
+        ParamDef::color("colorA", "Start Color", hex("#FF3D7F")).sec("Color").vis(when("colorMode", "gradient")),
+        ParamDef::color("colorB", "End Color", hex("#3DA9FF")).sec("Color").vis(when("colorMode", "gradient")),
+        s("rgbShift", "RGB Split", 0.0, 100.0, 0.0).step(1.0).unit("%").sec("Color"),
+        // lights
+        ParamDef::section_switch("lightsOnly", "Light Trails Only", false),
+        s("lightThreshold", "Brightness", 0.0, 100.0, 80.0).step(1.0).unit("%").sec("Light Trails Only"),
+    ])
+    .depth_bias()
+    .looks(vec![
+        look_g("ghosts", "Ghost Copies", "Copies", vals![]),
+        look_g("prism", "Prismatic Echo", "Copies", vals!["copies" => 6.0, "distance" => 50.0, "colorMode" => "rainbow", "colorAmount" => 80.0, "blend" => "screen", "opacity" => 55.0, "decay" => 80.0]),
+        look_g("stutter", "Stutter", "Copies", vals!["copies" => 4.0, "distance" => 120.0, "decay" => 60.0, "opacity" => 80.0, "blend" => "normal"]),
+        look_g("duo", "Duotone Echo", "Copies", vals!["copies" => 10.0, "colorMode" => "gradient", "blend" => "screen", "opacity" => 50.0]),
+        look_g("shake", "Hand Shake", "Copies", vals!["mode" => "shake", "copies" => 12.0, "distance" => 10.0, "amplitude" => 18.0, "opacity" => 45.0, "centered" => true]),
+        look_g("motion", "Motion Blur", "Smooth", vals!["style" => "smooth", "centered" => true, "opacity" => 100.0, "blend" => "normal", "decay" => 100.0]),
+        look_g("swing", "Camera Swing", "Smooth", vals!["style" => "smooth", "mode" => "arc", "bend" => 90.0, "distance" => 140.0, "opacity" => 85.0, "blend" => "normal"]),
+        look_g("zoomburst", "Zoom Burst", "Smooth", vals!["style" => "smooth", "mode" => "zoom", "distance" => 120.0, "opacity" => 90.0, "blend" => "normal", "decay" => 90.0]),
+        look_g("vortex", "Spiral Vortex", "Smooth", vals!["style" => "smooth", "mode" => "spiral", "distance" => 60.0, "turn" => 120.0, "opacity" => 90.0, "blend" => "normal"]),
+        look_g("light", "Light Painting", "Lights", vals!["style" => "smooth", "mode" => "wave", "distance" => 160.0, "amplitude" => 30.0, "waves" => 3.0, "lightsOnly" => true, "blend" => "add", "opacity" => 100.0, "decay" => 90.0]),
+        look_g("rainbowlights", "Rainbow Light Trails", "Lights", vals!["copies" => 24.0, "distance" => 140.0, "lightsOnly" => true, "lightThreshold" => 82.0, "colorMode" => "rainbow", "blend" => "add", "opacity" => 30.0, "decay" => 90.0]),
     ])
 }
