@@ -26,6 +26,7 @@ pub mod frame;
 pub mod grain;
 pub mod lens;
 pub mod lensfilters;
+pub mod looks080;
 pub mod light;
 pub mod print;
 pub mod texture;
@@ -191,7 +192,7 @@ static REGISTRY: OnceLock<Vec<Effect>> = OnceLock::new();
 
 pub fn all() -> &'static [Effect] {
     REGISTRY.get_or_init(|| {
-        vec![
+        let mut v = vec![
             // Adjust & color
             adjust::basic(), adjust::curves(), adjust::hsl(), adjust::huesat(), adjust::bw(), color::color_grade(), extra::split_tone(), color::gradient_map(), color::lut(),
             lens::sharpen(), adjust::invert(), adjust::posterize(), adjust::threshold(),
@@ -210,7 +211,11 @@ pub fn all() -> &'static [Effect] {
             camcorder::camcorder(), vhs::vhs(), lens::crt(), extra::led_display(), digital::digicam(), light::trail(),
             // Overlays & tracking
             texture::dust(), frame::frame(), blob::blob_tracker(),
-        ]
+        ];
+        for e in v.iter_mut() {
+            e.looks.extend(looks080::for_effect(e.id));
+        }
+        v
     })
 }
 

@@ -359,3 +359,10 @@ pub fn fuzz(args: &[String]) {
     }
     println!("fuzz finished: {failures} failures");
 }
+
+/// `--list-looks`: effects and how many Looks each has (dev).
+pub fn list_looks() {
+    for e in effects::all().iter().filter(|e| !e.hidden) {
+        println!("{:3} {:14} {}", e.looks.len(), e.id, e.name);
+    }
+}

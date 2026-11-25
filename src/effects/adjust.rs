@@ -167,9 +167,16 @@ pub fn bw() -> Effect {
 }
 
 pub fn invert() -> Effect {
-    Effect::new("invert", "Invert", Category::Adjust, |input, _p, ctx| ctx.apply("k_invert", &[input], &[]))
+    Effect::new("invert", "Invert", Category::Adjust, |input, p, ctx| {
+        let mode = match p.choice_or("mode", "all").as_str() { "luma" => 1.0, "color" => 2.0, "r" => 3.0, "g" => 4.0, "b" => 5.0, _ => 0.0 };
+        ctx.apply("k_invert", &[input], &[mode, p.fd("amount", 100.0) / 100.0])
+    })
         .symbol("circle.righthalf.filled.inverse")
-        .summary("Negative image.")
+        .summary("Negative image — everything, only the brightness, only the colours or one channel.")
+        .params(vec![
+            ParamDef::choice("mode", "Invert", &[("all", "Everything"), ("luma", "Brightness Only"), ("color", "Colors Only"), ("r", "Red Channel"), ("g", "Green Channel"), ("b", "Blue Channel")], "all"),
+            s("amount", "Amount", 0.0, 100.0, 100.0).step(1.0).unit("%"),
+        ])
 }
 
 pub fn posterize() -> Effect {
