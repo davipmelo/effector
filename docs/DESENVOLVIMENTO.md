@@ -31,7 +31,9 @@
 - **Mac local:** `packaging/macos/build_app.sh [--install]`.
 - **Ícone:** desenhado em código (`src/appicon.rs`); `effector --write-icons assets/icons` regera `.ico`, `.icns` e `.png`.
 
-## App Swift antigo (só macOS)
+## App Swift antigo (arquivado)
 
-O código Swift original continua em `Sources/` + `Package.swift` como referência até a versão Rust ser validada no Mac.
-Build antigo: `scripts/build_app.sh --install`. `tools/` guarda os scripts usados na conversão Swift → Rust.
+A versão Swift original (só macOS) foi arquivada depois que a versão Rust foi validada no Mac.
+Ela não está mais na `main`: fica na branch `swift-legacy` e na tag `swift-final`
+(`git checkout swift-final` para consultar). `tools/` guarda os scripts usados na conversão Swift → Rust;
+eles leem `Sources/`, então só funcionam a partir desse checkout antigo.

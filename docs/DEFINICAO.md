@@ -21,8 +21,8 @@ App nativo para macOS, **100% pessoal**, que aplica efeitos visuais em imagens u
 
 | Item | Decisão |
 |---|---|
-| Sistema | Apenas macOS recente (macOS 26+). Máquina de uso: MacBook Pro M1 Pro, 16 GB |
-| Stack | Swift + SwiftUI (AppKit onde necessário) + Metal / Core Image |
+| Sistema | macOS e Windows (um único código). Máquinas de uso: MacBook Pro M1 Pro, 16 GB, e um PC com Windows |
+| Stack | Rust + wgpu (render na GPU) + egui (interface). A versão Swift antiga está arquivada na branch `swift-legacy` / tag `swift-final` |
 | Instalação | App compilado e instalado em `/Applications/EFFECTOR.app`. O usuário abre como um app normal |
 | Código | 100% mantido pelo Claude. O usuário não lê nem edita código |
 | Versionamento | Git + repositório **privado** no GitHub (`effector`). Commit e push automáticos a cada entrega |
