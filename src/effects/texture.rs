@@ -9,7 +9,7 @@ pub fn dust() -> Effect {
         let mut rng = SplitMix::new((p.num("seed", 1.0).max(1.0) as u64).wrapping_mul(2654435761));
         let mut r = move || rng.unit();
         let style = p.choice_or("style", "light");
-        let size = p.num("size", 1.0);
+        let size = p.num("size", 0.8);
         let mut ov = OverlayCanvas::new(input.width(), input.height());
         let mut color = |r: &mut dyn FnMut() -> f64| -> (Rgba, f64) {
             let dark = style == "dark" || (style == "mixed" && r() < 0.5);
@@ -18,11 +18,12 @@ pub fn dust() -> Effect {
         };
         // specks: many tiny, a few larger clumps
         let ref_area = (w / s) * (h / s);
-        let n = if p.bool_or("dustOn", true) { (p.num("amount", 35.0) / 100.0 * ref_area * 0.0012) as i64 } else { 0 };
-        for _ in 0..n.min(40000) {
+        // density is steep: low values sprinkle, high values fill the frame with fine dust
+        let n = if p.bool_or("dustOn", true) { ((p.num("amount", 35.0) / 100.0).powf(1.6) * ref_area * 0.012) as i64 } else { 0 };
+        for _ in 0..n.min(80000) {
             let x = r() * w;
             let y = r() * h;
-            let rad = (0.35 + r().powi(5) * 5.5) * size * s;
+            let rad = (0.7 + r().powi(6) * 5.0) * size * s;
             let (c, a) = color(&mut r);
             ov.set_fill(c, a);
             let parts = if rad > 2.0 * s { 3 } else { 1 };
@@ -40,14 +41,15 @@ pub fn dust() -> Effect {
         for _ in 0..hairs.max(0) {
             let (c, a) = color(&mut r);
             ov.set_stroke(c, a);
-            ov.set_line_width((0.5 + r() * 0.8) * s * size);
+            let hs = p.num("hairSize", 1.0);
+            ov.set_line_width((0.55 + r() * 0.6) * s * hs);
             let px = r() * w;
             let py = r() * h;
             let mut pt = (px, py);
             ov.move_to(pt.0, pt.1);
             let mut ang = r() * std::f64::consts::PI * 2.0;
             let segs = 3 + (r() * 4.0) as i64;
-            let len = (15.0 + r() * 70.0) * s * size;
+            let len = (6.0 + r() * 34.0) * s * hs * p.num("hairLength", 100.0) / 100.0;
             for _ in 0..segs {
                 ang += (r() - 0.5) * 1.6;
                 let to = (pt.0 + ang.cos() * len / segs as f64, pt.1 + ang.sin() * len / segs as f64);
@@ -89,12 +91,14 @@ pub fn dust() -> Effect {
     .params(vec![
         ParamDef::segmented("style", "Style", &[("dark", "Dark"), ("light", "Light"), ("mixed", "Mixed")], "light").sec("Look"),
         ParamDef::section_switch("dustOn", "Dust", true),
-        s("amount", "Density", 0.0, 100.0, 35.0).step(1.0).unit("%").curve(1.5).sec("Dust"),
-        s("size", "Size", 0.2, 5.0, 1.0).step(0.05).curve(1.8).sec("Dust"),
+        s("amount", "Density", 0.0, 100.0, 35.0).step(1.0).unit("%").sec("Dust"),
+        s("size", "Size", 0.2, 5.0, 0.8).step(0.05).curve(2.0).sec("Dust"),
         ParamDef::section_switch("hairsOn", "Hairs", true),
-        s("hairs", "Hairs", 0.0, 40.0, 5.0).step(1.0).sec("Hairs"),
+        s("hairs", "Count", 0.0, 300.0, 8.0).step(1.0).curve(2.0).sec("Hairs"),
+        s("hairSize", "Thickness", 0.3, 4.0, 1.0).step(0.05).curve(1.6).sec("Hairs"),
+        s("hairLength", "Length", 10.0, 300.0, 100.0).step(1.0).unit("%").curve(1.4).sec("Hairs"),
         ParamDef::section_switch("scratchesOn", "Scratches", true),
-        s("scratches", "Scratches", 0.0, 40.0, 3.0).step(1.0).sec("Scratches"),
+        s("scratches", "Count", 0.0, 120.0, 3.0).step(1.0).curve(1.8).sec("Scratches"),
         s("scratchLen", "Scratch Length", 5.0, 100.0, 55.0).step(1.0).unit("%").sec("Scratches"),
         s("opacity", "Opacity", 0.0, 100.0, 80.0).step(1.0).unit("%").sec("Look"),
         s("softness", "Softness", 0.0, 3.0, 0.5).step(0.05).sec("Look"),
@@ -105,6 +109,9 @@ pub fn dust() -> Effect {
         look("print", "Old Print", vals!["style" => "dark", "amount" => 30.0, "hairs" => 4.0, "scratches" => 5.0, "opacity" => 65.0]),
         look("cinema", "Projected Film Reel", vals!["style" => "mixed", "amount" => 25.0, "hairs" => 3.0, "scratches" => 14.0, "scratchLen" => 100.0, "size" => 1.4]),
         look("subtle", "Subtle Specks", vals!["style" => "light", "amount" => 15.0, "hairs" => 1.0, "scratches" => 0.0, "opacity" => 60.0]),
+        look("heavy", "Neglected Negative", vals!["style" => "light", "amount" => 85.0, "size" => 0.6, "hairs" => 60.0, "hairSize" => 0.8, "scratches" => 8.0]),
+        look("flatbed", "Dirty Flatbed", vals!["style" => "dark", "amount" => 70.0, "size" => 0.5, "hairs" => 25.0, "hairSize" => 0.8, "hairLength" => 160.0, "scratches" => 0.0, "opacity" => 70.0]),
+        look("storm", "Dust Storm", vals!["style" => "mixed", "amount" => 100.0, "size" => 0.45, "hairs" => 120.0, "hairSize" => 0.7, "hairLength" => 60.0, "scratches" => 20.0]),
     ])
 }
 
