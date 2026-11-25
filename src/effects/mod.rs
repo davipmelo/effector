@@ -27,6 +27,7 @@ pub mod grain;
 pub mod lens;
 pub mod lensfilters;
 pub mod looks080;
+pub mod palettes080;
 pub mod light;
 pub mod print;
 pub mod texture;

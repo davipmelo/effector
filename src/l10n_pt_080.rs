@@ -56,4 +56,7 @@ pub const PT_080: &[(&str, &str)] = &[
     ("Pick on image", "Escolher na imagem"),
     ("Click a point of the photo to use its distance", "Clique num ponto da foto para usar a distância dele"),
     ("Focus set to %d%%", "Foco ajustado para %d%%"),
+    ("Palette", "Paleta"),
+    ("Preset Color", "Cor Pronta"),
+    ("Custom", "Personalizado"),
 ];

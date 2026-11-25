@@ -409,7 +409,14 @@ fn param_sections(ui: &mut Ui, app: &mut AppState, layer: &LayerNode, effect: &E
         let sw = items.iter().find(|d| d.is_section_switch);
         let on = sw.map(|d| if let ParamKind::Toggle(def) = d.kind { layer.params.bool_or(&d.key, def) } else { true });
         let dot = effect.section_colors.iter().find(|(k, _)| *k == sec).map(|(_, c)| rgba_color(c));
+        let sets: Vec<crate::effects::palettes080::ColorSet> = crate::effects::palettes080::color_sets(effect.id)
+            .into_iter()
+            .filter(|cs| items.iter().any(|d| d.key == cs.keys[0]))
+            .collect();
         let change = panel_section(ui, Id::new(("sec", layer.id, &sec)), &sec, dot, on, |ui| {
+            for cs in &sets {
+                color_set_row(ui, app, layer, cs);
+            }
             for d in items.iter().filter(|d| !d.is_section_switch) {
                 param_control(ui, app, layer, d);
             }
@@ -537,6 +544,41 @@ fn param_control(ui: &mut Ui, app: &mut AppState, layer: &LayerNode, def: &Param
             });
         }
     }
+}
+
+/// "Palette" picker that sets a group of colour params at once (e.g. Light Leak A + B).
+fn color_set_row(ui: &mut Ui, app: &mut AppState, layer: &LayerNode, cs: &crate::effects::palettes080::ColorSet) {
+    let current: Vec<String> = cs.keys.iter().map(|k| layer.params.color(k).to_hex()).collect();
+    let items: Vec<PickerItem> = cs
+        .entries
+        .iter()
+        .map(|(g, name, hexes)| {
+            let mut it = PickerItem::new(name, &tr(name), Some(tr(g)));
+            it.swatches = Some(hexes.iter().map(|h| Rgba::hex(h)).collect());
+            it
+        })
+        .collect();
+    let sel = cs.entries.iter().find(|(_, _, h)| h.iter().zip(&current).all(|(a, b)| a.eq_ignore_ascii_case(b))).map(|e| e.1).unwrap_or("");
+    let title = if sel.is_empty() { tr("Custom") } else { tr(sel) };
+    labeled_row(ui, if cs.keys.len() > 1 { "Palette" } else { "Preset Color" }, |ui| {
+        let r = picker_field(ui, &format!("cset.{}.{}", layer.effect_id, cs.keys.join("+")), &items, sel, Some(&title), &[], false);
+        if r.opened {
+            app.begin_browse();
+        }
+        if let Some(id) = r.selected {
+            if let Some((_, _, hexes)) = cs.entries.iter().find(|e| e.1 == id) {
+                let vals: Vec<(String, Rgba)> = cs.keys.iter().zip(hexes).map(|(k, h)| (k.to_string(), Rgba::hex(h))).collect();
+                app.update_layer(layer.id, None, |n| {
+                    for (k, c) in &vals {
+                        n.params.set(k, ParamValue::Color(*c));
+                    }
+                });
+            }
+        }
+        if r.closed {
+            app.end_browse();
+        }
+    });
 }
 
 // MARK: - Color wheels

@@ -13,7 +13,8 @@ pub fn one_bit() -> PaletteSpec { PaletteSpec::from("1-bit", &["#000000", "#FFFF
 
 pub fn gradient_groups() -> &'static Vec<(&'static str, Vec<GradientSpec>)> {
     static G: OnceLock<Vec<(&'static str, Vec<GradientSpec>)>> = OnceLock::new();
-    G.get_or_init(|| vec![
+    G.get_or_init(|| {
+        let mut v = vec![
         ("Thermal", vec![
             thermal_iron(),
             GradientSpec::from("Thermal · Rainbow", &["#000010", "#1E0B8C", "#0060FF", "#00D8D0", "#3CE840", "#FFF000", "#FF7A00", "#FF0000", "#FFFFFF"]),
@@ -64,12 +65,16 @@ pub fn gradient_groups() -> &'static Vec<(&'static str, Vec<GradientSpec>)> {
             GradientSpec::from("Dusk", &["#120A26", "#4B2C69", "#D0587E", "#FFB38A", "#FFE8C8"]),
             GradientSpec::from("Golden Hour", &["#1A0E05", "#7A3B12", "#E08E3C", "#FFD89A", "#FFF6E5"]),
         ]),
-    ])
+    ];
+        v.extend(crate::effects::palettes080::extra_gradient_groups());
+        v
+    })
 }
 
 pub fn palette_groups() -> &'static Vec<(&'static str, Vec<PaletteSpec>)> {
     static G: OnceLock<Vec<(&'static str, Vec<PaletteSpec>)>> = OnceLock::new();
-    G.get_or_init(|| vec![
+    G.get_or_init(|| {
+        let mut v = vec![
         ("1-bit & Mono", vec![
             one_bit(),
             PaletteSpec::from("Mac Classic", &["#000000", "#FFFFFF"]),
@@ -128,7 +133,10 @@ pub fn palette_groups() -> &'static Vec<(&'static str, Vec<PaletteSpec>)> {
             PaletteSpec::from("Neon", &["#0A0A12", "#FF00A0", "#00F0FF", "#B6FF00", "#FFFFFF"]),
             PaletteSpec::from("Cyberpunk", &["#0D0221", "#2DE2E6", "#F706CF", "#FD1D53", "#F9C80E"]),
         ]),
-    ])
+    ];
+        v.extend(crate::effects::palettes080::extra_palette_groups());
+        v
+    })
 }
 
 pub fn all_gradients() -> Vec<GradientSpec> { gradient_groups().iter().flat_map(|g| g.1.clone()).collect() }
