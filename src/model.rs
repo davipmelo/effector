@@ -559,6 +559,35 @@ pub struct LayerNode {
     pub expanded: bool,
     #[serde(default)]
     pub children: Vec<LayerNode>,
+    /// Limits the layer to a range of distances (needs the depth map).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub depth_mask: Option<DepthMask>,
+}
+
+/// Per-layer depth mask: the layer only shows between `from` and `to` (0 = farthest, 1 = nearest).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct DepthMask {
+    pub enabled: bool,
+    pub from: f64,
+    pub to: f64,
+    pub feather: f64,
+    pub invert: bool,
+}
+
+impl Default for DepthMask {
+    fn default() -> Self { DepthMask { enabled: true, from: 0.0, to: 0.45, feather: 0.12, invert: false } }
+}
+
+impl DepthMask {
+    pub fn hash_into<H: Hasher>(&self, h: &mut H) {
+        self.enabled.hash(h);
+        self.invert.hash(h);
+        for v in [self.from, self.to, self.feather] { v.to_bits().hash(h); }
+    }
+    pub fn uniforms(&self) -> [f32; 5] {
+        [if self.enabled { 1.0 } else { 0.0 }, self.from as f32, self.to as f32, self.feather as f32, if self.invert { 1.0 } else { 0.0 }]
+    }
 }
 
 impl LayerNode {
@@ -584,6 +613,7 @@ impl LayerNode {
             blend: BlendMode::Normal,
             expanded: true,
             children: vec![],
+            depth_mask: None,
         }
     }
 
@@ -599,6 +629,7 @@ impl LayerNode {
             blend: BlendMode::Normal,
             expanded: true,
             children,
+            depth_mask: None,
         }
     }
 
@@ -610,6 +641,7 @@ impl LayerNode {
         self.enabled.hash(h);
         self.opacity.to_bits().hash(h);
         self.blend.hash(h);
+        if let Some(m) = &self.depth_mask { m.hash_into(h); }
         for c in &self.children { c.render_hash(h); }
     }
 

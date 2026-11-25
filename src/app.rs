@@ -162,6 +162,10 @@ pub struct AppState {
     pub presenting: bool,
     /// Tab hides the side panels, Shift+Tab every panel (Lightroom).
     pub hide_side_panels: bool,
+    /// Canvas shows the depth map instead of the image.
+    pub show_depth: bool,
+    depth_gen: u64,
+    depth_missing_warned: bool,
     pub hide_all_panels: bool,
     pub fit_zoom: f64,
     pub viewport: egui::Vec2,
@@ -239,6 +243,9 @@ impl AppState {
             split_pos: 0.5,
             presenting: false,
             hide_side_panels: false,
+            show_depth: false,
+            depth_gen: 0,
+            depth_missing_warned: false,
             hide_all_panels: false,
             fit_zoom: 1.0,
             viewport: egui::Vec2::ZERO,
@@ -1281,8 +1288,43 @@ impl AppState {
             canvas: st.active_canvas().cloned(),
             scale,
             want_crop_view: self.is_cropping,
+            show_depth: self.show_depth,
         });
     }
+
+    /// Starts the depth map of the active image when something needs it; re-renders when it lands.
+    fn tick_depth(&mut self, ctx: &egui::Context) {
+        let Some(src) = self.source() else { return };
+        let mut needs = self.show_depth || crate::depth::layers_need_depth(self.layers());
+        if let Some(pv) = &self.preview_layers {
+            needs |= crate::depth::layers_need_depth(pv);
+        }
+        if needs && crate::depth::get(src.id).is_none() {
+            if !crate::depth::model_available() {
+                if !self.depth_missing_warned {
+                    self.depth_missing_warned = true;
+                    self.flash(&tr("Depth model not found: reinstall EFFECTOR to use depth"));
+                }
+            } else {
+                let c = ctx.clone();
+                crate::depth::request(&src, move || c.request_repaint());
+            }
+        }
+        let g = crate::depth::generation();
+        if g != self.depth_gen {
+            self.depth_gen = g;
+            self.request_render();
+            if let Some(id) = self.active_id {
+                self.make_strip_thumb(id);
+            }
+        }
+        if crate::depth::is_running(src.id) {
+            ctx.request_repaint_after(Duration::from_millis(200));
+        }
+    }
+
+    /// The depth map of the active image is being computed.
+    pub fn depth_busy(&self) -> bool { self.source().map(|s| crate::depth::is_running(s.id)).unwrap_or(false) }
 
     /// Picks a preview resolution matching what is on screen (quantized to avoid churn).
     pub fn output_size(&self) -> (usize, usize) {
@@ -1461,6 +1503,7 @@ impl AppState {
                 ctx.request_repaint_after(Duration::from_millis(100));
             }
         }
+        self.tick_depth(ctx);
         self.kick_render();
         if self.render_running || self.render_pending {
             ctx.request_repaint_after(Duration::from_millis(30));
@@ -1615,7 +1658,8 @@ impl AppState {
         let repaint = self.ctx.clone();
         std::thread::spawn(move || {
             let tex = src.make_texture(&st.crop, scale as f64);
-            let out = crate::renderer::Renderer::new(false).render(&st.layers, &tex, 0, true, st.active_canvas());
+            let depth = crate::depth::for_render(&src, &st.crop, &st.layers, true);
+            let out = crate::renderer::Renderer::new(false).render(&st.layers, &tex, 0, true, st.active_canvas(), depth);
             let r = imageio::write(&out, &path, format, quality, keep_alpha)
                 .map(|_| trf("Exported %@", &[&path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default()]));
             let _ = tx.send(r);
@@ -1654,7 +1698,8 @@ impl AppState {
                     },
                 };
                 let tex = src.make_texture(&st.crop, scale as f64);
-                let out = crate::renderer::Renderer::new(false).render(&st.layers, &tex, 0, true, st.active_canvas());
+                let depth = crate::depth::for_render(&src, &st.crop, &st.layers, true);
+                let out = crate::renderer::Renderer::new(false).render(&st.layers, &tex, 0, true, st.active_canvas(), depth);
                 let stem = Path::new(&name).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
                 let base = format!("{stem}{suffix}{}", if scale > 1 { format!("@{scale}x") } else { String::new() });
                 let mut path = dir.join(format!("{base}.{}", format.ext()));
@@ -1684,7 +1729,8 @@ impl AppState {
         let repaint = self.ctx.clone();
         std::thread::spawn(move || {
             let tex = src.make_texture(&st.crop, 1.0);
-            let out = crate::renderer::Renderer::new(false).render(&st.layers, &tex, 0, true, st.active_canvas());
+            let depth = crate::depth::for_render(&src, &st.crop, &st.layers, true);
+            let out = crate::renderer::Renderer::new(false).render(&st.layers, &tex, 0, true, st.active_canvas(), depth);
             let px = imageio::read_rgba8(&out);
             let _ = tx.send(Some((px, out.width(), out.height())));
             repaint.request_repaint();
@@ -1889,6 +1935,12 @@ impl AppState {
                 self.hide_side_panels = self.hide_all_panels;
             }
             Action::SelectAll => self.select_all_layers(),
+            Action::ShowDepth => {
+                if has {
+                    self.show_depth = !self.show_depth;
+                    self.request_render();
+                }
+            }
             Action::Deselect => {
                 self.set_selected(None);
                 self.selected_ids.clear();

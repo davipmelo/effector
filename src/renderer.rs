@@ -26,15 +26,18 @@ impl Renderer {
     pub fn clear_cache(&mut self) { self.cache.clear(); }
 
     /// `source_key` must change whenever the source texture content changes.
-    pub fn render(&mut self, layers: &[LayerNode], source: &T, source_key: u64, is_export: bool, canvas: Option<&CanvasSpec>) -> T {
+    pub fn render(&mut self, layers: &[LayerNode], source: &T, source_key: u64, is_export: bool, canvas: Option<&CanvasSpec>, depth: Option<crate::depth::DepthSrc>) -> T {
         let scale = source.width().max(source.height()) as f64 / REFERENCE_SIZE;
         let mut ctx = Ctx::new(scale, source.clone(), is_export);
+        let depth_key = depth.as_ref().map(|d| Arc::as_ptr(&d.map) as usize).unwrap_or(0);
+        ctx.depth_src = depth;
         let mut new_cache = HashMap::new();
         let mut h = std::collections::hash_map::DefaultHasher::new();
         source_key.hash(&mut h);
         scale.to_bits().hash(&mut h);
         source.w.hash(&mut h);
         source.h.hash(&mut h);
+        depth_key.hash(&mut h);
         let (mut out, _) = self.render_stack(layers, source.clone(), h.finish(), &mut ctx, &mut new_cache);
         if let Some(c) = canvas {
             out = crate::canvas::apply(&out, c, &mut ctx);
@@ -81,7 +84,10 @@ impl Renderer {
             } else {
                 continue;
             }
-            if node.opacity < 0.999 || node.blend != BlendMode::Normal || !Arc::ptr_eq(&out, &current) {
+            let mask = layer_mask(node, ctx);
+            if let Some(m) = mask {
+                out = ctx.apply("k_blendm", &[&current, &out, &m], &[node.opacity as f32, node.blend.shader_index()]);
+            } else if node.opacity < 0.999 || node.blend != BlendMode::Normal || !Arc::ptr_eq(&out, &current) {
                 out = ctx.apply("k_blend", &[&current, &out], &[node.opacity as f32, node.blend.shader_index()]);
             }
             if self.use_cache {
@@ -92,4 +98,22 @@ impl Renderer {
         }
         (current, current_hash)
     }
+}
+
+/// Depth mask of a layer (its own range mask × the effect's "Depth" weighting), if any.
+fn layer_mask(node: &LayerNode, ctx: &mut Ctx) -> Option<T> {
+    let range = node.depth_mask.as_ref().filter(|m| m.enabled);
+    let bias = if node.is_group { "off".to_string() } else { node.params.choice_or("depthBias", "off") };
+    let dir = match bias.as_str() {
+        "near" => 1.0,
+        "far" => -1.0,
+        _ => 0.0,
+    };
+    if range.is_none() && dir == 0.0 {
+        return None;
+    }
+    let d = ctx.depth()?;
+    let r = range.map(|m| m.uniforms()).unwrap_or([0.0; 5]);
+    let amount = (node.params.num("depthBiasAmount", 80.0) / 100.0) as f32;
+    Some(ctx.apply("k_depthmask", &[&d], &[r[0], r[1], r[2], r[3], r[4], dir, amount]))
 }

@@ -103,6 +103,13 @@ fn parse_spec(spec: &str) -> Vec<LayerNode> {
             for kv in kvs.split(',') {
                 let mut p = kv.splitn(2, '=');
                 let (Some(k), Some(v)) = (p.next(), p.next()) else { continue };
+                // depth mask: dm=from-to[-feather][-inv]
+                if k == "dm" {
+                    let parts: Vec<&str> = v.split('/').collect();
+                    let n = |i: usize, d: f64| parts.get(i).and_then(|x| x.parse::<f64>().ok()).unwrap_or(d);
+                    node.depth_mask = Some(DepthMask { enabled: true, from: n(0, 0.0), to: n(1, 0.45), feather: n(2, 0.12), invert: parts.contains(&"inv") });
+                    continue;
+                }
                 let val = if let Ok(d) = v.parse::<f64>() {
                     ParamValue::Number(d)
                 } else if v == "true" || v == "false" {
@@ -116,6 +123,26 @@ fn parse_spec(spec: &str) -> Vec<LayerNode> {
         layers.insert(0, node);
     }
     layers
+}
+
+/// `--depth-view <image> <out.png>`: writes the depth map at render size (dev/test).
+pub fn depth_view(args: &[String]) {
+    let Some(i) = args.iter().position(|a| a == "--depth-view") else { return };
+    crate::gpu::init_headless().expect("gpu");
+    let src = SourceImage::load_path(Path::new(&args[i + 1])).expect("image");
+    let t0 = std::time::Instant::now();
+    let Some(map) = crate::depth::get_blocking(&src) else {
+        println!("depth unavailable: model at {:?}", crate::depth::model_candidates());
+        return;
+    };
+    println!("depth {}x{} in {:?}", map.w, map.h, t0.elapsed());
+    let tex = src.make_texture(&CropRect::default(), (1200.0 / src.width.max(src.height) as f64).min(1.0));
+    let mut ctx = crate::gpu::Ctx::new(1.0, tex.clone(), true);
+    ctx.depth_src = Some(crate::depth::DepthSrc { map, crop: CropRect::default() });
+    let d = ctx.depth().unwrap();
+    let v = ctx.apply("k_depthview", &[&d], &[]);
+    ctx.flush();
+    let _ = imageio::write(&v, Path::new(&args[i + 2]), imageio::Format::Png, 1.0, false);
 }
 
 pub fn run(args: &[String]) {
@@ -161,7 +188,8 @@ pub fn run(args: &[String]) {
             for pr in crate::presets::factory() {
                 if cat.as_ref().map(|c| pr.category.as_deref() == Some(c.as_str())).unwrap_or(true) {
                     let t0 = std::time::Instant::now();
-                    let out = r.render(&pr.layers, &tex, 0, false, None);
+                    let depth = crate::depth::for_render(&src, &CropRect::default(), &pr.layers, true);
+                    let out = r.render(&pr.layers, &tex, 0, false, None, depth);
                     println!("ok preset {} {}ms", pr.name, t0.elapsed().as_millis());
                     sheet.push((pr.name.clone(), imageio::read_rgba8(&out), out.width(), out.height()));
                 }
@@ -170,7 +198,8 @@ pub fn run(args: &[String]) {
         }
         let layers = parse_spec(spec);
         let t0 = std::time::Instant::now();
-        let out = r.render(&layers, &tex, 0, false, None);
+        let depth = crate::depth::for_render(&src, &CropRect::default(), &layers, true);
+        let out = r.render(&layers, &tex, 0, false, None, depth);
         let ms = t0.elapsed().as_millis();
         let rgba8 = imageio::read_rgba8(&out);
         if args.iter().any(|a| a == "--check-neutral") {
@@ -306,7 +335,8 @@ pub fn fuzz(args: &[String]) {
             }
             let layers = vec![node.clone()];
             let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                let out = r.render(&layers, &tex, it as u64, false, None);
+                let depth = crate::depth::for_render(&src, &CropRect::default(), &layers, true);
+                let out = r.render(&layers, &tex, it as u64, false, None, depth);
                 let _ = imageio::read_rgba8(&out);
             }));
             if res.is_err() {

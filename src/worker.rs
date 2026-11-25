@@ -21,6 +21,8 @@ pub struct RenderRequest {
     pub scale: f64,
     /// Also produce the cropped full-resolution-ish texture for the crop tool.
     pub want_crop_view: bool,
+    /// Show the depth map instead of the result.
+    pub show_depth: bool,
 }
 
 pub struct RenderResult {
@@ -85,9 +87,22 @@ impl RenderWorker {
                             crop_key(&req.crop).hash(&mut h);
                             h.finish()
                         };
-                        let out = renderer.render(&req.layers, &src_tex, skey, false, req.canvas.as_ref());
+                        let depth = crate::depth::for_render(&req.source, &req.crop, &req.layers, false);
+                        let out = renderer.render(&req.layers, &src_tex, skey, false, req.canvas.as_ref(), depth);
                         let mut ctx = Ctx::new(1.0, out.clone(), false);
-                        let display = to_display(&mut ctx, &out);
+                        let mut display = to_display(&mut ctx, &out);
+                        if req.show_depth {
+                            if let Some(map) = crate::depth::get(req.source.id) {
+                                let mut dc = Ctx::new(1.0, src_tex.clone(), false);
+                                dc.depth_src = Some(crate::depth::DepthSrc { map, crop: req.crop });
+                                if let Some(d) = dc.depth() {
+                                    let v = dc.apply("k_depthview", &[&d], &[]);
+                                    let v = if v.width() != out.width() || v.height() != out.height() { dc.resize(&v, out.width(), out.height(), true) } else { v };
+                                    display = to_display(&mut dc, &v);
+                                }
+                                dc.flush();
+                            }
+                        }
                         let display_original = to_display(&mut ctx, &src_tex);
                         let crop_view = if req.want_crop_view {
                             match &crop_cache {
@@ -173,7 +188,8 @@ pub fn render_small(source: &SourceImage, crop: &CropRect, layers: &[LayerNode],
     let (cw, ch) = source.cropped_size(crop);
     let s = size / cw.max(ch).max(1) as f64;
     let tex = source.make_texture(crop, s);
-    let out = Renderer::new(false).render(layers, &tex, 0, false, canvas);
+    let depth = crate::depth::for_render(source, crop, layers, false);
+    let out = Renderer::new(false).render(layers, &tex, 0, false, canvas, depth);
     let px = imageio::read_rgba8(&out);
     (px, out.width(), out.height())
 }
@@ -195,7 +211,7 @@ impl ThumbWorker {
                             let mut r = Renderer::new(false);
                             for eff in crate::effects::all().iter().filter(|e| !e.hidden) {
                                 let node = LayerNode::effect(eff.id, None, None);
-                                let out = r.render(&[node], &tex, 0, false, None);
+                                let out = r.render(&[node], &tex, 0, false, None, None);
                                 let px = imageio::read_rgba8(&out);
                                 let _ = res_tx.send(ThumbResult::Effect { generation, id: eff.id.into(), rgba: px, w: out.width(), h: out.height() });
                                 repaint.request_repaint();
@@ -207,7 +223,8 @@ impl ThumbWorker {
                             let tex = source.make_texture(&crop, s);
                             let mut r = Renderer::new(false);
                             for (id, layers) in presets {
-                                let out = r.render(&layers, &tex, 0, false, None);
+                                let depth = crate::depth::for_render(&source, &crop, &layers, false);
+                                let out = r.render(&layers, &tex, 0, false, None, depth);
                                 let px = imageio::read_rgba8(&out);
                                 let _ = res_tx.send(ThumbResult::Preset { generation, id, rgba: px, w: out.width(), h: out.height() });
                                 repaint.request_repaint();

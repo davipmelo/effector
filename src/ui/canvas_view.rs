@@ -128,6 +128,12 @@ pub fn canvas(ui: &mut Ui, app: &mut AppState, tex: &CanvasTextures) {
     if app.show_original {
         bx = badge(ui, pos2(bx, rect.top() + 12.0), &tr("ORIGINAL")) + 6.0;
     }
+    if app.show_depth {
+        let t = if app.depth_busy() { tr("DEPTH · calculating…") } else { tr("DEPTH MAP") };
+        bx = badge(ui, pos2(bx, rect.top() + 12.0), &t) + 6.0;
+    } else if app.depth_busy() {
+        bx = badge(ui, pos2(bx, rect.top() + 12.0), &tr("Calculating depth…")) + 6.0;
+    }
     if let Some(s) = app.solo_id {
         if let Some(n) = app.layers().iter().flat_map(|n| std::iter::once(n.clone()).chain(n.children.clone())).find(|n| n.id == s).or_else(|| {
             use crate::model::LayerTreeRead;

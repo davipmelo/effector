@@ -358,12 +358,43 @@ pub struct Ctx {
     pub source: T,
     pub is_export: bool,
     passes: usize,
+    /// Depth map for this render (None = not computed / not needed).
+    pub depth_src: Option<crate::depth::DepthSrc>,
+    depth_tex: Option<T>,
 }
 
 impl Ctx {
     pub fn new(scale: f64, source: T, is_export: bool) -> Ctx {
         let (width, height) = (source.width(), source.height());
-        Ctx { encoder: None, scale, width, height, source, is_export, passes: 0 }
+        Ctx { encoder: None, scale, width, height, source, is_export, passes: 0, depth_src: None, depth_tex: None }
+    }
+
+    /// Depth at render size (r = 0 far … 1 near), edge-aware upsampled; None when unavailable.
+    pub fn depth(&mut self) -> Option<T> {
+        if let Some(t) = &self.depth_tex {
+            return Some(t.clone());
+        }
+        let d = self.depth_src.clone()?;
+        let px: Vec<f32> = d.map.data.iter().flat_map(|v| [*v, *v, *v, 1.0]).collect();
+        let low = gpu().texture_from_rgba_f32(&px, d.map.w, d.map.h, 1);
+        let c = d.crop;
+        let src = self.source.clone();
+        let t = self.apply_sized(
+            "k_depthup",
+            &[&low, &src],
+            &[c.x as f32, c.y as f32, c.w as f32, c.h as f32, d.map.w as f32, d.map.h as f32],
+            None,
+            self.width,
+            self.height,
+        );
+        self.depth_tex = Some(t.clone());
+        Some(t)
+    }
+
+    /// Depth sized like `like` (for effects working on resized textures).
+    pub fn depth_like(&mut self, like: &T) -> Option<T> {
+        let d = self.depth()?;
+        Some(self.resize(&d, like.width(), like.height(), true))
     }
 
     pub fn gpu(&self) -> &'static Gpu { gpu() }

@@ -165,18 +165,18 @@ pub enum Action {
     Group, Ungroup, Duplicate, Delete, ToggleVisibility, MoveUp, MoveDown,
     PrevImage, NextImage, Filmstrip, SyncSettings, CloseImage,
     ZoomIn, ZoomOut, ZoomFit, Zoom100, Present, Compare, Randomize, CopyLayers, PasteLayers, ShowLayers, ShowPresets,
-    CopySettings, PasteSettings, ResetSettings, TogglePanels, ToggleAllPanels, SelectAll, Deselect,
+    CopySettings, PasteSettings, ResetSettings, TogglePanels, ToggleAllPanels, SelectAll, Deselect, ShowDepth,
 }
 
 impl Action {
-    pub const ALL: [Action; 42] = [
+    pub const ALL: [Action; 43] = [
         Action::Open, Action::Save, Action::SaveAs, Action::Export, Action::CopyResult, Action::Paste, Action::Undo, Action::Redo,
         Action::CommandPalette, Action::AddEffect, Action::BeforeAfter, Action::Crop, Action::Group, Action::Ungroup, Action::Duplicate,
         Action::Delete, Action::ToggleVisibility, Action::MoveUp, Action::MoveDown, Action::PrevImage, Action::NextImage,
         Action::Filmstrip, Action::SyncSettings, Action::CloseImage, Action::ZoomIn, Action::ZoomOut, Action::ZoomFit, Action::Zoom100,
         Action::Present, Action::Compare, Action::Randomize, Action::CopyLayers, Action::PasteLayers, Action::ShowLayers,
         Action::ShowPresets, Action::CopySettings, Action::PasteSettings, Action::ResetSettings, Action::TogglePanels,
-        Action::ToggleAllPanels, Action::SelectAll, Action::Deselect,
+        Action::ToggleAllPanels, Action::SelectAll, Action::Deselect, Action::ShowDepth,
     ];
 
     /// Stable id (same raw values as the macOS app).
@@ -192,7 +192,7 @@ impl Action {
             Compare => "compare", Randomize => "randomize", CopyLayers => "copyLayers", PasteLayers => "pasteLayers",
             ShowLayers => "showLayers", ShowPresets => "showPresets", CopySettings => "copySettings",
             PasteSettings => "pasteSettings", ResetSettings => "resetSettings", TogglePanels => "togglePanels",
-            ToggleAllPanels => "toggleAllPanels", SelectAll => "selectAll", Deselect => "deselect",
+            ToggleAllPanels => "toggleAllPanels", SelectAll => "selectAll", Deselect => "deselect", ShowDepth => "showDepth",
         }
     }
 
@@ -241,6 +241,7 @@ impl Action {
             ToggleAllPanels => "Show / Hide All Panels",
             SelectAll => "Select All",
             Deselect => "Deselect All",
+            ShowDepth => "View Depth Map",
         }
     }
 
@@ -291,6 +292,7 @@ impl Action {
             ToggleAllPanels => k("tab", false, true, false),
             SelectAll => k("a", true, false, false),
             Deselect => k("d", true, false, false),
+            ShowDepth => k("d", false, false, false),
         }
     }
 

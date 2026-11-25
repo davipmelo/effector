@@ -342,6 +342,7 @@ impl EffectorUi {
                 item(ui, app, Action::ShowLayers, true);
                 item(ui, app, Action::ShowPresets, has);
                 ui.separator();
+                item(ui, app, Action::ShowDepth, has);
                 item(ui, app, Action::TogglePanels, true);
                 item(ui, app, Action::ToggleAllPanels, true);
             });
@@ -729,6 +730,15 @@ impl EffectorUi {
                     }
                 }
                 "browser" => self.app.show_effect_browser = true,
+                "depth" => self.app.show_depth = !self.app.show_depth,
+                "dm" => {
+                    let v: Vec<f64> = arg.split('/').filter_map(|x| x.parse().ok()).collect();
+                    if let Some(id) = self.app.selected_id {
+                        self.app.update_layer(id, None, |n| {
+                            n.depth_mask = Some(crate::model::DepthMask { enabled: true, from: v.first().copied().unwrap_or(0.0), to: v.get(1).copied().unwrap_or(0.45), ..Default::default() })
+                        });
+                    }
+                }
                 "presets" => self.app.set_show_presets(true),
                 "palette" => self.app.show_command_palette = true,
                 "export" => self.app.show_export = true,

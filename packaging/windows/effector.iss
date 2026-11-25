@@ -36,8 +36,10 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "..\..\target\release\effector.exe"; DestDir: "{app}"; DestName: "EFFECTOR.exe"; Flags: ignoreversion
+Source: "..\..\assets\models\*.safetensors"; DestDir: "{app}\models"; Flags: ignoreversion
 Source: "..\..\assets\fonts\OFL-*.txt"; DestDir: "{app}\licenses"; Flags: ignoreversion
 Source: "..\..\assets\fonts\LICENSE-Phosphor.txt"; DestDir: "{app}\licenses"; Flags: ignoreversion
+Source: "..\..\assets\fonts\LICENSE-DepthAnythingV2.txt"; DestDir: "{app}\licenses"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\EFFECTOR"; Filename: "{app}\EFFECTOR.exe"

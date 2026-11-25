@@ -28,6 +28,9 @@ jobs:
         run: cargo run --release -- --lint
       - name: Build
         run: cargo build --release
+      - name: Depth model
+        shell: bash
+        run: packaging/fetch_model.sh
       - name: Installer (Inno Setup)
         shell: pwsh
         run: |

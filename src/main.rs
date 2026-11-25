@@ -4,6 +4,7 @@
 mod app;
 mod appicon;
 mod canvas;
+mod depth;
 mod effects;
 mod gpu;
 mod imageio;
@@ -41,6 +42,10 @@ fn main() {
     }
     if args.iter().any(|a| a == "--fuzz") {
         rendertest::fuzz(&args);
+        return;
+    }
+    if args.iter().any(|a| a == "--depth-view") {
+        rendertest::depth_view(&args);
         return;
     }
     if args.iter().any(|a| a == "--render-test") {

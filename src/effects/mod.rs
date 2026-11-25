@@ -96,6 +96,8 @@ pub struct Effect {
     pub produces_alpha: bool,
     /// Kept only so older projects / presets still render; not offered in the browser.
     pub hidden: bool,
+    /// Does this effect (with these params) read the depth map? (`ctx.depth()`)
+    pub uses_depth: fn(&Params) -> bool,
     pub apply: ApplyFn,
 }
 
@@ -112,6 +114,7 @@ impl Effect {
             section_colors: vec![],
             produces_alpha: false,
             hidden: false,
+            uses_depth: uses_depth_bias,
             apply,
         }
     }
@@ -121,6 +124,12 @@ impl Effect {
     pub fn looks(mut self, l: Vec<Look>) -> Self { self.looks = l; self }
     pub fn section_colors(mut self, c: Vec<(String, Rgba)>) -> Self { self.section_colors = c; self }
     pub fn hidden(mut self) -> Self { self.hidden = true; self }
+    pub fn depth(mut self, f: fn(&Params) -> bool) -> Self { self.uses_depth = f; self }
+    /// Adds the standard "Depth" section (stronger in the background or the foreground).
+    pub fn depth_bias(mut self) -> Self {
+        self.params.extend(depth_bias_params());
+        self
+    }
 
     pub fn id(&self) -> &'static str { self.id }
     pub fn name(&self) -> &'static str { self.name }
@@ -165,6 +174,16 @@ pub fn look_g(id: &str, name: &str, group: &str, values: Vec<(String, ParamValue
 pub fn hex(s: &str) -> Rgba { Rgba::hex(s) }
 
 pub fn s(key: &str, label: &str, min: f64, max: f64, def: f64) -> ParamDef { ParamDef::slider(key, label, min, max, def) }
+
+/// Standard per-effect depth weighting, applied by the renderer (see `renderer::depth_bias`).
+pub fn depth_bias_params() -> Vec<ParamDef> {
+    vec![
+        ParamDef::segmented("depthBias", "Where", &[("off", "Everywhere"), ("far", "Background"), ("near", "Foreground")], "off").sec("Depth"),
+        s("depthBiasAmount", "Amount", 0.0, 100.0, 80.0).unit("%").step(1.0).sec("Depth").vis(when_not("depthBias", "off")),
+    ]
+}
+
+pub fn uses_depth_bias(p: &Params) -> bool { matches!(p.choice("depthBias").as_str(), "far" | "near") }
 
 static REGISTRY: OnceLock<Vec<Effect>> = OnceLock::new();
 
