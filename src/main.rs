@@ -6,6 +6,7 @@ mod appicon;
 mod canvas;
 mod depth;
 mod effects;
+mod exif;
 mod gpu;
 mod imageio;
 mod l10n;

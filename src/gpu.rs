@@ -361,12 +361,14 @@ pub struct Ctx {
     /// Depth map for this render (None = not computed / not needed).
     pub depth_src: Option<crate::depth::DepthSrc>,
     depth_tex: Option<T>,
+    /// Capture date of the photo (EXIF), if known.
+    pub taken: Option<crate::exif::DateTaken>,
 }
 
 impl Ctx {
     pub fn new(scale: f64, source: T, is_export: bool) -> Ctx {
         let (width, height) = (source.width(), source.height());
-        Ctx { encoder: None, scale, width, height, source, is_export, passes: 0, depth_src: None, depth_tex: None }
+        Ctx { encoder: None, scale, width, height, source, is_export, passes: 0, depth_src: None, depth_tex: None, taken: None }
     }
 
     /// Depth at render size (r = 0 far … 1 near), edge-aware upsampled; None when unavailable.

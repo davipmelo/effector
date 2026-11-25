@@ -13,6 +13,7 @@ pub mod adjust;
 pub mod ascii;
 pub mod blob;
 pub mod blur;
+pub mod camcorder;
 pub mod color;
 pub mod copy;
 pub mod digital;
@@ -205,7 +206,7 @@ pub fn all() -> &'static [Effect] {
             // Distort
             distort::fisheye(), distort::edge_distort(), extra::reeded_glass(), distort::mirror(), distort::stretch(),
             // Glitch & retro
-            vhs::vhs(), lens::crt(), extra::led_display(), digital::digicam(), light::trail(),
+            camcorder::camcorder(), vhs::vhs(), lens::crt(), extra::led_display(), digital::digicam(), light::trail(),
             // Overlays & tracking
             texture::dust(), frame::frame(), blob::blob_tracker(),
         ]

@@ -1658,8 +1658,8 @@ impl AppState {
         let repaint = self.ctx.clone();
         std::thread::spawn(move || {
             let tex = src.make_texture(&st.crop, scale as f64);
-            let depth = crate::depth::for_render(&src, &st.crop, &st.layers, true);
-            let out = crate::renderer::Renderer::new(false).render(&st.layers, &tex, 0, true, st.active_canvas(), depth);
+            let extras = crate::renderer::Extras::for_render(&src, &st.crop, &st.layers, true);
+            let out = crate::renderer::Renderer::new(false).render(&st.layers, &tex, 0, true, st.active_canvas(), extras);
             let r = imageio::write(&out, &path, format, quality, keep_alpha)
                 .map(|_| trf("Exported %@", &[&path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default()]));
             let _ = tx.send(r);
@@ -1698,8 +1698,8 @@ impl AppState {
                     },
                 };
                 let tex = src.make_texture(&st.crop, scale as f64);
-                let depth = crate::depth::for_render(&src, &st.crop, &st.layers, true);
-                let out = crate::renderer::Renderer::new(false).render(&st.layers, &tex, 0, true, st.active_canvas(), depth);
+                let extras = crate::renderer::Extras::for_render(&src, &st.crop, &st.layers, true);
+                let out = crate::renderer::Renderer::new(false).render(&st.layers, &tex, 0, true, st.active_canvas(), extras);
                 let stem = Path::new(&name).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
                 let base = format!("{stem}{suffix}{}", if scale > 1 { format!("@{scale}x") } else { String::new() });
                 let mut path = dir.join(format!("{base}.{}", format.ext()));
@@ -1729,8 +1729,8 @@ impl AppState {
         let repaint = self.ctx.clone();
         std::thread::spawn(move || {
             let tex = src.make_texture(&st.crop, 1.0);
-            let depth = crate::depth::for_render(&src, &st.crop, &st.layers, true);
-            let out = crate::renderer::Renderer::new(false).render(&st.layers, &tex, 0, true, st.active_canvas(), depth);
+            let extras = crate::renderer::Extras::for_render(&src, &st.crop, &st.layers, true);
+            let out = crate::renderer::Renderer::new(false).render(&st.layers, &tex, 0, true, st.active_canvas(), extras);
             let px = imageio::read_rgba8(&out);
             let _ = tx.send(Some((px, out.width(), out.height())));
             repaint.request_repaint();

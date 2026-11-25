@@ -103,6 +103,15 @@ fn parse_spec(spec: &str) -> Vec<LayerNode> {
             for kv in kvs.split(',') {
                 let mut p = kv.splitn(2, '=');
                 let (Some(k), Some(v)) = (p.next(), p.next()) else { continue };
+                // look=<id>: start from one of the effect's Looks
+                if k == "look" {
+                    if let Some(l) = effects::effect(id).and_then(|e| e.looks.iter().find(|l| l.id == v)) {
+                        for (lk, lv) in &l.values {
+                            node.params.set(lk, lv.clone());
+                        }
+                    }
+                    continue;
+                }
                 // depth mask: dm=from-to[-feather][-inv]
                 if k == "dm" {
                     let parts: Vec<&str> = v.split('/').collect();
@@ -188,8 +197,8 @@ pub fn run(args: &[String]) {
             for pr in crate::presets::factory() {
                 if cat.as_ref().map(|c| pr.category.as_deref() == Some(c.as_str())).unwrap_or(true) {
                     let t0 = std::time::Instant::now();
-                    let depth = crate::depth::for_render(&src, &CropRect::default(), &pr.layers, true);
-                    let out = r.render(&pr.layers, &tex, 0, false, None, depth);
+                    let extras = crate::renderer::Extras::for_render(&src, &CropRect::default(), &pr.layers, true);
+                    let out = r.render(&pr.layers, &tex, 0, false, None, extras);
                     println!("ok preset {} {}ms", pr.name, t0.elapsed().as_millis());
                     sheet.push((pr.name.clone(), imageio::read_rgba8(&out), out.width(), out.height()));
                 }
@@ -198,8 +207,8 @@ pub fn run(args: &[String]) {
         }
         let layers = parse_spec(spec);
         let t0 = std::time::Instant::now();
-        let depth = crate::depth::for_render(&src, &CropRect::default(), &layers, true);
-        let out = r.render(&layers, &tex, 0, false, None, depth);
+        let extras = crate::renderer::Extras::for_render(&src, &CropRect::default(), &layers, true);
+        let out = r.render(&layers, &tex, 0, false, None, extras);
         let ms = t0.elapsed().as_millis();
         let rgba8 = imageio::read_rgba8(&out);
         if args.iter().any(|a| a == "--check-neutral") {
@@ -335,8 +344,8 @@ pub fn fuzz(args: &[String]) {
             }
             let layers = vec![node.clone()];
             let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                let depth = crate::depth::for_render(&src, &CropRect::default(), &layers, true);
-                let out = r.render(&layers, &tex, it as u64, false, None, depth);
+                let extras = crate::renderer::Extras::for_render(&src, &CropRect::default(), &layers, true);
+                let out = r.render(&layers, &tex, it as u64, false, None, extras);
                 let _ = imageio::read_rgba8(&out);
             }));
             if res.is_err() {

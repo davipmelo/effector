@@ -77,6 +77,8 @@ pub fn vhs() -> Effect {
     })
     .symbol("videoprojector")
     .summary("Analog tape: soft luma, bleeding chroma, tracking errors, noise and OSD. Try the Looks.")
+    // replaced by Camcorder in 0.8.0; kept so older projects render
+    .hidden()
     .params(vec![
         ParamDef::section_switch("soft", "Signal", true),
         s("softAmt", "Softness", 0.0, 10.0, 3.0).step(0.1).sec("Signal"),

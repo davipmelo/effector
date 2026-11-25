@@ -14,6 +14,21 @@ use crate::model::*;
 /// so a stack looks identical at any resolution (preview, export 1x/2x, thumbnails).
 pub const REFERENCE_SIZE: f64 = 1000.0;
 
+/// Per-image data effects may use besides the pixels.
+#[derive(Clone, Default)]
+pub struct Extras {
+    pub depth: Option<crate::depth::DepthSrc>,
+    /// Capture date (EXIF) for date stamps.
+    pub taken: Option<crate::exif::DateTaken>,
+}
+
+impl Extras {
+    /// Everything `layers` needs for `src`. `blocking` waits for the depth map (exports).
+    pub fn for_render(src: &crate::imageio::SourceImage, crop: &CropRect, layers: &[LayerNode], blocking: bool) -> Extras {
+        Extras { depth: crate::depth::for_render(src, crop, layers, blocking), taken: crate::exif::date_taken_cached(src.id, &src.data) }
+    }
+}
+
 #[derive(Default)]
 pub struct Renderer {
     cache: HashMap<u64, T>,
@@ -26,11 +41,12 @@ impl Renderer {
     pub fn clear_cache(&mut self) { self.cache.clear(); }
 
     /// `source_key` must change whenever the source texture content changes.
-    pub fn render(&mut self, layers: &[LayerNode], source: &T, source_key: u64, is_export: bool, canvas: Option<&CanvasSpec>, depth: Option<crate::depth::DepthSrc>) -> T {
+    pub fn render(&mut self, layers: &[LayerNode], source: &T, source_key: u64, is_export: bool, canvas: Option<&CanvasSpec>, extras: Extras) -> T {
         let scale = source.width().max(source.height()) as f64 / REFERENCE_SIZE;
         let mut ctx = Ctx::new(scale, source.clone(), is_export);
-        let depth_key = depth.as_ref().map(|d| Arc::as_ptr(&d.map) as usize).unwrap_or(0);
-        ctx.depth_src = depth;
+        let depth_key = extras.depth.as_ref().map(|d| Arc::as_ptr(&d.map) as usize).unwrap_or(0);
+        ctx.depth_src = extras.depth;
+        ctx.taken = extras.taken;
         let mut new_cache = HashMap::new();
         let mut h = std::collections::hash_map::DefaultHasher::new();
         source_key.hash(&mut h);
@@ -38,6 +54,7 @@ impl Renderer {
         source.w.hash(&mut h);
         source.h.hash(&mut h);
         depth_key.hash(&mut h);
+        extras.taken.hash(&mut h);
         let (mut out, _) = self.render_stack(layers, source.clone(), h.finish(), &mut ctx, &mut new_cache);
         if let Some(c) = canvas {
             out = crate::canvas::apply(&out, c, &mut ctx);

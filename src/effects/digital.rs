@@ -90,6 +90,8 @@ pub fn digicam() -> Effect {
     })
     .symbol("camera.compact")
     .summary("Early-2000s compact digital camera: CCD colour, clipped highlights, noise, JPEG and date stamp.")
+    // replaced by Camcorder in 0.8.0; kept so older projects render
+    .hidden()
     .params(vec![
         s("resolution", "Sensor Resolution", 10.0, 100.0, 45.0).step(1.0).unit("%").sec("Camera"),
         s("exposure", "Exposure", -2.0, 2.0, 0.2).step(0.05).unit(" EV").sec("Camera"),
