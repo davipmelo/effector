@@ -84,6 +84,8 @@ pub struct Settings {
     pub presets_list: bool,
     /// Favourite items in pickers (keys "picker:id").
     pub favorites: Vec<String>,
+    /// Background around the image in the central canvas ("" = theme default, else a swatch id).
+    pub canvas_backdrop: String,
     /// Custom shortcuts: action id → shortcut string.
     pub shortcuts: std::collections::BTreeMap<String, String>,
 }
@@ -107,6 +109,7 @@ impl Default for Settings {
             browser_list: false,
             presets_list: false,
             favorites: vec![],
+            canvas_backdrop: String::new(),
             shortcuts: Default::default(),
         }
     }

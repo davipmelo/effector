@@ -864,6 +864,12 @@ pub fn browser_footer(ui: &mut Ui, s: &str) {
 }
 
 /// Mac symbols in hints become words on Windows.
+/// "Label (shortcut)" using the action's current (possibly customised) shortcut.
+pub fn action_hint(label: &str, a: crate::shortcuts::Action) -> String {
+    let k = crate::shortcuts::display(a);
+    if k.is_empty() { crate::l10n::tr(label) } else { format!("{} ({k})", crate::l10n::tr(label)) }
+}
+
 pub fn keys_hint(s: &str) -> String {
     if crate::shortcuts::IS_MAC {
         s.to_string()

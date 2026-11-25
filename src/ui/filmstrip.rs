@@ -18,11 +18,11 @@ pub fn filmstrip(ui: &mut Ui, app: &mut AppState) {
         ui.add_space(6.0);
         ui.vertical(|ui| {
             ui.add_space(14.0);
-            if icon_button(ui, "plus", &keys_hint("Add images… (⌘O)"), false, 13.0).clicked() {
+            if icon_button(ui, "plus", &action_hint("Add images…", crate::shortcuts::Action::Open), false, 13.0).clicked() {
                 app.open_panel();
             }
             let others: HashSet<Uuid> = app.strip_selection.iter().copied().filter(|i| Some(*i) != app.active_id).collect();
-            let sync = ui.add_enabled_ui(!others.is_empty(), |ui| icon_button(ui, "arrow.triangle.2.circlepath", &keys_hint("Sync settings from the active image to the selected ones (⌥⌘S)"), false, 13.0)).inner;
+            let sync = ui.add_enabled_ui(!others.is_empty(), |ui| icon_button(ui, "arrow.triangle.2.circlepath", &action_hint("Sync settings from the active image to the selected ones", crate::shortcuts::Action::SyncSettings), false, 13.0)).inner;
             if sync.clicked() {
                 app.show_sync = true;
             }
@@ -33,6 +33,8 @@ pub fn filmstrip(ui: &mut Ui, app: &mut AppState) {
         ui.add_space(6.0);
         let (sep, _) = ui.allocate_exact_size(vec2(1.0, rect.height()), Sense::hover());
         ui.painter().rect_filled(sep, CornerRadius::ZERO, separator());
+        // a plain (vertical) mouse wheel scrolls the strip sideways, no Shift needed
+        ui.style_mut().always_scroll_the_only_direction = true;
         egui::ScrollArea::horizontal().id_salt("filmstrip").auto_shrink([false, false]).show(ui, |ui| {
             ui.horizontal_centered(|ui| {
                 ui.add_space(8.0);

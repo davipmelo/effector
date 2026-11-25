@@ -34,15 +34,19 @@ pub fn layers_panel(ui: &mut Ui, app: &mut AppState) {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 6.0;
                 let bw = (w - 6.0) / 2.0;
+                let eon = app.show_effect_browser;
                 let (r1, add) = ui.allocate_exact_size(vec2(bw, 28.0), Sense::click());
-                ui.painter().rect_filled(r1, CornerRadius::same(7), ACCENT);
+                ui.painter().rect_filled(r1, CornerRadius::same(7), if eon { with_alpha(ACCENT, 0.75) } else { ACCENT });
+                if eon {
+                    ui.painter().rect_stroke(r1, CornerRadius::same(7), egui::Stroke::new(1.5, text()), egui::StrokeKind::Inside);
+                }
                 let g = ui.painter().layout_job(rich_job(&format!("{}  {}", icon_text("plus"), tr("Add Effect")), semibold(12.0), egui::Color32::BLACK, None));
                 ui.painter().galley(r1.center() - g.size() / 2.0, g, egui::Color32::BLACK);
                 if add.clicked() {
                     app.perform(Action::AddEffect, &ui.ctx().clone());
                 }
                 add.on_hover_text(format!("{}  {}", tr("Add Effect…"), display(Action::AddEffect)));
-                let on = app.show_preset_browser;
+                let on = app.show_preset_browser && !app.show_effect_browser;
                 let (r2, pr) = ui.allocate_exact_size(vec2(bw, 28.0), Sense::click());
                 ui.painter().rect_filled(r2, CornerRadius::same(7), if on { ACCENT } else { field_strong() });
                 let g = ui.painter().layout_job(rich_job(&format!("{}  {}", icon_text("wand.and.stars"), tr("Presets")), semibold(12.0), if on { egui::Color32::BLACK } else { text() }, None));
@@ -61,10 +65,10 @@ pub fn layers_panel(ui: &mut Ui, app: &mut AppState) {
                     if ui.add_enabled_ui(!empty, |ui| icon_button(ui, "square.and.arrow.down.on.square", "Save all layers as a preset", false, 13.0)).inner.clicked() {
                         app.save_stack_as_preset();
                     }
-                    if icon_button(ui, "plus.square.on.square", &keys_hint("Duplicate (⌘D)"), false, 13.0).clicked() {
+                    if icon_button(ui, "plus.square.on.square", &action_hint("Duplicate", crate::shortcuts::Action::Duplicate), false, 13.0).clicked() {
                         app.duplicate_selected();
                     }
-                    if icon_button(ui, "folder.badge.plus", &keys_hint("Group selected layers (⌘G)"), false, 13.0).clicked() {
+                    if icon_button(ui, "folder.badge.plus", &action_hint("Group selected layers", crate::shortcuts::Action::Group), false, 13.0).clicked() {
                         app.group_selected();
                     }
                 });
@@ -197,16 +201,16 @@ fn selection_bar(ui: &mut Ui, app: &mut AppState) {
                 if icon_button(ui, "xmark", "Clear selection", false, 12.0).clicked() {
                     app.set_selected(None);
                 }
-                if icon_button(ui, "trash", &keys_hint("Delete (⌘⌫)"), false, 12.0).clicked() {
+                if icon_button(ui, "trash", &action_hint("Delete", crate::shortcuts::Action::Delete), false, 12.0).clicked() {
                     app.delete_selected();
                 }
                 if icon_button(ui, "eye.slash", "Show / Hide (H)", false, 12.0).clicked() {
                     app.toggle_selected_visibility();
                 }
-                if icon_button(ui, "plus.square.on.square", &keys_hint("Duplicate (⌘D)"), false, 12.0).clicked() {
+                if icon_button(ui, "plus.square.on.square", &action_hint("Duplicate", crate::shortcuts::Action::Duplicate), false, 12.0).clicked() {
                     app.duplicate_selected();
                 }
-                if icon_button(ui, "folder.badge.plus", &keys_hint("Group selected layers (⌘G)"), false, 12.0).clicked() {
+                if icon_button(ui, "folder.badge.plus", &action_hint("Group selected layers", crate::shortcuts::Action::Group), false, 12.0).clicked() {
                     app.group_selected();
                 }
             });

@@ -1,0 +1,23 @@
+// Portuguese strings added in v0.8.0 (key = English text). Later entries override `PT`.
+pub const PT_080: &[(&str, &str)] = &[
+    ("Background", "Fundo"),
+    ("White", "Branco"),
+    ("Light Gray", "Cinza Claro"),
+    ("Medium Gray", "Cinza Médio"),
+    ("Dark Gray", "Cinza Escuro"),
+    ("Charcoal", "Grafite"),
+    ("Black", "Preto"),
+    ("Add images…", "Adicionar imagens…"),
+    ("Sync settings from the active image to the selected ones", "Sincronizar ajustes da imagem ativa nas selecionadas"),
+    ("Duplicate", "Duplicar"),
+    ("Group selected layers", "Agrupar layers selecionados"),
+    ("Delete", "Excluir"),
+    ("Copy Settings", "Copiar Ajustes"),
+    ("Paste Settings", "Colar Ajustes"),
+    ("Reset Settings", "Redefinir Ajustes"),
+    ("Show / Hide Side Panels", "Mostrar / Ocultar Painéis Laterais"),
+    ("Show / Hide All Panels", "Mostrar / Ocultar Todos os Painéis"),
+    ("Select All", "Selecionar Tudo"),
+    ("Deselect All", "Desmarcar Tudo"),
+    ("Close effects", "Fechar efeitos"),
+];

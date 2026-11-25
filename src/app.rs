@@ -160,6 +160,9 @@ pub struct AppState {
     pub compare_split: bool,
     pub split_pos: f64,
     pub presenting: bool,
+    /// Tab hides the side panels, Shift+Tab every panel (Lightroom).
+    pub hide_side_panels: bool,
+    pub hide_all_panels: bool,
     pub fit_zoom: f64,
     pub viewport: egui::Vec2,
     pub pixels_per_point: f64,
@@ -235,6 +238,8 @@ impl AppState {
             compare_split: false,
             split_pos: 0.5,
             presenting: false,
+            hide_side_panels: false,
+            hide_all_panels: false,
             fit_zoom: 1.0,
             viewport: egui::Vec2::ZERO,
             pixels_per_point: 1.0,
@@ -1813,7 +1818,14 @@ impl AppState {
             Action::MoveDown => self.nudge_selected(1),
             Action::ZoomIn => self.zoom_in(),
             Action::ZoomOut => self.zoom_out(),
-            Action::ZoomFit => self.set_zoom(None),
+            // Z toggles between fit and 100% (Lightroom)
+            Action::ZoomFit => {
+                if self.zoom().is_none() {
+                    self.zoom_actual()
+                } else {
+                    self.set_zoom(None)
+                }
+            }
             Action::Zoom100 => self.zoom_actual(),
             Action::Present => self.toggle_presentation(ctx),
             Action::PrevImage => self.activate_next(-1),
@@ -1848,6 +1860,39 @@ impl AppState {
                 if has {
                     self.set_show_presets(!self.show_preset_browser);
                 }
+            }
+            Action::CopySettings => {
+                if has {
+                    self.copy_settings();
+                }
+            }
+            Action::PasteSettings => {
+                let mut ids = self.strip_selection.clone();
+                ids.extend(self.active_id);
+                self.paste_settings(&ids);
+            }
+            Action::ResetSettings => {
+                let mut ids = self.strip_selection.clone();
+                ids.extend(self.active_id);
+                self.reset_settings(&ids);
+            }
+            Action::TogglePanels => {
+                if self.hide_all_panels {
+                    self.hide_all_panels = false;
+                    self.hide_side_panels = false;
+                } else {
+                    self.hide_side_panels = !self.hide_side_panels;
+                }
+            }
+            Action::ToggleAllPanels => {
+                self.hide_all_panels = !self.hide_all_panels;
+                self.hide_side_panels = self.hide_all_panels;
+            }
+            Action::SelectAll => self.select_all_layers(),
+            Action::Deselect => {
+                self.set_selected(None);
+                self.selected_ids.clear();
+                self.strip_selection = self.active_id.into_iter().collect();
             }
         }
     }

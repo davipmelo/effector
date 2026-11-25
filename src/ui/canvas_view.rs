@@ -48,7 +48,7 @@ fn paint_image(ui: &Ui, tex: egui::TextureId, rect: Rect, clip: Rect, checker: e
 pub fn canvas(ui: &mut Ui, app: &mut AppState, tex: &CanvasTextures) {
     let rect = ui.available_rect_before_wrap();
     let resp = ui.allocate_rect(rect, Sense::click_and_drag());
-    let bg = if app.presenting { Color32::BLACK } else { canvas_bg() };
+    let bg = if app.presenting { Color32::BLACK } else { backdrop_color() };
     ui.painter().rect_filled(rect, CornerRadius::ZERO, bg);
     // viewport bookkeeping (in points)
     let vs = rect.size();
@@ -94,6 +94,10 @@ pub fn canvas(ui: &mut Ui, app: &mut AppState, tex: &CanvasTextures) {
                 paint_image(ui, o, orect, left_clip, tex.checker, checker_px);
             }
             split_divider(ui, app, rect);
+        }
+        // right-click outside the image: background colour of the canvas (Lightroom-style)
+        if !app.presenting {
+            backdrop_menu(ui, &resp, img_rect);
         }
         // interaction: pan / zoom
         if resp.double_clicked() {
@@ -398,4 +402,61 @@ fn crop_overlay(ui: &mut Ui, app: &mut AppState, view: Rect, ir: Rect) {
     } else if esc {
         app.cancel_crop();
     }
+}
+
+/// Backdrop swatches offered on right-click around the image (white → greys → black).
+pub const BACKDROPS: [(&str, &str, f32); 6] = [
+    ("white", "White", 1.0),
+    ("light", "Light Gray", 0.72),
+    ("mid", "Medium Gray", 0.45),
+    ("dark", "Dark Gray", 0.22),
+    ("charcoal", "Charcoal", 0.1),
+    ("black", "Black", 0.0),
+];
+
+fn backdrop_color() -> Color32 {
+    let id = crate::settings::get().canvas_backdrop;
+    match BACKDROPS.iter().find(|b| b.0 == id) {
+        Some((_, _, v)) => {
+            let c = (v * 255.0).round() as u8;
+            Color32::from_rgb(c, c, c)
+        }
+        None => canvas_bg(),
+    }
+}
+
+fn backdrop_menu(ui: &mut Ui, resp: &egui::Response, img_rect: Rect) {
+    let id = Id::new("canvas-backdrop-menu");
+    if resp.secondary_clicked() {
+        if let Some(p) = resp.interact_pointer_pos() {
+            if !img_rect.contains(p) {
+                ui.data_mut(|d| d.insert_temp(id, p));
+                egui::Popup::open_id(ui.ctx(), id);
+            }
+        }
+    }
+    let Some(at) = ui.data(|d| d.get_temp::<egui::Pos2>(id)) else { return };
+    let current = crate::settings::get().canvas_backdrop;
+    egui::Popup::new(id, ui.ctx().clone(), egui::PopupAnchor::Position(at), ui.layer_id())
+        .open_memory(None)
+        .close_behavior(egui::PopupCloseBehavior::CloseOnClick)
+        .show(|ui| {
+            ui.set_min_width(170.0);
+            ui.label(egui::RichText::new(tr("Background")).font(semibold(11.0)).color(text_dim()));
+            ui.add_space(2.0);
+            for (key, label, v) in BACKDROPS {
+                let c = (v * 255.0).round() as u8;
+                let on = current == key;
+                let r = ui.horizontal(|ui| {
+                    let (sw, _) = ui.allocate_exact_size(vec2(14.0, 14.0), Sense::hover());
+                    ui.painter().rect_filled(sw, CornerRadius::same(3), Color32::from_rgb(c, c, c));
+                    ui.painter().rect_stroke(sw, CornerRadius::same(3), Stroke::new(1.0, separator()), StrokeKind::Inside);
+                    ui.add(egui::Button::selectable(on, tr(label)).frame_when_inactive(false))
+                });
+                if r.inner.clicked() {
+                    crate::settings::update(|s| s.canvas_backdrop = key.to_string());
+                    ui.close();
+                }
+            }
+        });
 }

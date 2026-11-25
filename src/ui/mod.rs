@@ -14,7 +14,7 @@ pub mod widgets;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use egui::{pos2, vec2, Align2, Color32, CornerRadius, Id, Rect, Sense, Ui};
+use egui::{pos2, vec2, Align2, CornerRadius, Id, Rect, Sense, Ui};
 
 use crate::app::AppState;
 use crate::gpu::T;
@@ -69,6 +69,9 @@ pub struct EffectorUi {
     allow_close: bool,
     canvas_btn_rect: Rect,
     presets_rect: Rect,
+    filmstrip_rect: Rect,
+    /// Where the last click happened: Delete acts on that area (images in the filmstrip, else layers).
+    strip_focused: bool,
     /// Dev/test: save a screenshot of the window here, then quit (`--ui-screenshot <png> [script]`).
     shot: Option<(PathBuf, String)>,
     shot_start: Option<std::time::Instant>,
@@ -108,6 +111,8 @@ impl EffectorUi {
             allow_close: false,
             canvas_btn_rect: Rect::NOTHING,
             presets_rect: Rect::NOTHING,
+            filmstrip_rect: Rect::NOTHING,
+            strip_focused: false,
             shot: std::env::var("EFFECTOR_SHOT").ok().map(|p| (PathBuf::from(p), std::env::var("EFFECTOR_SHOT_SCRIPT").unwrap_or_default())),
             shot_start: None,
             shot_step: 0,
@@ -143,7 +148,11 @@ impl EffectorUi {
         let picker_open = widgets_picker_open(ctx);
         let presets_hover = ctx.pointer_hover_pos().map(|p| self.presets_rect.contains(p)).unwrap_or(false);
         for (key, m) in events {
-            let Some(combo) = KeyCombo::from_event(key, m) else { continue };
+            let Some(mut combo) = KeyCombo::from_event(key, m) else { continue };
+            // forward-delete (Del on Windows keyboards) works like Backspace
+            if combo.key == "fdelete" {
+                combo.key = "delete".into();
+            }
             if combo.key == "escape" && !combo.has_modifier() && self.app.presenting && !editing {
                 self.app.toggle_presentation(ctx);
                 continue;
@@ -163,6 +172,19 @@ impl EffectorUi {
                 if presets_hover && self.app.show_preset_browser && matches!(combo.key.as_str(), "left" | "right" | "up" | "down") {
                     continue;
                 }
+            }
+            if action == Action::SelectAll && self.strip_focused && !self.app.docs.is_empty() {
+                self.app.strip_selection = self.app.docs.iter().map(|d| d.id).collect();
+                continue;
+            }
+            if action == Action::Delete && self.strip_focused && settings::get().show_filmstrip && !self.app.docs.is_empty() {
+                // Delete in the filmstrip closes the selected images (asks first when they have edits)
+                let mut ids = self.app.strip_selection.clone();
+                if ids.is_empty() {
+                    ids.extend(self.app.active_id);
+                }
+                self.app.request_close(ids);
+                continue;
             }
             if action == Action::CommandPalette || action == Action::Export || !self.app.show_command_palette {
                 self.app.perform(action, ctx);
@@ -276,6 +298,7 @@ impl EffectorUi {
                     app.select_all_layers();
                     ui.close();
                 }
+                item(ui, app, Action::Deselect, has);
             });
             ui.menu_button(tr("Image"), |ui| {
                 item(ui, app, Action::Crop, has);
@@ -284,15 +307,10 @@ impl EffectorUi {
                 ui.separator();
                 let many = app.strip_selection.len() >= 2;
                 item(ui, app, Action::SyncSettings, many);
-                if ui.add_enabled(has, egui::Button::new(tr("Copy Settings"))).clicked() {
-                    app.copy_settings();
-                    ui.close();
-                }
-                if ui.add_enabled(app.has_copied_settings(), egui::Button::new(tr("Paste Settings to Selected Images"))).clicked() {
-                    let s = app.strip_selection.clone();
-                    app.paste_settings(&s);
-                    ui.close();
-                }
+                item(ui, app, Action::CopySettings, has);
+                let can_paste = app.has_copied_settings();
+                item(ui, app, Action::PasteSettings, can_paste);
+                item(ui, app, Action::ResetSettings, has);
             });
             ui.menu_button(tr("Layer"), |ui| {
                 item(ui, app, Action::CommandPalette, has);
@@ -323,6 +341,9 @@ impl EffectorUi {
                 ui.separator();
                 item(ui, app, Action::ShowLayers, true);
                 item(ui, app, Action::ShowPresets, has);
+                ui.separator();
+                item(ui, app, Action::TogglePanels, true);
+                item(ui, app, Action::ToggleAllPanels, true);
             });
             ui.separator();
             if ui.button(tr("Settings…")).clicked() {
@@ -593,63 +614,50 @@ impl eframe::App for EffectorUi {
         }
 
         let presenting = self.app.presenting;
+        let (hide_all, hide_side) = (self.app.hide_all_panels, self.app.hide_side_panels || self.app.hide_all_panels);
         if !presenting {
-            egui::Panel::top("toolbar").exact_size(46.0).frame(egui::Frame::new().fill(panel_bg())).show_separator_line(true).show(ui, |ui| self.toolbar(ui));
+            if !hide_all {
+                egui::Panel::top("toolbar").exact_size(46.0).frame(egui::Frame::new().fill(panel_bg())).show_separator_line(true).show(ui, |ui| self.toolbar(ui));
+            }
             let s = settings::get();
             let total = ui.available_width();
             let max_left = 200f32.max(480f32.min(total - s.right_width as f32 - 420.0));
             let max_right = 240f32.max(520f32.min(total - s.left_width as f32 - 420.0));
-            let left = egui::Panel::left("left")
-                .resizable(true)
-                .default_size(s.left_width as f32)
-                .size_range(200.0..=max_left)
-                .frame(egui::Frame::new().fill(panel_bg()))
-                .show(ui, |ui| self.sidebar(ui));
-            let right = egui::Panel::right("right")
-                .resizable(true)
-                .default_size(s.right_width as f32)
-                .size_range(240.0..=max_right)
-                .frame(egui::Frame::new().fill(panel_bg()))
-                .show(ui, |ui| inspector::inspector(ui, &mut self.app));
-            let (lw, rw) = (left.response.rect.width() as f64, right.response.rect.width() as f64);
-            if (lw - s.left_width).abs() > 1.0 || (rw - s.right_width).abs() > 1.0 {
-                settings::update(|s| {
-                    s.left_width = lw;
-                    s.right_width = rw;
-                });
+            if !hide_side {
+                let left = egui::Panel::left("left")
+                    .resizable(true)
+                    .default_size(s.left_width as f32)
+                    .size_range(200.0..=max_left)
+                    .frame(egui::Frame::new().fill(panel_bg()))
+                    .show(ui, |ui| self.sidebar(ui));
+                let right = egui::Panel::right("right")
+                    .resizable(true)
+                    .default_size(s.right_width as f32)
+                    .size_range(240.0..=max_right)
+                    .frame(egui::Frame::new().fill(panel_bg()))
+                    .show(ui, |ui| inspector::inspector(ui, &mut self.app));
+                let (lw, rw) = (left.response.rect.width() as f64, right.response.rect.width() as f64);
+                if (lw - s.left_width).abs() > 1.0 || (rw - s.right_width).abs() > 1.0 {
+                    settings::update(|s| {
+                        s.left_width = lw;
+                        s.right_width = rw;
+                    });
+                }
             }
-            egui::Panel::bottom("infobar").exact_size(28.0).frame(egui::Frame::new().fill(panel_bg())).show_separator_line(true).show(ui, |ui| self.info_bar(ui));
-            if settings::get().show_filmstrip && !self.app.docs.is_empty() {
-                egui::Panel::bottom("filmstrip").exact_size(84.0).frame(egui::Frame::new().fill(panel_bg())).show_separator_line(false).show(ui, |ui| filmstrip::filmstrip(ui, &mut self.app));
+            self.filmstrip_rect = Rect::NOTHING;
+            if !hide_all {
+                egui::Panel::bottom("infobar").exact_size(28.0).frame(egui::Frame::new().fill(panel_bg())).show_separator_line(true).show(ui, |ui| self.info_bar(ui));
+                if settings::get().show_filmstrip && !self.app.docs.is_empty() {
+                    let fr = egui::Panel::bottom("filmstrip").exact_size(84.0).frame(egui::Frame::new().fill(panel_bg())).show_separator_line(false).show(ui, |ui| filmstrip::filmstrip(ui, &mut self.app));
+                    self.filmstrip_rect = fr.response.rect;
+                }
+            }
+            if let Some(p) = ctx.input(|i| if i.pointer.any_pressed() { i.pointer.interact_pos() } else { None }) {
+                self.strip_focused = self.filmstrip_rect.contains(p);
             }
         }
         egui::CentralPanel::no_frame().show(ui, |ui| {
-            let rect = ui.available_rect_before_wrap();
             canvas_view::canvas(ui, &mut self.app, &texs);
-            // effect browser floats over the left side of the canvas
-            if self.app.show_effect_browser && !presenting {
-                let left = rect.left();
-                let backdrop = Rect::from_min_max(pos2(left, rect.top()), rect.max);
-                let resp = ui.interact(backdrop, Id::new("browser-backdrop"), Sense::click());
-                ui.painter().rect_filled(backdrop, CornerRadius::ZERO, Color32::from_black_alpha(46));
-                if resp.clicked() {
-                    self.app.show_effect_browser = false;
-                    self.app.set_preview_layers(None);
-                }
-                let panel = Rect::from_min_size(pos2(left + 8.0, rect.top() + 8.0), vec2(440.0f32.min(rect.width() - 16.0), rect.height() - 16.0));
-                egui::Area::new(Id::new("effect-browser-area")).order(egui::Order::Middle).fixed_pos(panel.min).show(&ctx, |ui| {
-                    egui::Frame::new()
-                        .fill(panel_bg())
-                        .stroke(egui::Stroke::new(1.0, separator()))
-                        .corner_radius(CornerRadius::same(14))
-                        .shadow(egui::Shadow { offset: [0, 10], blur: 28, spread: 0, color: Color32::from_black_alpha(115) })
-                        .show(ui, |ui| {
-                            ui.set_width(panel.width());
-                            ui.set_height(panel.height());
-                            browsers::effect_browser(ui, &mut self.app);
-                        });
-                });
-            }
         });
         if self.app.show_command_palette {
             browsers::command_palette(&ctx, &mut self.app);
@@ -775,9 +783,10 @@ impl EffectorUi {
         }
     }
 
-    /// Layers on top; when Presets is open it takes the lower part (split adjustable by dragging).
+    /// Layers on top; when Effects or Presets is open it takes the lower part (split adjustable by
+    /// dragging). Effects has priority: it replaces Presets while open, and Presets comes back after.
     fn sidebar(&mut self, ui: &mut Ui) {
-        let docked = self.app.show_preset_browser && self.app.has_image();
+        let docked = (self.app.show_preset_browser || self.app.show_effect_browser) && self.app.has_image();
         let rect = ui.available_rect_before_wrap();
         if !docked {
             self.presets_rect = Rect::NOTHING;
@@ -816,7 +825,11 @@ impl EffectorUi {
         self.presets_rect = bottom;
         ui.scope_builder(egui::UiBuilder::new().max_rect(bottom), |ui| {
             ui.set_clip_rect(bottom);
-            browsers::presets_panel(ui, &mut self.app);
+            if self.app.show_effect_browser {
+                browsers::effect_browser(ui, &mut self.app);
+            } else {
+                browsers::presets_panel(ui, &mut self.app);
+            }
         });
     }
 }

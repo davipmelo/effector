@@ -61,10 +61,10 @@ fn multi_inspector(ui: &mut Ui, app: &mut AppState) {
         });
         egui::Frame::new().inner_margin(14).show(ui, |ui| {
             ui.horizontal(|ui| {
-                if pill_icon_button(ui, "folder.badge.plus", &tr("Group"), false).on_hover_text(keys_hint(&tr("Group selected layers (⌘G)"))).clicked() {
+                if pill_icon_button(ui, "folder.badge.plus", &tr("Group"), false).on_hover_text(action_hint("Group selected layers", crate::shortcuts::Action::Group)).clicked() {
                     app.group_selected();
                 }
-                if pill_icon_button(ui, "plus.square.on.square", &tr("Duplicate"), false).on_hover_text(keys_hint(&tr("Duplicate (⌘D)"))).clicked() {
+                if pill_icon_button(ui, "plus.square.on.square", &tr("Duplicate"), false).on_hover_text(action_hint("Duplicate", crate::shortcuts::Action::Duplicate)).clicked() {
                     app.duplicate_selected();
                 }
             });

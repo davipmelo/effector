@@ -73,9 +73,9 @@ pub fn effect_browser(ui: &mut Ui, app: &mut AppState) {
     let mut list_mode = settings::get().browser_list;
     let mut add: Option<&'static str> = None;
     let mouse = ui.ctx().pointer_hover_pos();
-    egui::Frame::new().inner_margin(12).show(ui, |ui| {
+    egui::Frame::new().inner_margin(egui::Margin::symmetric(10, 8)).show(ui, |ui| {
         ui.horizontal(|ui| {
-            let avail = ui.available_width() - 70.0;
+            let avail = ui.available_width() - 62.0 - 26.0 - 10.0;
             ui.allocate_ui(vec2(avail, 34.0), |ui| {
                 let before = mem.query.clone();
                 let r = search_field(ui, id.with("q"), &tr("Search effects"), &mut mem.query, !mem.focus_done);
@@ -91,6 +91,10 @@ pub fn effect_browser(ui: &mut Ui, app: &mut AppState) {
             if let Some(v) = view_mode_toggle(ui, id.with("vm"), list_mode) {
                 list_mode = v;
                 settings::update(|s| s.browser_list = v);
+            }
+            if icon_button(ui, "xmark", &format!("{} ({})", tr("Close effects"), shortcuts::display(Action::AddEffect)), false, 12.0).clicked() {
+                app.show_effect_browser = false;
+                app.set_preview_layers(None);
             }
         });
     });
@@ -121,7 +125,7 @@ pub fn effect_browser(ui: &mut Ui, app: &mut AppState) {
     let footer_h = 28.0;
     let avail_h = ui.available_height() - footer_h;
     egui::ScrollArea::vertical().id_salt("browser-scroll").max_height(avail_h).auto_shrink([false, false]).show(ui, |ui| {
-        egui::Frame::new().inner_margin(egui::Margin { left: 12, right: 12, top: 0, bottom: 14 }).show(ui, |ui| {
+        egui::Frame::new().inner_margin(egui::Margin { left: 10, right: 10, top: 0, bottom: 14 }).show(ui, |ui| {
             for cat in Category::ALL {
                 let items: Vec<&&Effect> = list.iter().filter(|e| e.category == cat).collect();
                 if items.is_empty() {

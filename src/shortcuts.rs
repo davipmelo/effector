@@ -36,6 +36,7 @@ impl KeyCombo {
             "return" => if mac { "↩".into() } else { "Enter".into() },
             "tab" => if mac { "⇥".into() } else { "Tab".into() },
             "escape" => if mac { "⎋".into() } else { "Esc".into() },
+            f if f.len() >= 2 && f.starts_with('f') && f[1..].chars().all(|c| c.is_ascii_digit()) => f.to_uppercase(),
             _ => k.to_uppercase(),
         }
     }
@@ -81,6 +82,18 @@ impl KeyCombo {
             Enter => "return",
             Tab => "tab",
             Escape => "escape",
+            F1 => "f1",
+            F2 => "f2",
+            F3 => "f3",
+            F4 => "f4",
+            F5 => "f5",
+            F6 => "f6",
+            F7 => "f7",
+            F8 => "f8",
+            F9 => "f9",
+            F10 => "f10",
+            F11 => "f11",
+            F12 => "f12",
             Backslash => "\\",
             Slash => "/",
             OpenBracket => "[",
@@ -152,16 +165,18 @@ pub enum Action {
     Group, Ungroup, Duplicate, Delete, ToggleVisibility, MoveUp, MoveDown,
     PrevImage, NextImage, Filmstrip, SyncSettings, CloseImage,
     ZoomIn, ZoomOut, ZoomFit, Zoom100, Present, Compare, Randomize, CopyLayers, PasteLayers, ShowLayers, ShowPresets,
+    CopySettings, PasteSettings, ResetSettings, TogglePanels, ToggleAllPanels, SelectAll, Deselect,
 }
 
 impl Action {
-    pub const ALL: [Action; 35] = [
+    pub const ALL: [Action; 42] = [
         Action::Open, Action::Save, Action::SaveAs, Action::Export, Action::CopyResult, Action::Paste, Action::Undo, Action::Redo,
         Action::CommandPalette, Action::AddEffect, Action::BeforeAfter, Action::Crop, Action::Group, Action::Ungroup, Action::Duplicate,
         Action::Delete, Action::ToggleVisibility, Action::MoveUp, Action::MoveDown, Action::PrevImage, Action::NextImage,
         Action::Filmstrip, Action::SyncSettings, Action::CloseImage, Action::ZoomIn, Action::ZoomOut, Action::ZoomFit, Action::Zoom100,
         Action::Present, Action::Compare, Action::Randomize, Action::CopyLayers, Action::PasteLayers, Action::ShowLayers,
-        Action::ShowPresets,
+        Action::ShowPresets, Action::CopySettings, Action::PasteSettings, Action::ResetSettings, Action::TogglePanels,
+        Action::ToggleAllPanels, Action::SelectAll, Action::Deselect,
     ];
 
     /// Stable id (same raw values as the macOS app).
@@ -175,7 +190,9 @@ impl Action {
             NextImage => "nextImage", Filmstrip => "filmstrip", SyncSettings => "syncSettings", CloseImage => "closeImage",
             ZoomIn => "zoomIn", ZoomOut => "zoomOut", ZoomFit => "zoomFit", Zoom100 => "zoom100", Present => "present",
             Compare => "compare", Randomize => "randomize", CopyLayers => "copyLayers", PasteLayers => "pasteLayers",
-            ShowLayers => "showLayers", ShowPresets => "showPresets",
+            ShowLayers => "showLayers", ShowPresets => "showPresets", CopySettings => "copySettings",
+            PasteSettings => "pasteSettings", ResetSettings => "resetSettings", TogglePanels => "togglePanels",
+            ToggleAllPanels => "toggleAllPanels", SelectAll => "selectAll", Deselect => "deselect",
         }
     }
 
@@ -217,29 +234,37 @@ impl Action {
             PasteLayers => "Paste Layers",
             ShowLayers => "Close Panels",
             ShowPresets => "Presets…",
+            CopySettings => "Copy Settings",
+            PasteSettings => "Paste Settings",
+            ResetSettings => "Reset Settings",
+            TogglePanels => "Show / Hide Side Panels",
+            ToggleAllPanels => "Show / Hide All Panels",
+            SelectAll => "Select All",
+            Deselect => "Deselect All",
         }
     }
 
     pub fn default_combo(&self) -> Option<KeyCombo> {
         use Action::*;
         let k = |key: &str, cmd: bool, shift: bool, opt: bool| Some(KeyCombo::new(key, cmd, shift, opt));
+        // Lightroom Classic where it has the same function, Photoshop for layer commands.
         match self {
             Open => k("o", true, false, false),
             Save => k("s", true, false, false),
-            SaveAs => k("s", true, true, false),
-            Export => k("e", true, false, false),
-            CopyResult => k("c", true, true, false),
+            SaveAs => k("s", true, false, true),
+            Export => k("e", true, true, false),
+            CopyResult => k("c", true, true, true),
             Paste => k("v", true, false, false),
             Undo => k("z", true, false, false),
             Redo => k("z", true, true, false),
             CommandPalette => k("k", true, false, false),
             AddEffect => k("a", true, true, false),
-            BeforeAfter => k("\\", false, false, false),
-            Crop => k("c", false, false, false),
+            BeforeAfter => k("]", false, false, false),
+            Crop => k("r", false, false, false),
             Group => k("g", true, false, false),
             Ungroup => k("g", true, true, false),
-            Duplicate => k("d", true, false, false),
-            Delete => k("delete", true, false, false),
+            Duplicate => k("j", true, false, false),
+            Delete => k("delete", false, false, false),
             ToggleVisibility => k("h", false, false, false),
             MoveUp => k("]", true, false, false),
             MoveDown => k("[", true, false, false),
@@ -250,21 +275,28 @@ impl Action {
             Present => k("f", false, false, false),
             PrevImage => k("left", false, false, false),
             NextImage => k("right", false, false, false),
-            Filmstrip => k("b", false, false, false),
-            SyncSettings => k("s", true, false, true),
-            CloseImage => k("w", true, false, true),
-            Compare => k("/", false, false, false),
-            Randomize => k("r", false, false, false),
+            Filmstrip => k("f6", false, false, false),
+            SyncSettings => k("s", true, true, false),
+            CloseImage => k("w", true, false, false),
+            Compare => k("y", false, false, false),
+            Randomize => k("r", false, true, false),
             CopyLayers => k("c", true, false, true),
             PasteLayers => k("v", true, false, true),
             ShowLayers => k("l", false, false, false),
             ShowPresets => k("p", false, false, false),
+            CopySettings => k("c", true, true, false),
+            PasteSettings => k("v", true, true, false),
+            ResetSettings => k("r", true, true, false),
+            TogglePanels => k("tab", false, false, false),
+            ToggleAllPanels => k("tab", false, true, false),
+            SelectAll => k("a", true, false, false),
+            Deselect => k("d", true, false, false),
         }
     }
 
     /// Standard text-editing shortcuts that must reach text fields while typing.
     pub fn is_text_editing_standard(&self) -> bool {
-        matches!(self, Action::Undo | Action::Redo | Action::Paste | Action::CopyResult | Action::Delete)
+        matches!(self, Action::Undo | Action::Redo | Action::Paste | Action::CopyResult | Action::Delete | Action::SelectAll | Action::Deselect)
     }
 }
 

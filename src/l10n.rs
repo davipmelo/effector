@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
 
 include!("l10n_pt.rs");
+include!("l10n_pt_080.rs");
 
 static PORTUGUESE: AtomicBool = AtomicBool::new(false);
 
@@ -13,7 +14,7 @@ pub fn is_portuguese() -> bool { PORTUGUESE.load(Ordering::Relaxed) }
 
 fn table() -> &'static HashMap<&'static str, &'static str> {
     static T: OnceLock<HashMap<&'static str, &'static str>> = OnceLock::new();
-    T.get_or_init(|| PT.iter().copied().collect())
+    T.get_or_init(|| PT.iter().chain(PT_080.iter()).copied().collect())
 }
 
 /// Translates an English UI string.
