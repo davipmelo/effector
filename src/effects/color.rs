@@ -119,3 +119,72 @@ pub fn cube_text(l: &LutData) -> String {
     }
     t
 }
+
+/// Lightroom-style colour grading: hue/saturation wheels and luminance for shadows, midtones,
+/// highlights and the whole image, with Blending and Balance.
+pub fn color_grade() -> Effect {
+    let zones: [(&'static str, &'static str); 4] = [("sh", "Shadows"), ("mid", "Midtones"), ("hi", "Highlights"), ("gl", "Global")];
+    let mut params = vec![
+        ParamDef::segmented("view", "View", &[("all", "3-Way"), ("sh", "Shad."), ("mid", "Mids"), ("hi", "Highs"), ("gl", "Global")], "all").sec("Color Grading"),
+        ParamDef::wheel_row("wheels", &["sh", "mid", "hi"]).sec("Color Grading").vis(when("view", "all")),
+        ParamDef::wheel_row("glWheels", &["gl"]).sec("Color Grading").vis(when("view", "all")),
+    ];
+    let hue_track: Vec<Rgba> = (0..13).map(|i| oklch_rgb(0.72, 0.13, i as f64 * 30.0)).collect();
+    for (z, label) in zones {
+        let v = when("view", z);
+        params.push(ParamDef::wheel(&format!("{z}Wheel"), label, z).sec("Color Grading").vis(v.clone()));
+        params.push(s(&format!("{z}Hue"), "Hue", 0.0, 360.0, 0.0).step(1.0).unit("°").sec("Color Grading").track(hue_track.clone()).vis(v.clone()));
+        params.push(s(&format!("{z}Sat"), "Saturation", 0.0, 100.0, 0.0).step(1.0).sec("Color Grading").vis(v.clone()));
+        params.push(s(&format!("{z}Lum"), "Luminance", -100.0, 100.0, 0.0).step(1.0).sec("Color Grading").vis(v));
+    }
+    params.push(s("blending", "Blending", 0.0, 100.0, 50.0).step(1.0).sec("Color Grading"));
+    params.push(s("balance", "Balance", -100.0, 100.0, 0.0).step(1.0).sec("Color Grading").track(vec![hex("#3A3A3A"), hex("#9A9A9A"), hex("#E8E8E8")]));
+    Effect::new("colorgrade", "Color Grading", Category::Adjust, |input, p, ctx| {
+        let mut u = vec![];
+        for z in ["sh", "mid", "hi", "gl"] {
+            u.push(p.f(&format!("{z}Hue")).to_radians());
+            u.push(p.f(&format!("{z}Sat")) / 100.0);
+            u.push(p.f(&format!("{z}Lum")) / 100.0);
+        }
+        u.push(p.fd("blending", 50.0) / 100.0);
+        u.push(p.f("balance") / 100.0);
+        ctx.apply("k_colorgrade", &[input], &u)
+    })
+    .symbol("circle.lefthalf.filled")
+    .summary("Color wheels for shadows, midtones, highlights and global, like Lightroom's Color Grading.")
+    .params(params)
+    .depth_bias()
+    .looks({
+        let g = |pairs: &[(&str, f64)]| -> Vec<(String, ParamValue)> { pairs.iter().map(|(k, v)| (k.to_string(), ParamValue::Number(*v))).collect() };
+        vec![
+            look_g("tealorange", "Teal & Orange", "Cinema", g(&[("shHue", 220.0), ("shSat", 45.0), ("hiHue", 65.0), ("hiSat", 35.0), ("midHue", 60.0), ("midSat", 8.0)])),
+            look_g("bleach", "Cold Thriller", "Cinema", g(&[("shHue", 200.0), ("shSat", 35.0), ("midHue", 180.0), ("midSat", 15.0), ("hiHue", 150.0), ("hiSat", 10.0), ("shLum", -10.0)])),
+            look_g("golden", "Golden Hour", "Warm", g(&[("hiHue", 75.0), ("hiSat", 45.0), ("midHue", 55.0), ("midSat", 20.0), ("shHue", 30.0), ("shSat", 15.0)])),
+            look_g("kodak", "Warm Print", "Warm", g(&[("shHue", 300.0), ("shSat", 12.0), ("midHue", 70.0), ("midSat", 15.0), ("hiHue", 90.0), ("hiSat", 25.0), ("shLum", 8.0)])),
+            look_g("matrix", "Green Code", "Stylized", g(&[("shHue", 150.0), ("shSat", 40.0), ("midHue", 135.0), ("midSat", 25.0), ("hiHue", 110.0), ("hiSat", 15.0)])),
+            look_g("vapor", "Vaporwave", "Stylized", g(&[("shHue", 285.0), ("shSat", 55.0), ("hiHue", 200.0), ("hiSat", 40.0), ("midHue", 330.0), ("midSat", 20.0)])),
+            look_g("nightblue", "Blue Night", "Cool", g(&[("shHue", 260.0), ("shSat", 50.0), ("midHue", 250.0), ("midSat", 25.0), ("hiHue", 220.0), ("hiSat", 10.0), ("midLum", -8.0)])),
+            look_g("faded", "Faded Pastel", "Cool", g(&[("shHue", 230.0), ("shSat", 20.0), ("shLum", 18.0), ("hiHue", 20.0), ("hiSat", 15.0), ("hiLum", -6.0), ("blending", 80.0)])),
+            look_g("split", "Classic Split Tone", "Classic", g(&[("shHue", 262.0), ("shSat", 40.0), ("hiHue", 65.0), ("hiSat", 30.0)])),
+            look_g("sepia", "Sepia Wash", "Classic", g(&[("glHue", 65.0), ("glSat", 30.0), ("shHue", 40.0), ("shSat", 15.0)])),
+        ]
+    })
+}
+
+/// sRGB colour of an Oklch value (for UI swatches; hue in degrees).
+pub fn oklch_rgb(l: f64, c: f64, h_deg: f64) -> Rgba {
+    let h = h_deg.to_radians();
+    let (a, b) = (c * h.cos(), c * h.sin());
+    let l_ = l + 0.3963377774 * a + 0.2158037573 * b;
+    let m_ = l - 0.1055613458 * a - 0.0638541728 * b;
+    let s_ = l - 0.0894841775 * a - 1.2914855480 * b;
+    let (l3, m3, s3) = (l_ * l_ * l_, m_ * m_ * m_, s_ * s_ * s_);
+    let r = 4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3;
+    let g = -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3;
+    let bl = -0.0041960863 * l3 - 0.7034186147 * m3 + 1.7076147010 * s3;
+    let enc = |x: f64| {
+        let x = x.clamp(0.0, 1.0);
+        if x <= 0.0031308 { x * 12.92 } else { 1.055 * x.powf(1.0 / 2.4) - 0.055 }
+    };
+    Rgba::new(enc(r), enc(g), enc(bl))
+}

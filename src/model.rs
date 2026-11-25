@@ -353,6 +353,10 @@ pub enum ParamKind {
     Text(String),
     Lut,
     Seed,
+    /// Colour wheel driving `{prefix}Hue` / `{prefix}Sat` (degrees / %), drawn large.
+    Wheel(String),
+    /// Several small wheels side by side, each with its `{prefix}Lum` slider below.
+    WheelRow(Vec<String>),
 }
 
 pub type Visible = Arc<dyn Fn(&Params) -> bool + Send + Sync>;
@@ -381,7 +385,7 @@ impl ParamDef {
             ParamKind::Gradient(d) => ParamValue::Gradient(d.clone()),
             ParamKind::Palette(d) => ParamValue::Palette(d.clone()),
             ParamKind::Text(d) => ParamValue::Text(d.clone()),
-            ParamKind::Lut => return None,
+            ParamKind::Lut | ParamKind::Wheel(_) | ParamKind::WheelRow(_) => return None,
             ParamKind::Seed => ParamValue::Number(1.0),
         })
     }
@@ -418,6 +422,10 @@ impl ParamDef {
         d
     }
     pub fn seed(key: &str) -> ParamDef { Self::base(key, "Seed", ParamKind::Seed) }
+    pub fn wheel(key: &str, label: &str, prefix: &str) -> ParamDef { Self::base(key, label, ParamKind::Wheel(prefix.into())) }
+    pub fn wheel_row(key: &str, prefixes: &[&str]) -> ParamDef {
+        Self::base(key, "", ParamKind::WheelRow(prefixes.iter().map(|s| s.to_string()).collect()))
+    }
 
     pub fn step(mut self, s: f64) -> Self {
         if let ParamKind::Slider { step, .. } = &mut self.kind { *step = s; }

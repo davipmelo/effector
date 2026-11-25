@@ -489,6 +489,35 @@ fn param_control(ui: &mut Ui, app: &mut AppState, layer: &LayerNode, def: &Param
             }
         }
         ParamKind::Lut => lut_control(ui, app, lid, &def.key, p.lut(&def.key)),
+        ParamKind::Wheel(prefix) => {
+            let size = ui.available_width().min(190.0);
+            ui.vertical_centered(|ui| {
+                wheel_param(ui, app, layer, prefix, size);
+            });
+        }
+        ParamKind::WheelRow(prefixes) => {
+            let n = prefixes.len().max(1) as f32;
+            let w = ui.available_width();
+            let gap = 10.0;
+            let col = ((w - gap * (n - 1.0)) / n).max(40.0);
+            let size = if prefixes.len() == 1 { col.min(104.0) } else { col.min(118.0) };
+            ui.horizontal_top(|ui| {
+                ui.spacing_mut().item_spacing.x = gap;
+                for pf in prefixes {
+                    ui.allocate_ui_with_layout(vec2(col, size + 64.0), egui::Layout::top_down(egui::Align::Center), |ui| {
+                        ui.set_width(col);
+                        let name = match pf.as_str() { "sh" => "Shadows", "mid" => "Midtones", "hi" => "Highlights", _ => "Global" };
+                        ui.label(egui::RichText::new(tr(name)).font(label_font()).color(text_dim()));
+                        wheel_param(ui, app, layer, pf, size);
+                        let key = format!("{pf}Lum");
+                        let lid2 = Id::new(("param", lid, &key));
+                        if let Some(v) = value_slider(ui, lid2, SliderSpec::new("Lum", p.num(&key, 0.0), -100.0, 100.0, 0.0).step(1.0)) {
+                            app.set_param(lid, &key, ParamValue::Number(v), true);
+                        }
+                    });
+                }
+            });
+        }
         ParamKind::Seed => {
             let v = p.num(&def.key, 1.0);
             labeled_row(ui, "Seed", |ui| {
@@ -500,6 +529,87 @@ fn param_control(ui: &mut Ui, app: &mut AppState, layer: &LayerNode, def: &Param
             });
         }
     }
+}
+
+// MARK: - Color wheels
+
+/// A hue / saturation wheel bound to `{prefix}Hue` and `{prefix}Sat`.
+fn wheel_param(ui: &mut Ui, app: &mut AppState, layer: &LayerNode, prefix: &str, size: f32) {
+    let (hk, sk) = (format!("{prefix}Hue"), format!("{prefix}Sat"));
+    let (hue, sat) = (layer.params.num(&hk, 0.0), layer.params.num(&sk, 0.0));
+    if let Some((h, s)) = color_wheel(ui, Id::new(("wheel", layer.id, prefix)), hue, sat, size) {
+        app.update_layer(layer.id, Some(format!("{}-wheel-{prefix}", layer.id)), |n| {
+            n.params.set(&hk, ParamValue::Number(h));
+            n.params.set(&sk, ParamValue::Number(s));
+        });
+    }
+    ui.label(egui::RichText::new(if sat < 0.5 { "—".to_string() } else { format!("{}°  ·  {}", hue.round() as i64, sat.round() as i64) }).font(value_font()).color(text_faint()));
+}
+
+/// Draws a colour wheel (angle = hue, distance = saturation). Drag anywhere; double-click resets;
+/// hold Shift for fine control.
+pub fn color_wheel(ui: &mut Ui, id: Id, hue: f64, sat: f64, size: f32) -> Option<(f64, f64)> {
+    let (rect, resp) = ui.allocate_exact_size(vec2(size, size), Sense::click_and_drag());
+    let resp = resp.on_hover_text(tr("Drag to pick hue and strength · Shift for fine control · double-click to reset"));
+    let c = rect.center();
+    let r = size / 2.0 - 3.0;
+    let painter = ui.painter_at(rect.expand(2.0));
+    // colour field
+    let mut mesh = egui::Mesh::default();
+    let (rings, segs) = (7usize, 72usize);
+    for i in 0..=rings {
+        let t = i as f32 / rings as f32;
+        for j in 0..=segs {
+            let a = j as f32 / segs as f32 * std::f32::consts::TAU;
+            let col = crate::effects::color::oklch_rgb(0.7, 0.14 * t as f64, a.to_degrees() as f64);
+            mesh.colored_vertex(c + vec2(a.cos(), -a.sin()) * r * t, rgba_color(&col));
+        }
+    }
+    for i in 0..rings {
+        for j in 0..segs {
+            let a = (i * (segs + 1) + j) as u32;
+            let b = a + (segs + 1) as u32;
+            mesh.add_triangle(a, a + 1, b);
+            mesh.add_triangle(a + 1, b + 1, b);
+        }
+    }
+    painter.add(egui::Shape::mesh(mesh));
+    painter.circle_stroke(c, r, egui::Stroke::new(1.0, separator()));
+    painter.circle_stroke(c, r * 0.5, egui::Stroke::new(0.5, with_alpha(Color32::WHITE, 0.12)));
+    painter.line_segment([c - vec2(5.0, 0.0), c + vec2(5.0, 0.0)], egui::Stroke::new(1.0, with_alpha(Color32::WHITE, 0.35)));
+    painter.line_segment([c - vec2(0.0, 5.0), c + vec2(0.0, 5.0)], egui::Stroke::new(1.0, with_alpha(Color32::WHITE, 0.35)));
+    // puck
+    let a = (hue as f32).to_radians();
+    let pr = (sat as f32 / 100.0).clamp(0.0, 1.0) * r;
+    let pp = c + vec2(a.cos(), -a.sin()) * pr;
+    let pc = rgba_color(&crate::effects::color::oklch_rgb(0.7, 0.14 * sat / 100.0, hue));
+    painter.circle_filled(pp, 6.5, Color32::from_black_alpha(90));
+    painter.circle_filled(pp, 5.5, pc);
+    painter.circle_stroke(pp, 5.5, egui::Stroke::new(2.0, Color32::WHITE));
+    if resp.double_clicked() {
+        return Some((hue, 0.0));
+    }
+    let drag_id = id.with("start");
+    if resp.drag_started() {
+        ui.data_mut(|d| d.insert_temp(drag_id, (pp, resp.interact_pointer_pos().unwrap_or(pp))));
+    }
+    if resp.dragged() || resp.clicked() {
+        let pos = resp.interact_pointer_pos()?;
+        let fine = ui.input(|i| i.modifiers.shift);
+        let target = match (resp.dragged(), fine, ui.data(|d| d.get_temp::<(egui::Pos2, egui::Pos2)>(drag_id))) {
+            (true, true, Some((puck0, ptr0))) => puck0 + (pos - ptr0) * 0.25,
+            (true, false, Some((puck0, ptr0))) => puck0 + (pos - ptr0),
+            _ => pos,
+        };
+        let d = target - c;
+        let mut h = (-d.y).atan2(d.x).to_degrees() as f64;
+        if h < 0.0 {
+            h += 360.0;
+        }
+        let s = ((d.length() / r) as f64 * 100.0).clamp(0.0, 100.0);
+        return Some((h.round(), s.round()));
+    }
+    None
 }
 
 // MARK: - Curves

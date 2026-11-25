@@ -26,6 +26,8 @@ pub fn dump_params() {
                 ParamKind::Curves => "curves".into(),
                 ParamKind::Lut => "lut".into(),
                 ParamKind::Seed => "seed".into(),
+                ParamKind::Wheel(p) => format!("wheel {p}"),
+                ParamKind::WheelRow(v) => format!("wheels {}", v.join(",")),
             };
             println!("  {}: {k}{}", d.key, d.section.as_ref().map(|s| format!("  §{s}")).unwrap_or_default());
         }

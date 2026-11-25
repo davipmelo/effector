@@ -17,6 +17,8 @@ pub fn split_tone() -> Effect {
     })
     .symbol("circle.lefthalf.filled")
     .summary("Tints shadows and highlights with two colours (cool shadows, warm highlights…).")
+    // replaced by Color Grading in 0.8.0; kept so older projects render
+    .hidden()
     .params(vec![
         ParamDef::color("shadow", "Shadow Color", hex("#1F4E9E")).sec("Shadows"),
         s("shadowAmt", "Amount", 0.0, 100.0, 50.0).step(1.0).unit("%").sec("Shadows"),
