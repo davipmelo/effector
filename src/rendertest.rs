@@ -131,6 +131,10 @@ pub fn run(args: &[String]) {
     let input = Path::new(&args[i + 1]);
     let out_dir = Path::new(&args[i + 2]);
     let _ = std::fs::create_dir_all(out_dir);
+    if args.iter().any(|a| a == "--project-roundtrip") {
+        project_roundtrip(input, out_dir);
+        return;
+    }
     let specs: Vec<&String> = args[i + 3..].iter().filter(|a| !a.starts_with("--")).collect();
     let src = match SourceImage::load_path(input) {
         Ok(s) => s,
@@ -222,5 +226,48 @@ fn write_sheet(items: &[(String, Vec<u8>, usize, usize)], path: &Path) {
     let rgba: Vec<u8> = ov.data().to_vec();
     if let Ok(b) = imageio::encode(&rgba, w, h, Format::Jpg, 0.85, false) {
         let _ = std::fs::write(path, b);
+    }
+}
+
+/// Saves a project with a preset stack and a crop, reopens it and compares the document state.
+fn project_roundtrip(input: &Path, out_dir: &Path) {
+    let ctx = egui::Context::default();
+    let mut app = crate::app::AppState::new(ctx);
+    app.headless = true;
+    let img = match SourceImage::load_path(input) {
+        Ok(i) => i,
+        Err(e) => {
+            println!("roundtrip error: {e}");
+            return;
+        }
+    };
+    let mut st = DocumentState::default();
+    st.layers = crate::presets::factory().iter().find(|p| p.category.as_deref() == Some("Tracking & HUD")).unwrap().layers.clone();
+    st.crop = CropRect { x: 0.1, y: 0.1, w: 0.8, h: 0.6 };
+    st.canvas = Some(CanvasSpec { ratio: "1:1".into(), fill: "blur".into(), ..Default::default() });
+    app.open_image(img, None, st.clone(), None, true);
+    let path = out_dir.join("test.effector");
+    if let Err(e) = app.write_project(&path) {
+        println!("roundtrip error: {e}");
+        return;
+    }
+    match app.open_project(&path, true) {
+        Ok(_) => {
+            let back = app.state();
+            println!("roundtrip equal: {} layers: {} file size: {} bytes", back == st, back.layers.len(), std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0));
+            if back != st {
+                let a = serde_json::to_string_pretty(&st).unwrap();
+                let b = serde_json::to_string_pretty(&back).unwrap();
+                for (i, (x, y)) in a.lines().zip(b.lines()).enumerate() {
+                    if x != y {
+                        println!("first difference at line {i}:
+  saved:  {x}
+  loaded: {y}");
+                        break;
+                    }
+                }
+            }
+        }
+        Err(e) => println!("roundtrip error: {e}"),
     }
 }
