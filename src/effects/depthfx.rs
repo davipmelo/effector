@@ -1,17 +1,17 @@
-//! Effects built on the depth map: Depth Blur (real bokeh), Lens Emulation, Fog & Haze and
-//! Parallax & Relief. Without a depth map they fall back to sensible 2D versions.
+//! Effects that use the AI subject matte (0.8.3; the depth map of 0.8.0–0.8.2 is gone):
+//! Background Blur (bokeh behind a sharp subject), Lens Emulation and Fog & Haze. Without the
+//! matte they fall back to sensible 2D versions. Parallax & Relief only worked with depth and is
+//! kept hidden for old projects.
 
 use super::*;
 
 /// Shared focus + aperture parameters (Depth Blur and Lens Emulation).
 fn bokeh_params(sec_focus: &str, sec_shape: &str, def_amount: f64) -> Vec<ParamDef> {
-    let depth = || when("focusMode", "depth");
     vec![
-        ParamDef::segmented("focusMode", "Focus", &[("depth", "Depth"), ("radial", "Radial"), ("band", "Tilt-Shift"), ("whole", "Whole")], "depth").sec(sec_focus),
-        s("focus", "Focus Distance", 0.0, 100.0, 88.0).step(1.0).unit("%").sec(sec_focus).vis(depth()).pick(),
-        s("range", "Sharp Zone", 0.0, 60.0, 14.0).step(0.5).unit("%").sec(sec_focus).vis(when_not("focusMode", "whole")),
+        // "depth" (the key of old projects) now means: the AI subject stays sharp
+        ParamDef::segmented("focusMode", "Focus", &[("depth", "Subject"), ("radial", "Radial"), ("band", "Tilt-Shift"), ("whole", "Whole")], "depth").sec(sec_focus),
+        s("range", "Sharp Zone", 0.0, 60.0, 14.0).step(0.5).unit("%").sec(sec_focus).vis(when_any("focusMode", &["radial", "band"])),
         s("transition", "Transition", 1.0, 60.0, 14.0).step(0.5).unit("%").sec(sec_focus).vis(when_not("focusMode", "whole")),
-        s("fgBlur", "Foreground Blur", 0.0, 100.0, 60.0).step(1.0).unit("%").sec(sec_focus).vis(depth()),
         s("cx", "Center X", 0.0, 100.0, 50.0).step(1.0).unit("%").sec(sec_focus).vis(when("focusMode", "radial")),
         s("cy", "Center Y", 0.0, 100.0, 50.0).step(1.0).unit("%").sec(sec_focus).vis(when_any("focusMode", &["radial", "band"])),
         s("bandAngle", "Angle", -90.0, 90.0, 0.0).step(1.0).unit("°").sec(sec_focus).vis(when("focusMode", "band")),
@@ -32,40 +32,41 @@ fn bokeh(input: &T, p: &Params, ctx: &mut Ctx) -> T {
         return input.clone();
     }
     let mut mode = match p.choice_or("focusMode", "depth").as_str() { "radial" => 1.0, "band" => 2.0, "whole" => 3.0, _ => 0.0 };
-    let d = if mode == 0.0 { ctx.depth() } else { None };
+    let d = if mode == 0.0 { ctx.subject() } else { None };
     if mode == 0.0 && d.is_none() {
         mode = 1.0;
     }
     let dt = d.unwrap_or_else(|| input.clone());
     let blades: f32 = p.choice_or("blades", "0").parse().unwrap_or(0.0);
+    // subject mode: the matte is the "distance" (1 = subject), in focus at 1, sharp zone fixed
+    let (focus, range) = if mode == 0.0 { (1.0, 0.2) } else { (p.fd("focus", 88.0) / 100.0, p.fd("range", 14.0) / 100.0) };
     let out = ctx.apply("k_bokeh", &[input, &dt], &[
-        amt as f32, p.fd("focus", 88.0) / 100.0, p.fd("range", 14.0) / 100.0, mode, p.fd("cx", 50.0) / 100.0, p.fd("cy", 50.0) / 100.0,
+        amt as f32, focus, range, mode, p.fd("cx", 50.0) / 100.0, p.fd("cy", 50.0) / 100.0,
         p.f("bandAngle"), p.fd("squeeze", 100.0) / 100.0, p.f("swirl") / 100.0, p.f("catEye") / 100.0, blades, p.f("bladeRot"),
-        p.fd("bokeh", 40.0) / 100.0, p.fd("seed", 1.0), p.fd("fgBlur", 60.0) / 100.0, p.fd("transition", 14.0) / 100.0,
+        p.fd("bokeh", 40.0) / 100.0, p.fd("seed", 1.0), 0.0, p.fd("transition", 14.0) / 100.0,
     ]);
     ctx.apply("k_clamp", &[&out], &[])
 }
 
-fn uses_focus_depth(p: &Params) -> bool { p.choice_or("focusMode", "depth") == "depth" || uses_depth_bias(p) }
+fn uses_focus_depth(p: &Params) -> bool { p.choice_or("focusMode", "depth") == "depth" || uses_subject_bias(p) }
 
 pub fn depth_blur() -> Effect {
-    Effect::new("depthblur", "Depth Blur", Category::Blur, |input, p, ctx| bokeh(input, p, ctx))
+    Effect::new("depthblur", "Background Blur", Category::Blur, |input, p, ctx| bokeh(input, p, ctx))
         .symbol("camera.aperture")
-        .summary("Real shallow depth of field from the depth map: pick what stays sharp, with round, bladed, oval or swirly bokeh.")
-        .depth(uses_focus_depth)
+        .summary("Shallow depth of field: the subject (detected by AI) stays sharp, the background melts into round, bladed, oval or swirly bokeh.")
+        .subject(uses_focus_depth)
         .params({
             let mut v = bokeh_params("Focus", "Bokeh", 18.0);
             v.push(ParamDef::seed("seed").sec("Bokeh"));
             v
         })
         .looks(vec![
-            look("portrait", "Portrait f/1.4", vals!["focus" => 80.0, "range" => 6.0, "amount" => 22.0]),
-            look("subtle", "Subtle Background", vals!["focus" => 80.0, "range" => 12.0, "amount" => 8.0, "transition" => 25.0]),
-            look("creamy", "Creamy f/0.95", vals!["focus" => 85.0, "range" => 4.0, "amount" => 40.0, "bokeh" => 60.0, "transition" => 10.0]),
+            look("portrait", "Portrait f/1.4", vals!["amount" => 22.0]),
+            look("subtle", "Subtle Background", vals!["amount" => 8.0, "transition" => 25.0]),
+            look("creamy", "Creamy f/0.95", vals!["amount" => 40.0, "bokeh" => 60.0, "transition" => 10.0]),
             look("hexagon", "Vintage Hexagons", vals!["blades" => "6", "amount" => 24.0, "bokeh" => 70.0]),
             look("swirl", "Swirly Helios", vals!["swirl" => 70.0, "catEye" => 40.0, "amount" => 26.0, "bokeh" => 55.0]),
             look("oval", "Anamorphic Ovals", vals!["squeeze" => 200.0, "amount" => 24.0, "bokeh" => 60.0]),
-            look("bg", "Background Only", vals!["focus" => 100.0, "range" => 30.0, "transition" => 20.0, "fgBlur" => 0.0, "amount" => 20.0]),
             look("mini", "Miniature (Tilt-Shift)", vals!["focusMode" => "band", "cy" => 55.0, "range" => 6.0, "transition" => 18.0, "amount" => 14.0]),
         ])
 }
@@ -113,8 +114,8 @@ pub fn lens_emulation() -> Effect {
         img
     })
     .symbol("camera.aperture")
-    .summary("Emulates whole lenses — cinema primes, anamorphics, vintage Soviet glass, toy cameras: focus falloff from depth, bokeh, distortion, glow, flares.")
-    .depth(|p| p.bool_or("focusOn", true) && uses_focus_depth(p))
+    .summary("Emulates whole lenses — cinema primes, anamorphics, vintage Soviet glass, toy cameras: a sharp subject with bokeh behind, distortion, glow, flares.")
+    .subject(|p| p.bool_or("focusOn", true) && uses_focus_depth(p))
     .params({
         let mut v = vec![ParamDef::section_switch("focusOn", "Focus", true)];
         v.extend(bokeh_params("Focus", "Focus", 14.0));
@@ -144,7 +145,7 @@ pub fn lens_emulation() -> Effect {
         look_g("anamorphic", "Anamorphic 2x", "Cinema", vals![
             "amount" => 18.0, "squeeze" => 200.0, "distortion" => 8.0, "vignette" => 35.0, "cornerSoft" => 30.0, "streak" => 45.0, "glow" => 15.0, "bokeh" => 55.0
         ]),
-        look_g("vista", "Large Format Vista", "Cinema", vals!["amount" => 26.0, "range" => 4.0, "transition" => 22.0, "vignette" => 15.0, "contrast" => 96.0]),
+        look_g("vista", "Large Format Vista", "Cinema", vals!["amount" => 26.0, "transition" => 22.0, "vignette" => 15.0, "contrast" => 96.0]),
         look_g("helios", "Helios 44 Swirl", "Vintage", vals![
             "amount" => 24.0, "swirl" => 75.0, "catEye" => 45.0, "bokeh" => 55.0, "vignette" => 40.0, "ca" => 25.0, "glow" => 30.0, "veil" => 25.0,
             "contrast" => 90.0, "rendering" => hex("#FFE3B8")
@@ -157,13 +158,13 @@ pub fn lens_emulation() -> Effect {
             "ca" => 60.0, "distortion" => 15.0, "saturation" => 120.0, "contrast" => 112.0
         ]),
         look_g("wide", "Cheap Wide Zoom", "Toy", vals!["focusOn" => false, "distortion" => 35.0, "ca" => 70.0, "cornerSoft" => 60.0, "vignette" => 35.0]),
-        look_g("macro", "Macro", "Cinema", vals!["amount" => 30.0, "range" => 3.0, "transition" => 8.0, "fgBlur" => 100.0, "bokeh" => 30.0]),
+        look_g("macro", "Macro", "Cinema", vals!["amount" => 30.0, "transition" => 8.0, "bokeh" => 30.0]),
     ])
 }
 
 pub fn fog() -> Effect {
     Effect::new("fog", "Fog & Haze", Category::Film, |input, p, ctx| {
-        let d = ctx.depth();
+        let d = ctx.subject();
         let has = d.is_some() as i32 as f32;
         let dt = d.unwrap_or_else(|| input.clone());
         let glow = p.fd("glow", 30.0) / 100.0;
@@ -181,8 +182,8 @@ pub fn fog() -> Effect {
         ])
     })
     .symbol("cloud.fog")
-    .summary("Atmospheric fog and haze that thickens with distance (uses the depth map), with glow around lights.")
-    .depth(|_| true)
+    .summary("Atmospheric fog and haze over the background while the subject (detected by AI) stays clear, with glow around lights.")
+    .subject(|_| true)
     .params(vec![
         s("density", "Density", 0.0, 100.0, 60.0).step(1.0).unit("%").sec("Fog"),
         s("start", "Starts At", 0.0, 90.0, 10.0).step(1.0).unit("%").sec("Fog"),
@@ -209,24 +210,16 @@ pub fn fog() -> Effect {
 }
 
 pub fn relief() -> Effect {
-    Effect::new("relief", "Parallax & Relief", Category::Distort, |input, p, ctx| {
-        let Some(d) = ctx.depth() else { return input.clone() };
-        let mode = match p.choice_or("mode", "parallax").as_str() { "relief" => 1.0, "tint" => 2.0, _ => 0.0 };
-        let (n, f) = (p.color_or("nearColor", hex("#FF6A3D")), p.color_or("farColor", hex("#2A3BFF")));
-        let blend = match p.choice_or("tintBlend", "soft").as_str() { "normal" => 0.0, "multiply" => 2.0, _ => 1.0 };
-        ctx.apply("k_relief", &[input, &d], &[
-            mode, if mode == 0.0 { ctx.px(p.num("shift", 20.0)) as f32 } else { p.fd("amount", 70.0) }, p.f("angle"), p.fd("pivot", 50.0) / 100.0,
-            p.fd("light", 135.0), p.fd("strength", 50.0) / 100.0, n.r as f32, n.g as f32, n.b as f32, f.r as f32, f.g as f32, f.b as f32, blend,
-        ])
-    })
+    // Removed in 0.8.3 with the depth map: kept hidden so old projects still open (renders unchanged).
+    Effect::new("relief", "Parallax & Relief", Category::Distort, |input, _p, _ctx| input.clone())
     .symbol("cube.transparent")
     .summary("Experimental depth tricks: 3D parallax shift, an embossed relief of the scene, or near/far colour tint.")
-    .depth(|_| true)
+    .hidden()
     .params(vec![
         ParamDef::segmented("mode", "Mode", &[("parallax", "Parallax"), ("relief", "Relief"), ("tint", "Depth Tint")], "parallax").sec("Depth"),
         s("shift", "Shift", -150.0, 150.0, 20.0).step(1.0).curve(1.5).sec("Depth").vis(when("mode", "parallax")),
         s("angle", "Direction", -180.0, 180.0, 0.0).step(1.0).unit("°").sec("Depth").vis(when("mode", "parallax")),
-        s("pivot", "Pivot Depth", 0.0, 100.0, 50.0).step(1.0).unit("%").sec("Depth").vis(when("mode", "parallax")).pick(),
+        s("pivot", "Pivot Depth", 0.0, 100.0, 50.0).step(1.0).unit("%").sec("Depth").vis(when("mode", "parallax")),
         s("amount", "Amount", 0.0, 100.0, 70.0).step(1.0).unit("%").sec("Depth").vis(when_not("mode", "parallax")),
         s("light", "Light Angle", 0.0, 360.0, 135.0).step(1.0).unit("°").sec("Depth").vis(when("mode", "relief")),
         s("strength", "Relief Depth", 0.0, 100.0, 50.0).step(1.0).unit("%").sec("Depth").vis(when("mode", "relief")),

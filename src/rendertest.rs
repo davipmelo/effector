@@ -114,11 +114,13 @@ fn parse_spec(spec: &str) -> Vec<LayerNode> {
                     }
                     continue;
                 }
-                // depth mask: dm=from-to[-feather][-inv]
-                if k == "dm" {
+                // mask=subject|background|linear|radial|brush[/inv]: limits the layer with a test mask
+                if k == "mask" {
                     let parts: Vec<&str> = v.split('/').collect();
-                    let n = |i: usize, d: f64| parts.get(i).and_then(|x| x.parse::<f64>().ok()).unwrap_or(d);
-                    node.depth_mask = Some(DepthMask { enabled: true, from: n(0, 0.0), to: n(1, 0.45), feather: n(2, 0.12), invert: parts.contains(&"inv") });
+                    if let Some(shape) = test_mask_shape(parts[0]) {
+                        let m = Mask { id: uuid::Uuid::new_v4(), name: "test".into(), parts: vec![MaskPart::new(shape, MaskMode::Add)] };
+                        node.resolved_mask = Some(ResolvedMask { mask: m, invert: parts.contains(&"inv") });
+                    }
                     continue;
                 }
                 let val = if let Ok(d) = v.parse::<f64>() {
@@ -136,22 +138,36 @@ fn parse_spec(spec: &str) -> Vec<LayerNode> {
     layers
 }
 
-/// `--depth-view <image> <out.png>`: writes the depth map at render size (dev/test).
-pub fn depth_view(args: &[String]) {
-    let Some(i) = args.iter().position(|a| a == "--depth-view") else { return };
+/// Mask shapes for `mask=<kind>` in render-test specs.
+pub fn test_mask_shape(kind: &str) -> Option<MaskShape> {
+    Some(match kind {
+        "subject" => MaskShape::subject_default(),
+        "background" => MaskShape::background_default(),
+        "linear" => MaskShape::linear_default(),
+        "radial" => MaskShape::radial_default(),
+        "brush" => MaskShape::Brush {
+            strokes: vec![BrushStroke { erase: false, size: 0.06, feather: 0.6, flow: 0.8, points: (0..=40).map(|i| [0.15 + i as f32 * 0.0175, 0.3 + (i as f32 * 0.25).sin() * 0.15]).collect() }],
+        },
+        _ => return None,
+    })
+}
+
+/// `--subject-view <image> <out.png>`: writes the subject matte at render size (dev/test).
+pub fn subject_view(args: &[String]) {
+    let Some(i) = args.iter().position(|a| a == "--subject-view") else { return };
     crate::gpu::init_headless().expect("gpu");
     let src = SourceImage::load_path(Path::new(&args[i + 1])).expect("image");
     let t0 = std::time::Instant::now();
-    let Some(map) = crate::depth::get_blocking(&src) else {
-        println!("depth unavailable: model at {:?}", crate::depth::model_candidates());
+    let Some(map) = crate::subject::get_blocking(&src) else {
+        println!("subject detection unavailable: model at {:?}", crate::subject::model_candidates().iter().map(|c| c.0.clone()).collect::<Vec<_>>());
         return;
     };
-    println!("depth {}x{} in {:?}", map.w, map.h, t0.elapsed());
+    println!("subject {}x{} in {:?}", map.w, map.h, t0.elapsed());
     let tex = src.make_texture(&CropRect::default(), (1200.0 / src.width.max(src.height) as f64).min(1.0));
     let mut ctx = crate::gpu::Ctx::new(1.0, tex.clone(), true);
-    ctx.depth_src = Some(crate::depth::DepthSrc { map, crop: CropRect::default() });
-    let d = ctx.depth().unwrap();
-    let v = ctx.apply("k_depthview", &[&d], &[]);
+    ctx.subject_src = Some(crate::subject::SubjectSrc { map, crop: CropRect::default() });
+    let d = ctx.subject().unwrap();
+    let v = ctx.apply("k_copy", &[&d], &[]);
     ctx.flush();
     let _ = imageio::write(&v, Path::new(&args[i + 2]), imageio::Format::Png, 1.0, false);
 }

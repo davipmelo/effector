@@ -23,10 +23,10 @@ cp assets/icons/icon.icns "$APP/Contents/Resources/AppIcon.icns"
 mkdir -p "$APP/Contents/Resources/en.lproj" "$APP/Contents/Resources/pt-BR.lproj"
 touch "$APP/Contents/Resources/en.lproj/InfoPlist.strings" "$APP/Contents/Resources/pt-BR.lproj/InfoPlist.strings"
 cp -R assets/fonts "$APP/Contents/Resources/licenses" 2>/dev/null || true
-# depth model (Depth Anything V2 Small, Apache-2.0)
+# subject detection model (IS-Net, Apache-2.0)
 packaging/fetch_model.sh
 mkdir -p "$APP/Contents/Resources/models"
-cp assets/models/*.safetensors "$APP/Contents/Resources/models/"
+cp assets/models/subject_isnet.onnx "$APP/Contents/Resources/models/"
 find "$APP/Contents/Resources/licenses" -name '*.ttf' -delete 2>/dev/null || true
 
 # ad-hoc signature (no Apple Developer account, not notarized). Since macOS 15 the right-click → Open bypass is gone:

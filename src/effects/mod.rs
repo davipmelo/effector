@@ -100,8 +100,8 @@ pub struct Effect {
     pub produces_alpha: bool,
     /// Kept only so older projects / presets still render; not offered in the browser.
     pub hidden: bool,
-    /// Does this effect (with these params) read the depth map? (`ctx.depth()`)
-    pub uses_depth: fn(&Params) -> bool,
+    /// Does this effect (with these params) read the depth map? (`ctx.subject()`)
+    pub uses_subject: fn(&Params) -> bool,
     /// Draws a fine pixel pattern (dots, dither, characters): the preview renders it at full
     /// resolution and shrinks it for the screen, so zooming out never shows patterns the export
     /// doesn't have.
@@ -122,7 +122,7 @@ impl Effect {
             section_colors: vec![],
             produces_alpha: false,
             hidden: false,
-            uses_depth: uses_depth_bias,
+            uses_subject: uses_subject_bias,
             fine_pattern: false,
             apply,
         }
@@ -134,8 +134,8 @@ impl Effect {
     pub fn section_colors(mut self, c: Vec<(String, Rgba)>) -> Self { self.section_colors = c; self }
     pub fn hidden(mut self) -> Self { self.hidden = true; self }
     pub fn fine_pattern(mut self) -> Self { self.fine_pattern = true; self }
-    pub fn depth(mut self, f: fn(&Params) -> bool) -> Self { self.uses_depth = f; self }
-    /// Adds the standard "Depth" section (stronger in the background or the foreground).
+    pub fn subject(mut self, f: fn(&Params) -> bool) -> Self { self.uses_subject = f; self }
+    /// Adds the standard "Where" section (only on the subject or the background, AI-detected).
     pub fn depth_bias(mut self) -> Self {
         self.params.extend(depth_bias_params());
         self
@@ -188,12 +188,12 @@ pub fn s(key: &str, label: &str, min: f64, max: f64, def: f64) -> ParamDef { Par
 /// Standard per-effect depth weighting, applied by the renderer (see `renderer::depth_bias`).
 pub fn depth_bias_params() -> Vec<ParamDef> {
     vec![
-        ParamDef::segmented("depthBias", "Where", &[("off", "Everywhere"), ("far", "Background"), ("near", "Foreground")], "off").sec("Depth"),
-        s("depthBiasAmount", "Amount", 0.0, 100.0, 80.0).unit("%").step(1.0).sec("Depth").vis(when_not("depthBias", "off")),
+        ParamDef::segmented("depthBias", "Apply To", &[("off", "Everywhere"), ("far", "Background"), ("near", "Subject")], "off").sec("Where"),
+        s("depthBiasAmount", "Amount", 0.0, 100.0, 80.0).unit("%").step(1.0).sec("Where").vis(when_not("depthBias", "off")),
     ]
 }
 
-pub fn uses_depth_bias(p: &Params) -> bool { matches!(p.choice("depthBias").as_str(), "far" | "near") }
+pub fn uses_subject_bias(p: &Params) -> bool { matches!(p.choice("depthBias").as_str(), "far" | "near") }
 
 static REGISTRY: OnceLock<Vec<Effect>> = OnceLock::new();
 

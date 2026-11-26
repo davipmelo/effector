@@ -165,20 +165,21 @@ pub enum Action {
     Group, Ungroup, Duplicate, Delete, ToggleVisibility, MoveUp, MoveDown,
     PrevImage, NextImage, Filmstrip, SyncSettings, CloseImage,
     ZoomIn, ZoomOut, ZoomFit, Zoom100, Present, Compare, Randomize, CopyLayers, PasteLayers, ShowLayers, ShowPresets,
-    CopySettings, PasteSettings, ResetSettings, TogglePanels, ToggleAllPanels, SelectAll, Deselect, ShowDepth,
-    ShowClipping, ToggleHistogram, ToolEdit, ToolCanvas, ToolMasks,
+    CopySettings, PasteSettings, ResetSettings, TogglePanels, ToggleAllPanels, SelectAll, Deselect,
+    ShowClipping, ToggleHistogram, ToolEdit, ToolCanvas, ToolMasks, MaskBrush, MaskLinear, MaskRadial, MaskSubject, MaskBackground,
 }
 
 impl Action {
-    pub const ALL: [Action; 48] = [
+    pub const ALL: [Action; 52] = [
         Action::Open, Action::Save, Action::SaveAs, Action::Export, Action::CopyResult, Action::Paste, Action::Undo, Action::Redo,
         Action::CommandPalette, Action::AddEffect, Action::BeforeAfter, Action::Crop, Action::Group, Action::Ungroup, Action::Duplicate,
         Action::Delete, Action::ToggleVisibility, Action::MoveUp, Action::MoveDown, Action::PrevImage, Action::NextImage,
         Action::Filmstrip, Action::SyncSettings, Action::CloseImage, Action::ZoomIn, Action::ZoomOut, Action::ZoomFit, Action::Zoom100,
         Action::Present, Action::Compare, Action::Randomize, Action::CopyLayers, Action::PasteLayers, Action::ShowLayers,
         Action::ShowPresets, Action::CopySettings, Action::PasteSettings, Action::ResetSettings, Action::TogglePanels,
-        Action::ToggleAllPanels, Action::SelectAll, Action::Deselect, Action::ShowDepth, Action::ShowClipping, Action::ToggleHistogram,
-        Action::ToolEdit, Action::ToolCanvas, Action::ToolMasks,
+        Action::ToggleAllPanels, Action::SelectAll, Action::Deselect, Action::ShowClipping, Action::ToggleHistogram,
+        Action::ToolEdit, Action::ToolCanvas, Action::ToolMasks, Action::MaskBrush, Action::MaskLinear, Action::MaskRadial,
+        Action::MaskSubject, Action::MaskBackground,
     ];
 
     /// Stable id (same raw values as the macOS app).
@@ -194,9 +195,10 @@ impl Action {
             Compare => "compare", Randomize => "randomize", CopyLayers => "copyLayers", PasteLayers => "pasteLayers",
             ShowLayers => "showLayers", ShowPresets => "showPresets", CopySettings => "copySettings",
             PasteSettings => "pasteSettings", ResetSettings => "resetSettings", TogglePanels => "togglePanels",
-            ToggleAllPanels => "toggleAllPanels", SelectAll => "selectAll", Deselect => "deselect", ShowDepth => "showDepth",
+            ToggleAllPanels => "toggleAllPanels", SelectAll => "selectAll", Deselect => "deselect",
             ShowClipping => "showClipping", ToggleHistogram => "toggleHistogram", ToolEdit => "toolEdit",
-            ToolCanvas => "toolCanvas", ToolMasks => "toolMasks",
+            ToolCanvas => "toolCanvas", ToolMasks => "toolMasks", MaskBrush => "maskBrush", MaskLinear => "maskLinear",
+            MaskRadial => "maskRadial", MaskSubject => "maskSubject", MaskBackground => "maskBackground",
         }
     }
 
@@ -245,12 +247,16 @@ impl Action {
             ToggleAllPanels => "Show / Hide All Panels",
             SelectAll => "Select All",
             Deselect => "Deselect All",
-            ShowDepth => "View Depth Map",
             ShowClipping => "Show Clipping",
             ToggleHistogram => "Show / Hide Histogram",
             ToolEdit => "Edit Tool",
             ToolCanvas => "Canvas & Borders",
             ToolMasks => "Masks",
+            MaskBrush => "Mask: Brush",
+            MaskLinear => "Mask: Linear Gradient",
+            MaskRadial => "Mask: Radial Gradient",
+            MaskSubject => "Mask: Select Subject",
+            MaskBackground => "Mask: Select Background",
         }
     }
 
@@ -301,12 +307,17 @@ impl Action {
             ToggleAllPanels => k("tab", false, true, false),
             SelectAll => k("a", true, false, false),
             Deselect => k("d", true, false, false),
-            ShowDepth => k("d", false, false, false),
             ShowClipping => k("j", false, false, false),
             ToggleHistogram => k("h", true, true, false),
             ToolEdit => k("e", false, false, false),
             ToolCanvas => k("b", false, true, false),
             ToolMasks => k("w", false, true, false),
+            // Lightroom Classic: K brush, M linear, ⇧M radial (subject / background have no LR default)
+            MaskBrush => k("k", false, false, false),
+            MaskLinear => k("m", false, false, false),
+            MaskRadial => k("m", false, true, false),
+            MaskSubject => k("s", false, true, false),
+            MaskBackground => k("g", false, true, false),
         }
     }
 

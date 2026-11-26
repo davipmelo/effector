@@ -369,14 +369,6 @@ fn param_control(ui: &mut Ui, app: &mut AppState, layer: &LayerNode, def: &Param
             if let Some(v) = value_slider(ui, id, spec) {
                 app.set_param(lid, &def.key, ParamValue::Number(v), true);
             }
-            if def.pick_depth {
-                let on = app.depth_pick.as_ref().map(|(l, k)| *l == lid && *k == def.key).unwrap_or(false);
-                let label = if on { tr("Click the image… (Esc cancels)") } else { tr("Pick on image") };
-                if ui.add(egui::Button::selectable(on, format!("{}  {}", icon_text("eyedropper"), label))).on_hover_text(tr("Click a point of the photo to use its distance")).clicked() {
-                    app.depth_pick = if on { None } else { Some((lid, def.key.clone())) };
-                }
-                ui.add_space(4.0);
-            }
         }
         ParamKind::Toggle(d) => {
             if let Some(v) = toggle_row(ui, &def.label, p.bool_or(&def.key, *d)) {

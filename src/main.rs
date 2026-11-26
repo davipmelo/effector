@@ -3,8 +3,9 @@
 
 mod app;
 mod appicon;
+mod brush;
 mod canvas;
-mod depth;
+mod subject;
 mod effects;
 mod exif;
 mod export;
@@ -81,8 +82,8 @@ fn main() {
         rendertest::list_looks();
         return;
     }
-    if args.iter().any(|a| a == "--depth-view") {
-        rendertest::depth_view(&args);
+    if args.iter().any(|a| a == "--subject-view") {
+        rendertest::subject_view(&args);
         return;
     }
     if args.iter().any(|a| a == "--render-test") {

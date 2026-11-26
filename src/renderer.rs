@@ -17,7 +17,11 @@ pub const REFERENCE_SIZE: f64 = 1000.0;
 /// Per-image data effects may use besides the pixels.
 #[derive(Clone, Default)]
 pub struct Extras {
-    pub depth: Option<crate::depth::DepthSrc>,
+    pub subject: Option<crate::subject::SubjectSrc>,
+    /// Crop of the render (masks are drawn in image coordinates).
+    pub crop: CropRect,
+    /// Image width and height divided by its long side.
+    pub aspect: (f64, f64),
     /// Capture date (EXIF) for date stamps.
     pub taken: Option<crate::exif::DateTaken>,
 }
@@ -25,7 +29,13 @@ pub struct Extras {
 impl Extras {
     /// Everything `layers` needs for `src`. `blocking` waits for the depth map (exports).
     pub fn for_render(src: &crate::imageio::SourceImage, crop: &CropRect, layers: &[LayerNode], blocking: bool) -> Extras {
-        Extras { depth: crate::depth::for_render(src, crop, layers, blocking), taken: crate::exif::date_taken_cached(src.id, &src.data) }
+        let long = src.width.max(src.height).max(1) as f64;
+        Extras {
+            subject: crate::subject::for_render(src, crop, layers, blocking),
+            crop: *crop,
+            aspect: (src.width as f64 / long, src.height as f64 / long),
+            taken: crate::exif::date_taken_cached(src.id, &src.data),
+        }
     }
 }
 
@@ -45,8 +55,10 @@ impl Renderer {
         let scale = source.width().max(source.height()) as f64 / REFERENCE_SIZE;
         let mut ctx = Ctx::new(scale, source.clone(), is_export);
         ctx.content_key = source_key;
-        let depth_key = extras.depth.as_ref().map(|d| Arc::as_ptr(&d.map) as usize).unwrap_or(0);
-        ctx.depth_src = extras.depth;
+        let depth_key = extras.subject.as_ref().map(|d| Arc::as_ptr(&d.map) as usize).unwrap_or(0);
+        ctx.subject_src = extras.subject;
+        ctx.crop = extras.crop;
+        ctx.aspect = if extras.aspect.0 > 0.0 { extras.aspect } else { (1.0, 1.0) };
         ctx.taken = extras.taken;
         let mut new_cache = HashMap::new();
         let mut h = std::collections::hash_map::DefaultHasher::new();
@@ -56,6 +68,9 @@ impl Renderer {
         source.h.hash(&mut h);
         depth_key.hash(&mut h);
         extras.taken.hash(&mut h);
+        for v in [extras.crop.x, extras.crop.y, extras.crop.w, extras.crop.h, extras.aspect.0, extras.aspect.1] {
+            v.to_bits().hash(&mut h);
+        }
         let (mut out, _, _) = self.render_stack(layers, source.clone(), h.finish(), source_key, &mut ctx, &mut new_cache);
         if let Some(c) = canvas {
             out = crate::canvas::apply(&out, c, &mut ctx);
@@ -102,14 +117,32 @@ impl Renderer {
                 let (sub, _, _) = self.render_stack(&node.children, current.clone(), current_hash, current_stable, ctx, new_cache);
                 out = sub;
             } else if let Some(eff) = effects::effect(&node.effect_id) {
-                ctx.layer_key = stable;
-                out = (eff.apply)(&current, &node.params, ctx);
-                if out.w != current.w || out.h != current.h {
-                    out = ctx.resize(&out, current.width(), current.height(), false);
-                }
-                // Effects never change transparency: restore the exact input alpha.
-                if !Arc::ptr_eq(&out, &current) && !eff.produces_alpha {
-                    out = ctx.apply("k_withalpha", &[&out, &current], &[]);
+                // the effect's output before mask / opacity / blend, cached on its own
+                let fx_key = {
+                    let mut h = std::collections::hash_map::DefaultHasher::new();
+                    0xFEEDu16.hash(&mut h);
+                    current_hash.hash(&mut h);
+                    node.effect_hash(&mut h);
+                    h.finish()
+                };
+                let cached = if self.use_cache { self.cache.get(&fx_key).or_else(|| new_cache.get(&fx_key)).cloned() } else { None };
+                out = match cached {
+                    Some(c) => c,
+                    None => {
+                        ctx.layer_key = stable;
+                        let mut o = (eff.apply)(&current, &node.params, ctx);
+                        if o.w != current.w || o.h != current.h {
+                            o = ctx.resize(&o, current.width(), current.height(), false);
+                        }
+                        // Effects never change transparency: restore the exact input alpha.
+                        if !Arc::ptr_eq(&o, &current) && !eff.produces_alpha {
+                            o = ctx.apply("k_withalpha", &[&o, &current], &[]);
+                        }
+                        o
+                    }
+                };
+                if self.use_cache && (node.resolved_mask.is_some() || node.params.choice_or("depthBias", "off") != "off") {
+                    new_cache.insert(fx_key, out.clone());
                 }
             } else {
                 continue;
@@ -131,7 +164,8 @@ impl Renderer {
     }
 }
 
-/// Mask of a layer: its document mask (`resolved_mask`) × the effect's "Depth" weighting, if any.
+/// Mask of a layer: its document mask (`resolved_mask`) × the effect's "Where" weighting
+/// (subject / background), if any.
 fn layer_mask(node: &LayerNode, ctx: &mut Ctx) -> Option<T> {
     let rm = node.resolved_mask.as_ref().filter(|r| r.mask.is_active());
     let bias = if node.is_group { "off".to_string() } else { node.params.choice_or("depthBias", "off") };
@@ -143,30 +177,80 @@ fn layer_mask(node: &LayerNode, ctx: &mut Ctx) -> Option<T> {
     if rm.is_none() && dir == 0.0 {
         return None;
     }
-    let d = ctx.depth()?;
-    let mut m = rm.and_then(|r| mask_texture(&r.mask, r.invert, &d, ctx));
+    let mut m = rm.and_then(|r| mask_texture(&r.mask, r.invert, ctx));
     if dir != 0.0 {
-        let amount = (node.params.num("depthBiasAmount", 80.0) / 100.0) as f32;
-        let b = ctx.apply("k_depthmask", &[&d], &[0.0, 0.0, 0.0, 0.0, 0.0, dir, amount]);
-        m = Some(match m {
-            Some(x) => ctx.apply("k_maskop", &[&x, &b], &[MaskMode::Intersect.shader_index()]),
-            None => b,
-        });
+        if let Some(d) = ctx.subject() {
+            let amount = (node.params.num("depthBiasAmount", 80.0) / 100.0) as f32;
+            let b = ctx.apply("k_depthmask", &[&d], &[0.0, 0.0, 0.0, 0.0, 0.0, dir, amount]);
+            m = Some(match m {
+                Some(x) => ctx.apply("k_maskop", &[&x, &b], &[MaskMode::Intersect.shader_index()]),
+                None => b,
+            });
+        }
     }
     m
 }
 
-/// Renders a document mask (1 = selected) at the size of `depth`. The first enabled part is the
+/// Renders one mask part (1 = selected) at the render size. None when it needs the subject
+/// matte and that is not ready yet.
+pub fn part_texture(shape: &MaskShape, ctx: &mut Ctx) -> Option<T> {
+    let (w, h) = (ctx.width, ctx.height);
+    let c = ctx.crop;
+    let (ax, ay) = ctx.aspect;
+    let g = [c.x as f32, c.y as f32, c.w as f32, c.h as f32, ax as f32, ay as f32];
+    let src = ctx.source.clone();
+    Some(match shape {
+        MaskShape::Linear { x, y, angle, width } => {
+            let mut u = vec![0.0];
+            u.extend(g);
+            u.extend([*x as f32, *y as f32, *angle as f32, *width as f32]);
+            ctx.apply_sized("k_maskgeom", &[&src], &u, None, w, h)
+        }
+        MaskShape::Radial { x, y, rx, ry, angle, feather } => {
+            let mut u = vec![1.0];
+            u.extend(g);
+            u.extend([*x as f32, *y as f32, *rx as f32, *ry as f32, *angle as f32, *feather as f32]);
+            ctx.apply_sized("k_maskgeom", &[&src], &u, None, w, h)
+        }
+        MaskShape::Brush { strokes } => {
+            let (rw, rh) = crate::brush::raster_size(w, h);
+            let cov = crate::brush::raster(strokes, rw, rh, &c, ctx.aspect);
+            let px: Vec<f32> = cov.iter().flat_map(|v| [*v, *v, *v, 1.0]).collect();
+            let low = ctx.gpu().texture_from_rgba_f32(&px, rw, rh, 1);
+            if (rw, rh) == (w, h) { low } else { ctx.resize(&low, w, h, true) }
+        }
+        MaskShape::Subject { softness, grow } | MaskShape::Background { softness, grow } => {
+            let d = ctx.subject()?;
+            let (sf, gr) = (softness.clamp(0.0, 1.0), grow.clamp(-1.0, 1.0));
+            // blur so the edge can move (grow / shrink) and soften
+            let r = ctx.px(2.0 + sf * 30.0 + gr.abs() * 30.0);
+            let b = if r > 0.6 { ctx.blur(&d, r) } else { d };
+            let thr = (0.5 - gr * 0.42) as f32;
+            let hw = (0.04 + sf * 0.45) as f32;
+            let inv = if matches!(shape, MaskShape::Background { .. }) { 1.0 } else { 0.0 };
+            ctx.apply("k_subjectmask", &[&b], &[thr, hw, inv])
+        }
+        MaskShape::Depth { from, to, feather } => {
+            let d = ctx.subject()?;
+            ctx.apply("k_depthmask", &[&d], &[1.0, *from as f32, *to as f32, *feather as f32, 0.0, 0.0, 0.0])
+        }
+    })
+}
+
+/// Renders a document mask (1 = selected) at the render size. The first enabled part is the
 /// base; the others add, subtract or intersect. None when no part is enabled.
-pub fn mask_texture(mask: &Mask, invert: bool, depth: &T, ctx: &mut Ctx) -> Option<T> {
+pub fn mask_texture(mask: &Mask, invert: bool, ctx: &mut Ctx) -> Option<T> {
     let mut acc: Option<T> = None;
     for part in mask.parts.iter().filter(|p| p.enabled) {
-        let t = match &part.shape {
-            MaskShape::Depth { from, to, feather } => {
-                ctx.apply("k_depthmask", &[depth], &[1.0, *from as f32, *to as f32, *feather as f32, if part.invert { 1.0 } else { 0.0 }, 0.0, 0.0])
-            }
-        };
+        let Some(mut t) = part_texture(&part.shape, ctx) else { continue };
+        if part.invert {
+            t = ctx.apply("k_maskop", &[&t, &t], &[3.0]);
+        }
         acc = Some(match acc {
+            None if part.mode == MaskMode::Subtract => {
+                // a lone subtract part: everything minus it
+                ctx.apply("k_maskop", &[&t, &t], &[3.0])
+            }
             None => t,
             Some(a) => ctx.apply("k_maskop", &[&a, &t], &[part.mode.shader_index()]),
         });

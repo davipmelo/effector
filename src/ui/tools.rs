@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use super::theme::*;
 use super::widgets::*;
-use crate::app::{AppState, Tool};
+use crate::app::{AppState, MaskDraw, Tool};
 use crate::l10n::{tr, trf};
 use crate::model::*;
 use crate::shortcuts::{self, Action};
@@ -138,31 +138,85 @@ pub fn canvas_panel(ui: &mut Ui, app: &mut AppState) {
 // MARK: - Masks
 
 /// Quick depth selections offered when creating a mask or a part.
-const DEPTH_PRESETS: [(&str, &str, f64, f64); 3] = [
-    ("Subject", "Near the camera", 0.55, 1.0),
-    ("Background", "Far from the camera", 0.0, 0.42),
-    ("Middle", "Middle distance", 0.3, 0.7),
+/// The five ways to make a mask (Lightroom Classic order), with their shortcut actions.
+const MASK_KINDS: [(&str, &str, Action); 5] = [
+    ("mask.subject", "Select Subject", Action::MaskSubject),
+    ("mask.background", "Select Background", Action::MaskBackground),
+    ("paintbrush", "Brush", Action::MaskBrush),
+    ("mask.linear", "Linear Gradient", Action::MaskLinear),
+    ("mask.radial", "Radial Gradient", Action::MaskRadial),
 ];
 
-fn depth_shape(from: f64, to: f64) -> MaskShape { MaskShape::Depth { from, to, feather: 0.12 } }
-
-/// "Create Mask" button with its menu of mask kinds.
-fn create_mask_button(ui: &mut Ui, app: &mut AppState, apply_to: Option<Uuid>) {
-    let resp = pill_icon_button(ui, "plus", &tr("Create Mask"), true);
-    egui::Popup::menu(&resp).show(|ui| {
-        ui.set_min_width(220.0);
-        ui.label(egui::RichText::new(spaced_upper(&tr("Depth"))).font(section_font()).color(text_faint()));
-        for (name, sub, a, b) in DEPTH_PRESETS {
-            if ui.add(egui::Button::new(format!("{}  ·  {}", tr(name), tr(sub)))).clicked() {
-                let id = app.create_mask(depth_shape(a, b), apply_to);
-                let nm = format!("{} {}", tr(name), app.state().masks.iter().filter(|m| m.name.starts_with(&tr(name))).count() + 1);
-                app.update_mask(id, None, |m| m.name = nm.clone());
-                ui.close();
-            }
+/// Starts making a part of kind `i` of `MASK_KINDS`: AI kinds are added at once, drawing kinds
+/// arm the tool (the part appears when you drag on the image).
+fn begin_kind(app: &mut AppState, i: usize, into: Option<(Uuid, MaskMode)>) {
+    match i {
+        0 => {
+            app.add_mask_part(MaskShape::subject_default(), into);
         }
-        ui.separator();
-        ui.add_enabled(false, egui::Button::new(tr("Brush, gradients and color range: coming soon")));
-    });
+        1 => {
+            app.add_mask_part(MaskShape::background_default(), into);
+        }
+        _ => {
+            app.mask_draw_into = into;
+            let d = match i {
+                2 => MaskDraw::Brush,
+                3 => MaskDraw::Linear,
+                _ => MaskDraw::Radial,
+            };
+            app.start_mask_draw(Some(d));
+            app.mask_draw = Some(d);
+        }
+    }
+}
+
+/// Menu with the five mask kinds. Returns the chosen index.
+fn kinds_menu(ui: &mut Ui) -> Option<usize> {
+    ui.set_min_width(230.0);
+    let mut out = None;
+    for (i, (sym, label, action)) in MASK_KINDS.iter().enumerate() {
+        if i == 2 {
+            ui.separator();
+        }
+        let keys = shortcuts::display(*action);
+        let text = if keys.is_empty() { format!("{}  {}", icon_text(sym), tr(label)) } else { format!("{}  {}      {}", icon_text(sym), tr(label), keys) };
+        if ui.add(egui::Button::new(egui::RichText::new(text).font(regular(12.0)))).clicked() {
+            out = Some(i);
+            ui.close();
+        }
+    }
+    out
+}
+
+/// Big buttons for the five kinds (shown when there is no mask yet).
+fn kinds_grid(ui: &mut Ui, app: &mut AppState) {
+    let w = ui.available_width();
+    for (i, (sym, label, action)) in MASK_KINDS.iter().enumerate() {
+        let (r, resp) = ui.allocate_exact_size(vec2(w, 30.0), Sense::click());
+        let armed = match i {
+            2 => app.mask_draw == Some(MaskDraw::Brush),
+            3 => app.mask_draw == Some(MaskDraw::Linear),
+            4 => app.mask_draw == Some(MaskDraw::Radial),
+            _ => false,
+        };
+        ui.painter().rect_filled(r, CornerRadius::same(7), if armed { row_selected() } else if resp.hovered() { field_strong() } else { field() });
+        paint_icon(ui, Rect::from_center_size(pos2(r.left() + 16.0, r.center().y), vec2(16.0, 16.0)), sym, 13.0, if armed { accent_text() } else { text_dim() });
+        ui.painter().text(pos2(r.left() + 32.0, r.center().y), egui::Align2::LEFT_CENTER, tr(label), regular(12.0), text());
+        let keys = shortcuts::display(*action);
+        ui.painter().text(pos2(r.right() - 10.0, r.center().y), egui::Align2::RIGHT_CENTER, keys, regular(10.5), text_faint());
+        if resp.clicked() {
+            begin_kind(app, i, None);
+        }
+        ui.add_space(2.0);
+    }
+}
+
+/// "Create New Mask" button with its menu.
+fn create_mask_button(ui: &mut Ui, app: &mut AppState) {
+    let resp = pill_icon_button(ui, "plus", &tr("Create New Mask"), true);
+    if let Some(i) = egui::Popup::menu(&resp).show(kinds_menu).and_then(|r| r.inner) {
+        begin_kind(app, i, None);
+    }
 }
 
 pub fn masks_panel(ui: &mut Ui, app: &mut AppState) {
@@ -185,18 +239,77 @@ pub fn masks_panel(ui: &mut Ui, app: &mut AppState) {
                     hint(ui, &tr("Masks limit effects to a part of the image. Create a mask, then choose which effects use it. One mask can be used by many effects."));
                 });
                 ui.add_space(8.0);
+                kinds_grid(ui, app);
+            } else {
+                for m in &st.masks {
+                    mask_list_row(ui, app, &st, m);
+                }
+                ui.add_space(8.0);
+                ui.horizontal(|ui| create_mask_button(ui, app));
             }
-            for m in &st.masks {
-                mask_list_row(ui, app, &st, m);
-            }
-            ui.add_space(8.0);
-            ui.horizontal(|ui| create_mask_button(ui, app, None));
         });
+        draw_status(ui, app);
         let st = app.state();
         let Some(mask) = app.selected_mask.and_then(|id| st.mask(id).cloned()) else { return };
         ui.add_space(4.0);
         separator_line(ui);
         mask_editor(ui, app, &st, &mask);
+    });
+}
+
+/// What the armed drawing tool does, and its settings (brush).
+fn draw_status(ui: &mut Ui, app: &mut AppState) {
+    let Some(d) = app.mask_draw else { return };
+    egui::Frame::new().inner_margin(egui::Margin { left: 10, right: 10, top: 4, bottom: 8 }).show(ui, |ui| {
+        egui::Frame::new().fill(with_alpha(ACCENT, 0.12)).corner_radius(CornerRadius::same(8)).inner_margin(10).show(ui, |ui| {
+            ui.spacing_mut().item_spacing.y = 6.0;
+            ui.horizontal(|ui| {
+                let (sym, title) = match d {
+                    MaskDraw::Brush => ("paintbrush", "Brush"),
+                    MaskDraw::Linear => ("mask.linear", "Linear Gradient"),
+                    MaskDraw::Radial => ("mask.radial", "Radial Gradient"),
+                };
+                let (ir, _) = ui.allocate_exact_size(vec2(16.0, 16.0), Sense::hover());
+                paint_icon(ui, ir, sym, 13.0, accent_text());
+                ui.label(egui::RichText::new(tr(title)).font(semibold(12.0)).color(text()));
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.add(egui::Button::new(tr("Done"))).on_hover_text(keys_hint("⎋")).clicked() {
+                        app.mask_draw = None;
+                    }
+                });
+            });
+            let into = app.mask_draw_into.and_then(|(m, mode)| app.state().mask(m).map(|mm| (mm.name.clone(), mode)));
+            let target = match &into {
+                Some((n, MaskMode::Subtract)) => trf("Subtracting from %@", &[n]),
+                Some((n, MaskMode::Intersect)) => trf("Intersecting with %@", &[n]),
+                Some((n, _)) => trf("Adding to %@", &[n]),
+                None => String::new(),
+            };
+            match d {
+                MaskDraw::Brush => {
+                    hint(ui, &keys_hint(&tr("Paint on the image · hold ⌥ to erase · [ ] size · ⇧[ ⇧] feather")));
+                    let b = app.brush;
+                    let id = Id::new("brush-settings");
+                    if let Some(v) = value_slider(ui, id.with("size"), SliderSpec::new("Size", b.size as f64 * 1000.0, 2.0, 400.0, 35.0).step(1.0).curve(1.8)) {
+                        app.brush.size = (v / 1000.0) as f32;
+                    }
+                    if let Some(v) = value_slider(ui, id.with("feather"), SliderSpec::new("Feather", b.feather as f64 * 100.0, 0.0, 100.0, 60.0).step(1.0).unit("%")) {
+                        app.brush.feather = (v / 100.0) as f32;
+                    }
+                    if let Some(v) = value_slider(ui, id.with("flow"), SliderSpec::new("Flow", b.flow as f64 * 100.0, 1.0, 100.0, 80.0).step(1.0).unit("%")) {
+                        app.brush.flow = (v / 100.0) as f32;
+                    }
+                    if let Some(v) = toggle_row(ui, "Erase", app.brush_erase) {
+                        app.brush_erase = v;
+                    }
+                }
+                MaskDraw::Linear => hint(ui, &tr("Drag on the image: from where the effect is full to where it fades out.")),
+                MaskDraw::Radial => hint(ui, &keys_hint(&tr("Drag on the image from the centre outward · ⇧ for a circle."))),
+            }
+            if !target.is_empty() {
+                hint(ui, &target);
+            }
+        });
     });
 }
 
@@ -226,6 +339,9 @@ fn mask_list_row(ui: &mut Ui, app: &mut AppState, st: &DocumentState, m: &Mask) 
     let g = ui.painter().layout_job(job);
     ui.painter().galley(pos2(r.left() + 28.0, r.center().y - g.size().y / 2.0), g, text());
     if resp.clicked() {
+        if app.selected_mask != Some(m.id) {
+            app.selected_part = m.parts.first().map(|p| p.id);
+        }
         app.selected_mask = Some(m.id);
         app.request_render();
     }
@@ -271,30 +387,39 @@ fn mask_editor(ui: &mut Ui, app: &mut AppState, st: &DocumentState, mask: &Mask)
             });
         });
     });
-    if app.depth_busy() {
-        egui::Frame::new().inner_margin(egui::Margin::symmetric(14, 2)).show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.add(egui::Spinner::new().size(11.0));
-                ui.label(egui::RichText::new(tr("Calculating depth…")).font(regular(11.0)).color(text_dim()));
+    if mask.needs_subject() {
+        if app.subject_busy() {
+            egui::Frame::new().inner_margin(egui::Margin::symmetric(14, 2)).show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.add(egui::Spinner::new().size(11.0));
+                    ui.label(egui::RichText::new(tr("Detecting the subject…")).font(regular(11.0)).color(text_dim()));
+                });
             });
-        });
-    } else if !crate::depth::model_available() {
-        egui::Frame::new().inner_margin(egui::Margin::symmetric(14, 2)).show(ui, |ui| {
-            hint(ui, &tr("Depth model not found: reinstall EFFECTOR to use depth"));
-        });
+        } else if !crate::subject::model_available() {
+            egui::Frame::new().inner_margin(egui::Margin::symmetric(14, 2)).show(ui, |ui| {
+                hint(ui, &tr("Subject detection model not found: reinstall EFFECTOR"));
+            });
+        }
+    }
+    if app.selected_part.map(|p| !mask.parts.iter().any(|x| x.id == p)).unwrap_or(true) {
+        app.selected_part = mask.parts.first().map(|p| p.id);
     }
     let n = mask.parts.len();
     for (i, part) in mask.parts.iter().enumerate() {
         mask_part(ui, app, mask, i, part, n);
     }
     egui::Frame::new().inner_margin(egui::Margin { left: 14, right: 14, top: 6, bottom: 10 }).show(ui, |ui| {
-        // Lightroom-style: add or subtract another range
+        // Lightroom-style: add to or subtract from this mask with any kind
         ui.horizontal(|ui| {
-            if pill_icon_button(ui, "plus", &tr("Add"), false).on_hover_text(tr("Add another depth range to this mask")).clicked() {
-                app.update_mask(mid, None, |m| m.parts.push(MaskPart::new(depth_shape(0.3, 0.7), MaskMode::Add)));
+            let add = pill_icon_button(ui, "plus", &tr("Add"), false).on_hover_text(tr("Add to this mask"));
+            if let Some(i) = egui::Popup::menu(&add).show(kinds_menu).and_then(|r| r.inner) {
+                begin_kind(app, i, Some((mid, MaskMode::Add)));
             }
-            if pill_icon_button(ui, "minus", &tr("Subtract"), false).on_hover_text(tr("Remove a depth range from this mask")).clicked() {
-                app.update_mask(mid, None, |m| m.parts.push(MaskPart::new(depth_shape(0.0, 0.42), MaskMode::Subtract)));
+        });
+        ui.horizontal(|ui| {
+            let sub = pill_icon_button(ui, "minus", &tr("Subtract"), false).on_hover_text(tr("Subtract from this mask"));
+            if let Some(i) = egui::Popup::menu(&sub).show(kinds_menu).and_then(|r| r.inner) {
+                begin_kind(app, i, Some((mid, MaskMode::Subtract)));
             }
         });
     });
@@ -338,165 +463,134 @@ fn mask_editor(ui: &mut Ui, app: &mut AppState, st: &DocumentState, mask: &Mask)
             crate::settings::update(|s| s.mask_overlay = v);
             app.request_render();
         }
-        let dv = app.show_depth;
-        if ui.add(egui::Button::selectable(dv, format!("{}  {}", tr("View depth map"), shortcuts::display(Action::ShowDepth)))).clicked() {
-            app.show_depth = !dv;
-            app.request_render();
-        }
-        hint(ui, &tr("0% = farthest, 100% = nearest. The depth map is estimated by AI on this computer."));
     });
 }
 
 fn mask_part(ui: &mut Ui, app: &mut AppState, mask: &Mask, i: usize, part: &MaskPart, n: usize) {
     let mid = mask.id;
     let pid = part.id;
+    let sel = app.selected_part == Some(pid);
     let set = move |app: &mut AppState, key: &str, f: &dyn Fn(&mut MaskPart)| {
-        app.update_mask(mid, Some(format!("{pid}-{key}")), |m| {
-            if let Some(p) = m.parts.iter_mut().find(|p| p.id == pid) {
-                f(p);
-            }
-        });
+        app.update_part(mid, pid, Some(format!("{pid}-{key}")), |p| f(p));
     };
     egui::Frame::new().inner_margin(egui::Margin { left: 10, right: 10, top: 4, bottom: 4 }).show(ui, |ui| {
-        egui::Frame::new().fill(with_alpha(field(), 0.6)).corner_radius(CornerRadius::same(8)).inner_margin(10).show(ui, |ui| {
-            ui.spacing_mut().item_spacing.y = 8.0;
-            ui.horizontal(|ui| {
-                let (ir, _) = ui.allocate_exact_size(vec2(16.0, 16.0), Sense::hover());
-                paint_icon(ui, ir, part.shape.symbol(), 13.0, accent_text());
-                let title = if i == 0 { tr(part.shape.kind_label()) } else { format!("{} · {}", tr(part.mode.label()), tr(part.shape.kind_label())) };
-                ui.label(egui::RichText::new(title).font(semibold(12.0)).color(if part.enabled { text() } else { text_faint() }));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.spacing_mut().item_spacing.x = 2.0;
-                    if n > 1 && icon_button(ui, "xmark", "Remove", false, 11.0).clicked() {
-                        app.update_mask(mid, None, |m| m.parts.retain(|p| p.id != pid));
+        let fr = egui::Frame::new()
+            .fill(with_alpha(field(), if sel { 0.95 } else { 0.5 }))
+            .stroke(if sel { Stroke::new(1.0, with_alpha(ACCENT, 0.6)) } else { Stroke::NONE })
+            .corner_radius(CornerRadius::same(8))
+            .inner_margin(10)
+            .show(ui, |ui| {
+                ui.spacing_mut().item_spacing.y = 8.0;
+                ui.horizontal(|ui| {
+                    let (ir, _) = ui.allocate_exact_size(vec2(16.0, 16.0), Sense::hover());
+                    paint_icon(ui, ir, part.shape.symbol(), 13.0, accent_text());
+                    let title = if i == 0 { tr(part.shape.kind_label()) } else { format!("{} · {}", tr(part.mode.label()), tr(part.shape.kind_label())) };
+                    let t = ui.add(egui::Label::new(egui::RichText::new(title).font(semibold(12.0)).color(if part.enabled { text() } else { text_faint() })).sense(Sense::click()));
+                    if t.clicked() {
+                        app.selected_part = Some(pid);
                     }
-                    if icon_button(ui, if part.enabled { "eye" } else { "eye.slash" }, "Show / Hide", false, 12.0).clicked() {
-                        let on = !part.enabled;
-                        set(app, "on", &move |p| p.enabled = on);
-                    }
-                });
-            });
-            if i > 0 {
-                let modes = vec![("add".to_string(), tr("Add")), ("subtract".to_string(), tr("Subtract")), ("intersect".to_string(), tr("Intersect"))];
-                let cur = match part.mode {
-                    MaskMode::Add => "add",
-                    MaskMode::Subtract => "subtract",
-                    MaskMode::Intersect => "intersect",
-                };
-                if let Some(v) = segmented_row(ui, "", &modes, cur) {
-                    let mode = match v.as_str() {
-                        "subtract" => MaskMode::Subtract,
-                        "intersect" => MaskMode::Intersect,
-                        _ => MaskMode::Add,
-                    };
-                    set(app, "mode", &move |p| p.mode = mode);
-                }
-            }
-            match &part.shape {
-                MaskShape::Depth { from, to, feather } => {
-                    let (from, to, feather) = (*from, *to, *feather);
-                    ui.horizontal(|ui| {
-                        ui.spacing_mut().item_spacing.x = 4.0;
-                        for (name, _, a, b) in [DEPTH_PRESETS[1], DEPTH_PRESETS[2], DEPTH_PRESETS[0]] {
-                            let on = (from - a).abs() < 1e-3 && (to - b).abs() < 1e-3;
-                            if ui.add(egui::Button::selectable(on, tr(name))).clicked() {
-                                set(app, "preset", &move |p| {
-                                    if let MaskShape::Depth { from, to, .. } = &mut p.shape {
-                                        *from = a;
-                                        *to = b;
-                                    }
-                                });
-                            }
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.spacing_mut().item_spacing.x = 2.0;
+                        if icon_button(ui, if n > 1 { "xmark" } else { "trash" }, "Remove", false, 11.0).clicked() {
+                            app.delete_part(mid, pid);
+                        }
+                        if icon_button(ui, if part.enabled { "eye" } else { "eye.slash" }, "Show / Hide", false, 12.0).clicked() {
+                            let on = !part.enabled;
+                            set(app, "on", &move |p| p.enabled = on);
                         }
                     });
-                    let track: Vec<Rgba> = (0..8)
-                        .map(|i| {
-                            let v = 0.08 + 0.84 * i as f64 / 7.0;
-                            Rgba::new(v, v, v)
-                        })
-                        .collect();
-                    let id = Id::new(("mask-part", pid));
-                    if let Some(v) = value_slider(ui, id.with("from"), SliderSpec::new("Far edge", from * 100.0, 0.0, 100.0, 0.0).step(1.0).unit("%").track(Some(&track))) {
-                        set(app, "from", &move |p| {
-                            if let MaskShape::Depth { from, .. } = &mut p.shape {
-                                *from = v / 100.0;
-                            }
-                        });
-                    }
-                    if let Some(v) = value_slider(ui, id.with("to"), SliderSpec::new("Near edge", to * 100.0, 0.0, 100.0, 100.0).step(1.0).unit("%").track(Some(&track))) {
-                        set(app, "to", &move |p| {
-                            if let MaskShape::Depth { to, .. } = &mut p.shape {
-                                *to = v / 100.0;
-                            }
-                        });
-                    }
-                    if let Some(v) = value_slider(ui, id.with("feather"), SliderSpec::new("Softness", feather * 100.0, 0.0, 50.0, 12.0).step(1.0).unit("%")) {
-                        set(app, "feather", &move |p| {
-                            if let MaskShape::Depth { feather, .. } = &mut p.shape {
-                                *feather = v / 100.0;
-                            }
-                        });
+                });
+                if i > 0 {
+                    let modes = vec![("add".to_string(), tr("Add")), ("subtract".to_string(), tr("Subtract")), ("intersect".to_string(), tr("Intersect"))];
+                    let cur = match part.mode {
+                        MaskMode::Add => "add",
+                        MaskMode::Subtract => "subtract",
+                        MaskMode::Intersect => "intersect",
+                    };
+                    if let Some(v) = segmented_row(ui, "", &modes, cur) {
+                        let mode = match v.as_str() {
+                            "subtract" => MaskMode::Subtract,
+                            "intersect" => MaskMode::Intersect,
+                            _ => MaskMode::Add,
+                        };
+                        set(app, "mode", &move |p| p.mode = mode);
                     }
                 }
-            }
-            if let Some(v) = toggle_row(ui, "Invert", part.invert) {
-                set(app, "invert", &move |p| p.invert = v);
-            }
-        });
+                let id = Id::new(("mask-part", pid));
+                let sl = |ui: &mut Ui, key: &str, label: &str, v: f64, min: f64, max: f64, def: f64, unit: &'static str| -> Option<f64> {
+                    value_slider(ui, id.with(key.to_string()), SliderSpec::new(label, v, min, max, def).step(1.0).unit(unit))
+                };
+                match part.shape.clone() {
+                    MaskShape::Linear { angle, width, .. } => {
+                        if let Some(v) = sl(ui, "width", "Softness", width * 100.0, 1.0, 150.0, 30.0, "%") {
+                            set(app, "width", &move |p| if let MaskShape::Linear { width, .. } = &mut p.shape { *width = v / 100.0 });
+                        }
+                        if let Some(v) = sl(ui, "angle", "Angle", angle, -180.0, 180.0, 90.0, "°") {
+                            set(app, "angle", &move |p| if let MaskShape::Linear { angle, .. } = &mut p.shape { *angle = v });
+                        }
+                    }
+                    MaskShape::Radial { rx, ry, angle, feather, .. } => {
+                        let size = (rx.max(ry) * 100.0).max(0.1);
+                        if let Some(v) = sl(ui, "size", "Size", size, 1.0, 150.0, 25.0, "%") {
+                            let k = v / size;
+                            set(app, "size", &move |p| if let MaskShape::Radial { rx, ry, .. } = &mut p.shape { *rx *= k; *ry *= k });
+                        }
+                        if let Some(v) = sl(ui, "round", "Roundness", (rx.min(ry) / rx.max(ry).max(1e-6)) * 100.0, 5.0, 100.0, 72.0, "%") {
+                            set(app, "round", &move |p| if let MaskShape::Radial { rx, ry, .. } = &mut p.shape {
+                                let big = rx.max(*ry);
+                                if *rx >= *ry { *ry = big * v / 100.0 } else { *rx = big * v / 100.0 }
+                            });
+                        }
+                        if let Some(v) = sl(ui, "feather", "Feather", feather * 100.0, 0.0, 100.0, 50.0, "%") {
+                            set(app, "feather", &move |p| if let MaskShape::Radial { feather, .. } = &mut p.shape { *feather = v / 100.0 });
+                        }
+                        if let Some(v) = sl(ui, "angle", "Angle", angle, -180.0, 180.0, 0.0, "°") {
+                            set(app, "angle", &move |p| if let MaskShape::Radial { angle, .. } = &mut p.shape { *angle = v });
+                        }
+                    }
+                    MaskShape::Brush { strokes } => {
+                        ui.horizontal(|ui| {
+                            let painting = app.mask_draw == Some(MaskDraw::Brush) && sel;
+                            if ui.add(egui::Button::selectable(painting, format!("{}  {}", icon_text("paintbrush"), tr("Paint")))).clicked() {
+                                app.selected_part = Some(pid);
+                                app.mask_draw_into = None;
+                                app.mask_draw = if painting { None } else { Some(MaskDraw::Brush) };
+                            }
+                            if ui.add_enabled(!strokes.is_empty(), egui::Button::new(tr("Clear"))).clicked() {
+                                set(app, "clear", &|p| if let MaskShape::Brush { strokes } = &mut p.shape { strokes.clear() });
+                            }
+                        });
+                        hint(ui, &trf("%d strokes", &[&strokes.len()]));
+                    }
+                    MaskShape::Subject { softness, grow } | MaskShape::Background { softness, grow } => {
+                        if let Some(v) = sl(ui, "soft", "Edge Softness", softness * 100.0, 0.0, 100.0, 15.0, "%") {
+                            set(app, "soft", &move |p| match &mut p.shape {
+                                MaskShape::Subject { softness, .. } | MaskShape::Background { softness, .. } => *softness = v / 100.0,
+                                _ => {}
+                            });
+                        }
+                        if let Some(v) = sl(ui, "grow", "Expand / Contract", grow * 100.0, -100.0, 100.0, 0.0, "%") {
+                            set(app, "grow", &move |p| match &mut p.shape {
+                                MaskShape::Subject { grow, .. } | MaskShape::Background { grow, .. } => *grow = v / 100.0,
+                                _ => {}
+                            });
+                        }
+                    }
+                    MaskShape::Depth { .. } => {}
+                }
+                if let Some(v) = toggle_row(ui, &keys_hint(&format!("{}  (')", tr("Invert"))), part.invert) {
+                    set(app, "invert", &move |p| p.invert = v);
+                }
+            });
+        if fr.response.interact(Sense::click()).clicked() {
+            app.selected_part = Some(pid);
+        }
     });
-}
-
-/// "Mask" row of a layer's settings (Edit tool): which mask limits it, inverted or not.
-pub fn layer_mask_row(ui: &mut Ui, app: &mut AppState, layer: &LayerNode) {
-    let st = app.state();
-    let lid = layer.id;
-    let mut items = vec![PickerItem::new("none", &tr("None (whole image)"), None)];
-    for m in &st.masks {
-        items.push(PickerItem::new(&m.id.to_string(), &m.name, Some(tr("Masks"))));
-    }
-    let cur = layer.mask.filter(|r| st.mask(r.id).is_some());
-    let sel = cur.map(|r| r.id.to_string()).unwrap_or_else(|| "none".into());
-    let actions = vec![
-        PickerAction { label: tr("New Mask…"), symbol: "plus", destructive: false },
-        PickerAction { label: tr("Edit Masks…"), symbol: "circle.dashed.inset.filled", destructive: false },
-    ];
-    labeled_row(ui, "Mask", |ui| {
-        let r = picker_field(ui, &format!("layer-mask.{lid}"), &items, &sel, None, &actions, false);
-        if let Some(v) = r.selected {
-            let invert = cur.map(|c| c.invert).unwrap_or(false);
-            let m = if v == "none" { None } else { Uuid::parse_str(&v).ok().map(|id| MaskRef { id, invert }) };
-            app.set_layer_mask(lid, m);
-        }
-        match r.action {
-            Some(0) => {
-                app.create_mask(depth_shape(DEPTH_PRESETS[0].2, DEPTH_PRESETS[0].3), Some(lid));
-                app.set_tool(Tool::Masks);
-            }
-            Some(1) => {
-                app.selected_mask = cur.map(|c| c.id).or(app.selected_mask);
-                app.set_tool(Tool::Masks);
-            }
-            _ => {}
-        }
-    });
-    if let Some(c) = cur {
-        if let Some(v) = toggle_row(ui, "Invert Mask", c.invert) {
-            app.set_layer_mask(lid, Some(MaskRef { id: c.id, invert: v }));
-        }
-    }
 }
 
 /// Overlay of the selected mask on the image (Masks tool), placed over the photo inside the
 /// canvas borders.
 pub fn paint_mask_overlay(ui: &Ui, app: &AppState, tex: egui::TextureId, img_rect: Rect, clip: Rect) {
-    let Some(src) = app.source() else { return };
-    let st = app.state();
-    let mut r = img_rect;
-    if let Some(c) = st.active_canvas() {
-        let (cw, ch) = src.cropped_size(&st.crop);
-        let ((ow, oh), (ix, iy, iw, ih)) = c.layout(cw as f64, ch as f64);
-        let (sx, sy) = (img_rect.width() as f64 / ow, img_rect.height() as f64 / oh);
-        r = Rect::from_min_size(pos2(img_rect.left() + (ix * sx) as f32, img_rect.top() + (iy * sy) as f32), vec2((iw * sx) as f32, (ih * sy) as f32));
-    }
+    let r = super::mask_canvas::photo_rect(app, img_rect);
     ui.painter().with_clip_rect(clip).image(tex, r, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
 }

@@ -21,8 +21,6 @@ pub struct RenderRequest {
     pub scale: f64,
     /// Also produce the cropped full-resolution-ish texture for the crop tool.
     pub want_crop_view: bool,
-    /// Show the depth map instead of the result.
-    pub show_depth: bool,
     /// Paint clipped highlights / shadows on the display copy (J).
     pub show_clipping: bool,
     /// Measure the histogram of the result (only while the histogram panel is open).
@@ -105,30 +103,21 @@ impl RenderWorker {
                         let shown = shrink(&mut ctx, &out);
                         let mut display = if req.show_clipping { ctx.apply("k_clipview", &[&shown], &[]) } else { to_display(&mut ctx, &shown) };
                         let histogram = if req.want_histogram { Some(Arc::new(crate::histogram::Histogram::of(&mut ctx, &out))) } else { None };
-                        if req.show_depth {
-                            if let Some(map) = crate::depth::get(req.source.id) {
-                                let mut dc = Ctx::new(1.0, src_tex.clone(), false);
-                                dc.depth_src = Some(crate::depth::DepthSrc { map, crop: req.crop });
-                                if let Some(d) = dc.depth() {
-                                    let v = dc.apply("k_depthview", &[&d], &[]);
-                                    let v = if v.width() != out.width() || v.height() != out.height() { dc.resize(&v, out.width(), out.height(), true) } else { v };
-                                    display = to_display(&mut dc, &v);
-                                }
-                                dc.flush();
-                            }
-                        }
                         let mut mask_view = None;
                         if let Some(m) = &req.mask_overlay {
-                            if let Some(map) = crate::depth::get(req.source.id) {
-                                let mut dc = Ctx::new(1.0, src_tex.clone(), false);
-                                dc.depth_src = Some(crate::depth::DepthSrc { map, crop: req.crop });
-                                if let Some(d) = dc.depth() {
-                                    if let Some(t) = crate::renderer::mask_texture(m, false, &d, &mut dc) {
-                                        mask_view = Some(dc.apply("k_maskview", &[&t], &[0.55]));
-                                    }
+                            let mut dc = Ctx::new(src_tex.width().max(src_tex.height()) as f64 / crate::renderer::REFERENCE_SIZE, src_tex.clone(), false);
+                            dc.crop = req.crop;
+                            let long = req.source.width.max(req.source.height).max(1) as f64;
+                            dc.aspect = (req.source.width as f64 / long, req.source.height as f64 / long);
+                            if m.needs_subject() {
+                                if let Some(map) = crate::subject::get(req.source.id) {
+                                    dc.subject_src = Some(crate::subject::SubjectSrc { map, crop: req.crop });
                                 }
-                                dc.flush();
                             }
+                            if let Some(t) = crate::renderer::mask_texture(m, false, &mut dc) {
+                                mask_view = Some(dc.apply("k_maskview", &[&t], &[0.55]));
+                            }
+                            dc.flush();
                         }
                         let orig_shown = match req.canvas {
                             // the original has no canvas borders: shrink it by the same factor

@@ -10,6 +10,7 @@ pub mod histogram;
 pub mod icons;
 pub mod inspector;
 pub mod layers;
+pub mod mask_canvas;
 pub mod theme;
 pub mod tools;
 pub mod widgets;
@@ -175,6 +176,9 @@ impl EffectorUi {
             }
             if combo.key == "escape" && !combo.has_modifier() && self.app.presenting && !editing {
                 self.app.toggle_presentation(ctx);
+                continue;
+            }
+            if !editing && !focused && !picker_open && self.app.mask_key(&combo) {
                 continue;
             }
             let Some(action) = shortcuts::action_for(&combo) else { continue };
@@ -359,7 +363,7 @@ impl EffectorUi {
                 item(ui, app, Action::ShowLayers, true);
                 item(ui, app, Action::ShowPresets, has);
                 ui.separator();
-                item(ui, app, Action::ShowDepth, has);
+                item(ui, app, Action::MaskSubject, has);
                 item(ui, app, Action::ShowClipping, has);
                 item(ui, app, Action::ToggleHistogram, true);
                 item(ui, app, Action::TogglePanels, true);
@@ -789,15 +793,20 @@ impl EffectorUi {
                     }
                 }
                 "browser" => self.app.show_effect_browser = true,
-                "depth" => self.app.show_depth = !self.app.show_depth,
                 "clip" => self.app.perform(Action::ShowClipping, ctx),
-                "dm" => {
-                    let v: Vec<f64> = arg.split('/').filter_map(|x| x.parse().ok()).collect();
-                    if let Some(id) = self.app.selected_id {
-                        let shape = crate::model::MaskShape::Depth { from: v.first().copied().unwrap_or(0.0), to: v.get(1).copied().unwrap_or(0.45), feather: 0.12 };
-                        self.app.create_mask(shape, Some(id));
+                // mask:<subject|background|linear|radial|brush>: a new mask on the selected layer
+                "mask" => {
+                    if let Some(shape) = crate::rendertest::test_mask_shape(arg) {
+                        self.app.mask_new_for = self.app.selected_id;
+                        self.app.add_mask_part(shape, None);
                     }
                 }
+                // draw:<brush|linear|radial>: arms a mask drawing tool
+                "draw" => self.app.start_mask_draw(match arg {
+                    "brush" => Some(crate::app::MaskDraw::Brush),
+                    "linear" => Some(crate::app::MaskDraw::Linear),
+                    _ => Some(crate::app::MaskDraw::Radial),
+                }),
                 "presets" => self.app.set_show_presets(true),
                 "palette" => self.app.show_command_palette = true,
                 "export" => self.app.show_export = true,

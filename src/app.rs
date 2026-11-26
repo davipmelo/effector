@@ -92,6 +92,26 @@ pub enum Tool {
     Masks,
 }
 
+/// Drawing tools of the Masks panel (Lightroom Classic: K, M, ⇧M).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MaskDraw {
+    Brush,
+    Linear,
+    Radial,
+}
+
+/// Brush settings (the next strokes use them). Size is a fraction of the photo's long side.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BrushSettings {
+    pub size: f32,
+    pub feather: f32,
+    pub flow: f32,
+}
+
+impl Default for BrushSettings {
+    fn default() -> Self { BrushSettings { size: 0.035, feather: 0.6, flow: 0.8 } }
+}
+
 #[derive(Clone, Copy, Default)]
 pub struct SyncOptions {
     pub layers: bool,
@@ -174,8 +194,6 @@ pub struct AppState {
     pub presenting: bool,
     /// Tab hides the side panels, Shift+Tab every panel (Lightroom).
     pub hide_side_panels: bool,
-    /// Canvas shows the depth map instead of the image.
-    pub show_depth: bool,
     /// Lightroom-style clipping warnings on the canvas (J).
     pub show_clipping: bool,
     /// Histogram of the current result (None until measured, or while the panel is closed).
@@ -189,10 +207,17 @@ pub struct AppState {
     pub update_check_auto: bool,
     /// The "update available" pop-up is open.
     pub show_update_popup: bool,
-    /// Eyedropper armed: the next click on the image sets this layer slider to the depth there.
-    pub depth_pick: Option<(Uuid, String)>,
-    depth_gen: u64,
-    depth_missing_warned: bool,
+    subject_gen: u64,
+    subject_missing_warned: bool,
+    /// Masks tool: drawing a new linear / radial gradient or painting with the brush.
+    pub mask_draw: Option<MaskDraw>,
+    /// Where the next drawn part goes: an existing mask (with a mode) or a new mask (None).
+    pub mask_draw_into: Option<(Uuid, MaskMode)>,
+    /// The part of the selected mask whose handles show on the image.
+    pub selected_part: Option<Uuid>,
+    pub brush: BrushSettings,
+    /// Brush erases (the Erase button; holding ⌥/Alt also erases).
+    pub brush_erase: bool,
     pub hide_all_panels: bool,
     pub fit_zoom: f64,
     pub viewport: egui::Vec2,
@@ -279,17 +304,20 @@ impl AppState {
             split_pos: 0.5,
             presenting: false,
             hide_side_panels: false,
-            show_depth: false,
             show_clipping: false,
             histogram: None,
-            depth_pick: None,
             quit_for_update: false,
             update_announced: false,
             last_display_target: None,
             update_check_auto: false,
             show_update_popup: false,
-            depth_gen: 0,
-            depth_missing_warned: false,
+            subject_gen: 0,
+            subject_missing_warned: false,
+            mask_draw: None,
+            mask_draw_into: None,
+            selected_part: None,
+            brush: BrushSettings::default(),
+            brush_erase: false,
             hide_all_panels: false,
             fit_zoom: 1.0,
             viewport: egui::Vec2::ZERO,
@@ -1367,7 +1395,6 @@ impl AppState {
             canvas: st.active_canvas().cloned(),
             scale,
             want_crop_view: self.is_cropping,
-            show_depth: self.show_depth,
             show_clipping: self.show_clipping,
             want_histogram: settings::get().histogram_open,
             mask_overlay: self.mask_overlay(),
@@ -1376,40 +1403,40 @@ impl AppState {
         self.last_display_target = self.display_target();
     }
 
-    /// Starts the depth map of the active image when something needs it; re-renders when it lands.
-    fn tick_depth(&mut self, ctx: &egui::Context) {
+    /// Starts subject detection on the active image when something needs it; re-renders when it lands.
+    fn tick_subject(&mut self, ctx: &egui::Context) {
         let Some(src) = self.source() else { return };
         let st = self.state();
-        let mut needs = self.show_depth || self.depth_pick.is_some() || self.mask_overlay().is_some() || crate::depth::layers_need_depth(&st.render_layers());
+        let mut needs = self.mask_overlay().map(|m| m.needs_subject()).unwrap_or(false) || crate::subject::layers_need_subject(&st.render_layers());
         if let Some(pv) = &self.preview_layers {
-            needs |= crate::depth::layers_need_depth(&resolve_masks(pv, &st.masks));
+            needs |= crate::subject::layers_need_subject(&resolve_masks(pv, &st.masks));
         }
-        if needs && crate::depth::get(src.id).is_none() {
-            if !crate::depth::model_available() {
-                if !self.depth_missing_warned {
-                    self.depth_missing_warned = true;
-                    self.flash(&tr("Depth model not found: reinstall EFFECTOR to use depth"));
+        if needs && crate::subject::get(src.id).is_none() {
+            if !crate::subject::model_available() {
+                if !self.subject_missing_warned {
+                    self.subject_missing_warned = true;
+                    self.flash(&tr("Subject detection model not found: reinstall EFFECTOR"));
                 }
             } else {
                 let c = ctx.clone();
-                crate::depth::request(&src, move || c.request_repaint());
+                crate::subject::request(&src, move || c.request_repaint());
             }
         }
-        let g = crate::depth::generation();
-        if g != self.depth_gen {
-            self.depth_gen = g;
+        let g = crate::subject::generation();
+        if g != self.subject_gen {
+            self.subject_gen = g;
             self.request_render();
             if let Some(id) = self.active_id {
                 self.make_strip_thumb(id);
             }
         }
-        if crate::depth::is_running(src.id) {
+        if crate::subject::is_running(src.id) {
             ctx.request_repaint_after(Duration::from_millis(200));
         }
     }
 
-    /// The depth map of the active image is being computed.
-    pub fn depth_busy(&self) -> bool { self.source().map(|s| crate::depth::is_running(s.id)).unwrap_or(false) }
+    /// Subject detection is running on the active image.
+    pub fn subject_busy(&self) -> bool { self.source().map(|s| crate::subject::is_running(s.id)).unwrap_or(false) }
 
     /// Picks a preview resolution matching what is on screen (quantized to avoid churn).
     pub fn output_size(&self) -> (usize, usize) {
@@ -1596,7 +1623,7 @@ impl AppState {
                 ctx.request_repaint_after(Duration::from_millis(100));
             }
         }
-        self.tick_depth(ctx);
+        self.tick_subject(ctx);
         if self.update_check_auto && !self.update_announced {
             match crate::updater::current() {
                 crate::updater::State::Available { version, .. } => {
@@ -1920,21 +1947,6 @@ impl AppState {
         self.state().mask(id).cloned().filter(|m| m.is_active())
     }
 
-    /// Creates a mask with one part; when `apply_to` is given, that layer uses it.
-    pub fn create_mask(&mut self, shape: MaskShape, apply_to: Option<Uuid>) -> Uuid {
-        let name = self.state().new_mask_name(&tr("Mask"));
-        let m = Mask { id: Uuid::new_v4(), name, parts: vec![MaskPart::new(shape, MaskMode::Add)] };
-        let id = m.id;
-        self.edit(None, |s| {
-            s.masks.push(m);
-            if let Some(l) = apply_to {
-                s.layers.update(l, &mut |n| n.mask = Some(MaskRef { id, invert: false }));
-            }
-        });
-        self.selected_mask = Some(id);
-        id
-    }
-
     pub fn update_mask(&mut self, id: Uuid, coalesce: Option<String>, body: impl FnOnce(&mut Mask)) {
         self.edit(coalesce, |s| {
             if let Some(m) = s.masks.iter_mut().find(|m| m.id == id) {
@@ -1973,6 +1985,117 @@ impl AppState {
         let nid = m.id;
         self.edit(None, |s| s.masks.push(m));
         self.selected_mask = Some(nid);
+    }
+
+    /// Arms a drawing tool of the Masks panel (or disarms with None). Opens the Masks tool.
+    pub fn start_mask_draw(&mut self, d: Option<MaskDraw>) {
+        if !self.has_image() {
+            return;
+        }
+        if self.tool != Tool::Masks {
+            self.set_tool(Tool::Masks);
+        }
+        self.mask_draw = if self.mask_draw == d && d.is_some() { None } else { d };
+        if d != Some(MaskDraw::Brush) {
+            return;
+        }
+        // the brush keeps painting into the selected brush part, if there is one
+        let st = self.state();
+        let sel_is_brush = self
+            .selected_mask
+            .and_then(|m| st.mask(m))
+            .and_then(|m| m.parts.iter().find(|p| Some(p.id) == self.selected_part))
+            .map(|p| matches!(p.shape, MaskShape::Brush { .. }))
+            .unwrap_or(false);
+        if !sel_is_brush && self.mask_draw_into.is_none() {
+            self.selected_part = None;
+        }
+    }
+
+    /// Adds a part: to `into` (mask, mode) or as a new mask (applied to the layer whose mask slot
+    /// asked for it). Selects it. Returns (mask, part).
+    pub fn add_mask_part(&mut self, shape: MaskShape, into: Option<(Uuid, MaskMode)>) -> (Uuid, Uuid) {
+        if self.tool != Tool::Masks {
+            self.set_tool(Tool::Masks);
+        }
+        let label = tr(shape.kind_label());
+        let part = MaskPart::new(shape, into.map(|i| i.1).unwrap_or(MaskMode::Add));
+        let pid = part.id;
+        let mid = match into.filter(|(m, _)| self.state().mask(*m).is_some()) {
+            Some((m, _)) => {
+                self.edit(None, |s| {
+                    if let Some(mm) = s.masks.iter_mut().find(|x| x.id == m) {
+                        mm.parts.push(part);
+                    }
+                });
+                m
+            }
+            None => {
+                let name = self.state().new_mask_name(&label);
+                let m = Mask { id: Uuid::new_v4(), name, parts: vec![part] };
+                let id = m.id;
+                let apply_to = self.mask_new_for.take();
+                self.edit(None, |s| {
+                    s.masks.push(m);
+                    if let Some(l) = apply_to {
+                        s.layers.update(l, &mut |n| n.mask = Some(MaskRef { id, invert: false }));
+                    }
+                });
+                id
+            }
+        };
+        self.selected_mask = Some(mid);
+        self.selected_part = Some(pid);
+        self.request_render();
+        (mid, pid)
+    }
+
+    /// Changes one part of a mask.
+    pub fn update_part(&mut self, mask: Uuid, part: Uuid, coalesce: Option<String>, body: impl FnOnce(&mut MaskPart)) {
+        self.edit(coalesce, |s| {
+            if let Some(p) = s.masks.iter_mut().find(|m| m.id == mask).and_then(|m| m.parts.iter_mut().find(|p| p.id == part)) {
+                body(p);
+            }
+        });
+    }
+
+    /// Removes a part (the whole mask when it was the last one).
+    pub fn delete_part(&mut self, mask: Uuid, part: Uuid) {
+        let last = self.state().mask(mask).map(|m| m.parts.len() <= 1).unwrap_or(false);
+        if last {
+            self.delete_mask(mask);
+        } else {
+            self.update_mask(mask, None, |m| m.parts.retain(|p| p.id != part));
+        }
+        if self.selected_part == Some(part) {
+            self.selected_part = None;
+        }
+    }
+
+    /// Keys of the Masks tool, before the global shortcuts (Lightroom Classic): [ ] brush size,
+    /// ⇧[ ⇧] brush feather, ' inverts the selected part, ⌫ deletes it, Esc stops drawing.
+    pub fn mask_key(&mut self, combo: &crate::shortcuts::KeyCombo) -> bool {
+        if self.tool != Tool::Masks || combo.cmd || combo.opt {
+            return false;
+        }
+        let brush = self.mask_draw == Some(MaskDraw::Brush);
+        match (combo.key.as_str(), combo.shift) {
+            ("[", false) if brush => self.brush.size = (self.brush.size / 1.15).max(0.002),
+            ("]", false) if brush => self.brush.size = (self.brush.size * 1.15).min(0.5),
+            ("[", true) if brush => self.brush.feather = (self.brush.feather - 0.1).max(0.0),
+            ("]", true) if brush => self.brush.feather = (self.brush.feather + 0.1).min(1.0),
+            ("escape", false) if self.mask_draw.is_some() => self.mask_draw = None,
+            ("'", false) => {
+                let (Some(m), Some(p)) = (self.selected_mask, self.selected_part) else { return false };
+                self.update_part(m, p, None, |x| x.invert = !x.invert);
+            }
+            ("delete", false) => {
+                let (Some(m), Some(p)) = (self.selected_mask, self.selected_part) else { return false };
+                self.delete_part(m, p);
+            }
+            _ => return false,
+        }
+        true
     }
 
     /// Links a layer to a mask (None = whole image).
@@ -2115,10 +2238,19 @@ impl AppState {
                 self.request_render();
             }
             Action::SelectAll => self.select_all_layers(),
-            Action::ShowDepth => {
+            Action::MaskBrush => self.start_mask_draw(Some(MaskDraw::Brush)),
+            Action::MaskLinear => self.start_mask_draw(Some(MaskDraw::Linear)),
+            Action::MaskRadial => self.start_mask_draw(Some(MaskDraw::Radial)),
+            Action::MaskSubject => {
                 if has {
-                    self.show_depth = !self.show_depth;
-                    self.request_render();
+                    let into = self.mask_draw_into.take();
+                    self.add_mask_part(MaskShape::subject_default(), into);
+                }
+            }
+            Action::MaskBackground => {
+                if has {
+                    let into = self.mask_draw_into.take();
+                    self.add_mask_part(MaskShape::background_default(), into);
                 }
             }
             Action::Deselect => {

@@ -17,7 +17,7 @@ pub fn reeded_glass() -> Effect {
             src = ctx.apply("k_dirblur", &[&src], &[dx, dy, 1.0, 0.0]);
         }
         let depth_amt = if p.bool("depthAware") { p.fd("depthAmount", 70.0) / 100.0 } else { 0.0 };
-        let d = if depth_amt > 0.0 { ctx.depth() } else { None };
+        let d = if depth_amt > 0.0 { ctx.subject() } else { None };
         let depth_amt = if d.is_some() { depth_amt } else { 0.0 };
         let dt = d.unwrap_or_else(|| input.clone());
         let kind = match p.choice_or("profile", "round").as_str() { "concave" => 1.0, "prism" => 2.0, "wave" => 3.0, _ => 0.0 };
@@ -40,7 +40,7 @@ pub fn reeded_glass() -> Effect {
     })
     .symbol("rectangle.split.3x1")
     .summary("Fluted / ribbed glass: every rib is a little cylindrical lens that squeezes and repeats what is behind it.")
-    .depth(|p| p.bool("depthAware") || crate::effects::uses_depth_bias(p))
+    .subject(|p| p.bool("depthAware") || crate::effects::uses_subject_bias(p))
     .params(vec![
         ParamDef::segmented("profile", "Rib Shape", &[("round", "Round"), ("concave", "Fluted"), ("prism", "Prism"), ("wave", "Wave")], "round").sec("Glass"),
         s("width", "Rib Width", 2.0, 200.0, 12.0).step(0.5).curve(1.8).sec("Glass"),
@@ -53,8 +53,8 @@ pub fn reeded_glass() -> Effect {
         s("shading", "Rib Shading", 0.0, 100.0, 45.0).step(1.0).unit("%").sec("Light"),
         s("highlight", "Highlight", 0.0, 100.0, 30.0).step(1.0).unit("%").sec("Light"),
         s("groove", "Groove", 0.0, 100.0, 35.0).step(1.0).unit("%").sec("Light"),
-        ParamDef::section_switch("depthAware", "Depth", false),
-        s("depthAmount", "Far Things Distort More", 0.0, 100.0, 70.0).step(1.0).unit("%").sec("Depth"),
+        ParamDef::section_switch("depthAware", "Subject", false),
+        s("depthAmount", "Subject Stays Clearer", 0.0, 100.0, 70.0).step(1.0).unit("%").sec("Subject"),
         s("wave", "Melt", 0.0, 100.0, 0.0).step(1.0).unit("%").sec("Melt"),
         s("waveScale", "Melt Scale", 5.0, 400.0, 60.0).step(1.0).curve(1.6).sec("Melt"),
         ParamDef::seed("seed").sec("Melt"),

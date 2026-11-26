@@ -84,7 +84,7 @@ pub fn canvas(ui: &mut Ui, app: &mut AppState, tex: &CanvasTextures) {
         if let Some(t) = main {
             paint_image(ui, t, img_rect, rect, tex.checker, checker_px);
         }
-        if let (Some(m), false) = (tex.mask, app.show_original || app.show_depth) {
+        if let (Some(m), false) = (tex.mask, app.show_original) {
             super::tools::paint_mask_overlay(ui, app, m, img_rect, rect);
         }
         if app.compare_split && !app.show_original {
@@ -100,10 +100,8 @@ pub fn canvas(ui: &mut Ui, app: &mut AppState, tex: &CanvasTextures) {
             }
             split_divider(ui, app, rect);
         }
-        // focus eyedropper: click the image to set a slider to the depth at that point
-        if app.depth_pick.is_some() {
-            depth_pick(ui, app, &resp, img_rect);
-        }
+        // masks: draw gradients, paint, move handles (takes the pointer from panning)
+        let mask_busy = !app.show_original && super::mask_canvas::interact(ui, app, &resp, img_rect);
         // right-click outside the image: background colour of the canvas (Lightroom-style)
         if !app.presenting {
             backdrop_menu(ui, &resp, img_rect);
@@ -114,11 +112,11 @@ pub fn canvas(ui: &mut Ui, app: &mut AppState, tex: &CanvasTextures) {
         let can_pan = pannable.0 || pannable.1;
         if resp.double_clicked() {
             app.set_zoom(None);
-        } else if can_pan && (resp.dragged_by(egui::PointerButton::Primary) || resp.dragged_by(egui::PointerButton::Middle)) {
+        } else if can_pan && ((resp.dragged_by(egui::PointerButton::Primary) && !mask_busy) || resp.dragged_by(egui::PointerButton::Middle)) {
             let p = app.pan() + resp.drag_delta();
             app.set_pan(p);
             ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
-        } else if can_pan && resp.hovered() && app.depth_pick.is_none() && ui.rect_contains_pointer(img_rect) {
+        } else if can_pan && resp.hovered() && !mask_busy && ui.rect_contains_pointer(img_rect) {
             ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
         }
         if resp.hovered() {
@@ -150,11 +148,8 @@ pub fn canvas(ui: &mut Ui, app: &mut AppState, tex: &CanvasTextures) {
     if app.show_original {
         bx = badge(ui, pos2(bx, rect.top() + 12.0), &tr("ORIGINAL")) + 6.0;
     }
-    if app.show_depth {
-        let t = if app.depth_busy() { tr("DEPTH · calculating…") } else { tr("DEPTH MAP") };
-        bx = badge(ui, pos2(bx, rect.top() + 12.0), &t) + 6.0;
-    } else if app.depth_busy() {
-        bx = badge(ui, pos2(bx, rect.top() + 12.0), &tr("Calculating depth…")) + 6.0;
+    if app.subject_busy() {
+        bx = badge(ui, pos2(bx, rect.top() + 12.0), &tr("Detecting the subject…")) + 6.0;
     }
     if let Some(s) = app.solo_id {
         if let Some(n) = app.layers().iter().flat_map(|n| std::iter::once(n.clone()).chain(n.children.clone())).find(|n| n.id == s).or_else(|| {
@@ -506,42 +501,3 @@ fn backdrop_menu(ui: &mut Ui, resp: &egui::Response, img_rect: Rect) {
         });
 }
 
-fn depth_pick(ui: &mut Ui, app: &mut AppState, resp: &egui::Response, img_rect: Rect) {
-    if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
-        app.depth_pick = None;
-        return;
-    }
-    if resp.hovered() {
-        ui.ctx().set_cursor_icon(egui::CursorIcon::Crosshair);
-    }
-    if !resp.clicked() {
-        return;
-    }
-    let (Some(pos), Some(src)) = (resp.interact_pointer_pos(), app.source()) else { return };
-    if !img_rect.contains(pos) {
-        return;
-    }
-    let st = app.state();
-    // output uv -> image uv (inside the canvas borders) -> source uv (crop)
-    let (mut u, mut v) = (((pos.x - img_rect.left()) / img_rect.width()) as f64, ((pos.y - img_rect.top()) / img_rect.height()) as f64);
-    if let Some(c) = st.active_canvas() {
-        let (cw, ch) = src.cropped_size(&st.crop);
-        let ((ow, oh), (ix, iy, iw, ih)) = c.layout(cw as f64, ch as f64);
-        u = (u * ow - ix) / iw;
-        v = (v * oh - iy) / ih;
-        if !(0.0..=1.0).contains(&u) || !(0.0..=1.0).contains(&v) {
-            return;
-        }
-    }
-    let (su, sv) = (st.crop.x + u * st.crop.w, st.crop.y + v * st.crop.h);
-    match crate::depth::get(src.id) {
-        Some(map) => {
-            let d = (map.sample(su, sv) as f64 * 100.0).round();
-            if let Some((lid, key)) = app.depth_pick.take() {
-                app.set_param(lid, &key, crate::model::ParamValue::Number(d), false);
-                app.flash(&crate::l10n::trf("Focus set to %d%%", &[&(d as i64)]));
-            }
-        }
-        None => app.flash(&tr("Calculating depth…")),
-    }
-}

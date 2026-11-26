@@ -372,8 +372,6 @@ pub struct ParamDef {
     pub track: Option<Vec<Rgba>>,
     /// A boolean shown as an on/off switch in its section header.
     pub is_section_switch: bool,
-    /// Slider (0..100) that can be set by clicking the image: takes the depth there (focus picker).
-    pub pick_depth: bool,
 }
 
 impl ParamDef {
@@ -393,7 +391,7 @@ impl ParamDef {
     }
 
     fn base(key: &str, label: &str, kind: ParamKind) -> ParamDef {
-        ParamDef { key: key.into(), label: label.into(), kind, section: None, visible: None, track: None, is_section_switch: false, pick_depth: false }
+        ParamDef { key: key.into(), label: label.into(), kind, section: None, visible: None, track: None, is_section_switch: false }
     }
 
     /// Slider. Chain `.step()`, `.unit()`, `.curve()`, `.sec()`, `.track()`, `.vis()`.
@@ -445,7 +443,6 @@ impl ParamDef {
     pub fn sec_opt(mut self, s: Option<&str>) -> Self { self.section = s.map(|s| s.into()); self }
     pub fn track(mut self, t: Vec<Rgba>) -> Self { self.track = Some(t); self }
     /// Adds an eyedropper that sets this 0..100 slider from the depth at a clicked point.
-    pub fn pick(mut self) -> Self { self.pick_depth = true; self }
     pub fn vis(mut self, v: Visible) -> Self { self.visible = Some(v); self }
     pub fn is_visible(&self, p: &Params) -> bool { self.visible.as_ref().map(|f| f(p)).unwrap_or(true) }
 }
@@ -698,28 +695,120 @@ impl MaskMode {
     }
 }
 
-/// What a mask part selects. Only depth for now; brush, gradients and colour / luminance ranges
-/// will come here.
+/// One brush stroke of a Brush mask part. Points are in image coordinates (0..1 of the whole,
+/// uncropped photo); sizes are relative to the long side of the photo.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrushStroke {
+    #[serde(default)]
+    pub erase: bool,
+    /// Radius (fraction of the long side).
+    pub size: f32,
+    /// 0 = hard edge … 1 = all soft.
+    pub feather: f32,
+    /// Opacity of each dab (strokes build up).
+    pub flow: f32,
+    /// x, y pairs.
+    pub points: Vec<[f32; 2]>,
+}
+
+/// What a mask part selects. Positions are in image coordinates (0..1 of the whole, uncropped
+/// photo), lengths relative to the photo's long side, angles in degrees.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum MaskShape {
-    /// Distances between `from` and `to` (0 = farthest, 1 = nearest).
+    /// Old (0.8.0–0.8.2) depth range; turned into Subject / Background when a document loads.
     #[serde(rename_all = "camelCase")]
     Depth { from: f64, to: f64, feather: f64 },
+    /// Linear gradient: fully selected before the centre line, fading out over `width` along `angle`.
+    #[serde(rename_all = "camelCase")]
+    Linear { x: f64, y: f64, angle: f64, width: f64 },
+    /// Radial gradient: an ellipse, fully selected inside, soft over `feather` (0..1 of the radius).
+    #[serde(rename_all = "camelCase")]
+    Radial { x: f64, y: f64, rx: f64, ry: f64, angle: f64, feather: f64 },
+    /// Painted with the brush.
+    #[serde(rename_all = "camelCase")]
+    Brush { strokes: Vec<BrushStroke> },
+    /// The main subject (AI). `grow` expands (+) or shrinks (−) the edge, `softness` feathers it.
+    #[serde(rename_all = "camelCase")]
+    Subject { softness: f64, grow: f64 },
+    /// Everything but the subject (AI).
+    #[serde(rename_all = "camelCase")]
+    Background { softness: f64, grow: f64 },
 }
 
 impl MaskShape {
     pub fn kind_label(&self) -> &'static str {
         match self {
-            MaskShape::Depth { .. } => "Depth Range",
+            MaskShape::Depth { .. } | MaskShape::Subject { .. } => "Subject",
+            MaskShape::Linear { .. } => "Linear Gradient",
+            MaskShape::Radial { .. } => "Radial Gradient",
+            MaskShape::Brush { .. } => "Brush",
+            MaskShape::Background { .. } => "Background",
         }
     }
     pub fn symbol(&self) -> &'static str {
         match self {
-            MaskShape::Depth { .. } => "square.3.layers.3d",
+            MaskShape::Depth { .. } | MaskShape::Subject { .. } => "mask.subject",
+            MaskShape::Linear { .. } => "mask.linear",
+            MaskShape::Radial { .. } => "mask.radial",
+            MaskShape::Brush { .. } => "paintbrush",
+            MaskShape::Background { .. } => "mask.background",
         }
     }
-    pub fn needs_depth(&self) -> bool { matches!(self, MaskShape::Depth { .. }) }
+    /// Uses the AI subject matte.
+    pub fn needs_subject(&self) -> bool { matches!(self, MaskShape::Depth { .. } | MaskShape::Subject { .. } | MaskShape::Background { .. }) }
+    pub fn linear_default() -> MaskShape { MaskShape::Linear { x: 0.5, y: 0.5, angle: 90.0, width: 0.3 } }
+    pub fn radial_default() -> MaskShape { MaskShape::Radial { x: 0.5, y: 0.5, rx: 0.25, ry: 0.18, angle: 0.0, feather: 0.5 } }
+    pub fn subject_default() -> MaskShape { MaskShape::Subject { softness: 0.15, grow: 0.0 } }
+    pub fn background_default() -> MaskShape { MaskShape::Background { softness: 0.15, grow: 0.0 } }
+    pub fn hash_into<H: Hasher>(&self, h: &mut H) {
+        let f = |h: &mut H, v: &[f64]| v.iter().for_each(|x| x.to_bits().hash(h));
+        match self {
+            MaskShape::Depth { from, to, feather } => {
+                0u8.hash(h);
+                f(h, &[*from, *to, *feather]);
+            }
+            MaskShape::Linear { x, y, angle, width } => {
+                1u8.hash(h);
+                f(h, &[*x, *y, *angle, *width]);
+            }
+            MaskShape::Radial { x, y, rx, ry, angle, feather } => {
+                2u8.hash(h);
+                f(h, &[*x, *y, *rx, *ry, *angle, *feather]);
+            }
+            MaskShape::Brush { strokes } => {
+                3u8.hash(h);
+                strokes.len().hash(h);
+                for s in strokes {
+                    s.erase.hash(h);
+                    for v in [s.size, s.feather, s.flow] {
+                        v.to_bits().hash(h);
+                    }
+                    s.points.len().hash(h);
+                    for p in &s.points {
+                        p[0].to_bits().hash(h);
+                        p[1].to_bits().hash(h);
+                    }
+                }
+            }
+            MaskShape::Subject { softness, grow } => {
+                4u8.hash(h);
+                f(h, &[*softness, *grow]);
+            }
+            MaskShape::Background { softness, grow } => {
+                5u8.hash(h);
+                f(h, &[*softness, *grow]);
+            }
+        }
+    }
+    /// The 0.8.2 depth ranges as subject / background selections.
+    pub fn migrated(&self) -> Option<MaskShape> {
+        match self {
+            MaskShape::Depth { from, to, .. } => Some(if *to < 0.9 && *from <= 0.1 { MaskShape::background_default() } else { MaskShape::subject_default() }),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -757,14 +846,7 @@ impl Mask {
         for p in self.parts.iter().filter(|p| p.enabled) {
             p.mode.hash(h);
             p.invert.hash(h);
-            match &p.shape {
-                MaskShape::Depth { from, to, feather } => {
-                    0u8.hash(h);
-                    for v in [from, to, feather] {
-                        v.to_bits().hash(h);
-                    }
-                }
-            }
+            p.shape.hash_into(h);
         }
     }
     /// Same selection (ignores ids and the name).
@@ -773,7 +855,18 @@ impl Mask {
             && self.parts.iter().zip(&o.parts).all(|(a, b)| a.mode == b.mode && a.invert == b.invert && a.enabled == b.enabled && a.shape == b.shape)
     }
     pub fn is_active(&self) -> bool { self.parts.iter().any(|p| p.enabled) }
-    pub fn needs_depth(&self) -> bool { self.parts.iter().any(|p| p.enabled && p.shape.needs_depth()) }
+    pub fn needs_subject(&self) -> bool { self.parts.iter().any(|p| p.enabled && p.shape.needs_subject()) }
+    /// Replaces old depth parts with subject / background parts.
+    pub fn migrate(&mut self) -> bool {
+        let mut changed = false;
+        for p in self.parts.iter_mut() {
+            if let Some(n) = p.shape.migrated() {
+                p.shape = n;
+                changed = true;
+            }
+        }
+        changed
+    }
     pub fn from_depth(dm: &DepthMask) -> Mask {
         let mut p = MaskPart::new(MaskShape::Depth { from: dm.from, to: dm.to, feather: dm.feather }, MaskMode::Add);
         p.invert = dm.invert;
@@ -870,6 +963,13 @@ impl LayerNode {
     }
 
     /// Hash of the rendering-relevant state (ignores name / expansion).
+    /// What the effect's own output depends on (not its mask, opacity or blend): lets the
+    /// renderer reuse it while only the mask changes (painting, dragging a gradient).
+    pub fn effect_hash<H: Hasher>(&self, h: &mut H) {
+        self.effect_id.hash(h);
+        self.params.hash_into(h);
+    }
+
     pub fn render_hash<H: Hasher>(&self, h: &mut H) {
         self.is_group.hash(h);
         self.effect_id.hash(h);
@@ -1230,11 +1330,14 @@ impl DocumentState {
                     let invert = n.mask.map(|r| r.invert).unwrap_or(false);
                     n.mask = None;
                     if let Some(e) = n.embedded_mask.take() {
+                        let mut e = e;
+                        e.migrate();
                         let id = s.intern_mask(e);
                         n.mask = Some(MaskRef { id, invert });
                     } else if let Some(d) = n.depth_mask.clone().filter(|d| d.enabled) {
                         let mut m = Mask::from_depth(&d);
-                        m.name = crate::l10n::tr("Depth Mask");
+                        m.migrate();
+                        m.name = crate::l10n::tr(m.parts.first().map(|p| p.shape.kind_label()).unwrap_or("Mask"));
                         let id = s.intern_mask(m);
                         n.mask = Some(MaskRef { id, invert: false });
                     }
@@ -1243,6 +1346,9 @@ impl DocumentState {
                 n.depth_mask = None;
                 walk(&mut n.children, s);
             }
+        }
+        for m in self.masks.iter_mut() {
+            m.migrate();
         }
         if !needs(&self.layers, &self.masks) {
             return;
@@ -1297,6 +1403,29 @@ mod migration_tests {
         assert_eq!(c.effect_id, "colorgrade");
         assert_eq!(c.params.choice("mode"), "split");
         assert_eq!(c.params.num("shadowAmt", 0.0), 42.0);
+    }
+
+    #[test]
+    fn depth_ranges_become_subject_or_background() {
+        let mut m = Mask { id: Uuid::new_v4(), name: "m".into(), parts: vec![
+            MaskPart::new(MaskShape::Depth { from: 0.55, to: 1.0, feather: 0.1 }, MaskMode::Add),
+            MaskPart::new(MaskShape::Depth { from: 0.0, to: 0.42, feather: 0.1 }, MaskMode::Add),
+        ] };
+        assert!(m.migrate());
+        assert!(matches!(m.parts[0].shape, MaskShape::Subject { .. }));
+        assert!(matches!(m.parts[1].shape, MaskShape::Background { .. }));
+        assert!(!m.migrate());
+    }
+
+    #[test]
+    fn brush_paints_and_erases() {
+        let crop = CropRect::default();
+        let paint = BrushStroke { erase: false, size: 0.1, feather: 0.0, flow: 1.0, points: vec![[0.5, 0.5]] };
+        let c = crate::brush::raster(&[paint.clone()], 100, 100, &crop, (1.0, 1.0));
+        assert!(c[50 * 100 + 50] > 0.99 && c[5 * 100 + 5] == 0.0);
+        let erase = BrushStroke { erase: true, ..paint };
+        let c = crate::brush::raster(&[BrushStroke { erase: false, ..erase.clone() }, erase], 100, 100, &crop, (1.0, 1.0));
+        assert!(c[50 * 100 + 50] < 0.01);
     }
 
     #[test]
