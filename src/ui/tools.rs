@@ -288,16 +288,14 @@ fn mask_editor(ui: &mut Ui, app: &mut AppState, st: &DocumentState, mask: &Mask)
         mask_part(ui, app, mask, i, part, n);
     }
     egui::Frame::new().inner_margin(egui::Margin { left: 14, right: 14, top: 6, bottom: 10 }).show(ui, |ui| {
+        // Lightroom-style: add or subtract another range
         ui.horizontal(|ui| {
-            ui.label(egui::RichText::new(tr("Depth range")).font(label_font()).color(text_dim()));
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if pill_icon_button(ui, "minus", &tr("Subtract"), false).on_hover_text(tr("Remove a depth range from this mask")).clicked() {
-                    app.update_mask(mid, None, |m| m.parts.push(MaskPart::new(depth_shape(0.0, 0.42), MaskMode::Subtract)));
-                }
-                if pill_icon_button(ui, "plus", &tr("Add"), false).on_hover_text(tr("Add another depth range to this mask")).clicked() {
-                    app.update_mask(mid, None, |m| m.parts.push(MaskPart::new(depth_shape(0.3, 0.7), MaskMode::Add)));
-                }
-            });
+            if pill_icon_button(ui, "plus", &tr("Add"), false).on_hover_text(tr("Add another depth range to this mask")).clicked() {
+                app.update_mask(mid, None, |m| m.parts.push(MaskPart::new(depth_shape(0.3, 0.7), MaskMode::Add)));
+            }
+            if pill_icon_button(ui, "minus", &tr("Subtract"), false).on_hover_text(tr("Remove a depth range from this mask")).clicked() {
+                app.update_mask(mid, None, |m| m.parts.push(MaskPart::new(depth_shape(0.0, 0.42), MaskMode::Subtract)));
+            }
         });
     });
     separator_line(ui);
