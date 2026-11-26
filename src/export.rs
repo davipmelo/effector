@@ -561,6 +561,26 @@ mod tests {
     }
 
     #[test]
+    fn jpg_size_limit() {
+        // noisy image: high quality is large, the limit forces a lower quality
+        let (w, h) = (256usize, 256usize);
+        let mut px = vec![0u8; w * h * 4];
+        let mut x: u32 = 12345;
+        for p in px.chunks_mut(4) {
+            for c in 0..3 {
+                x = x.wrapping_mul(1103515245).wrapping_add(12345);
+                p[c] = (x >> 16) as u8;
+            }
+            p[3] = 255;
+        }
+        let full = imageio::encode(&px, w, h, Format::Jpg, 0.95, false).unwrap().len();
+        let limit = full / 3;
+        let b = jpg_within(&px, w, h, 0.95, limit).unwrap();
+        assert!(b.len() <= limit, "{} > {}", b.len(), limit);
+        assert!(b.len() > limit / 3, "should use the best quality that fits");
+    }
+
+    #[test]
     fn sizing() {
         let mut s = ExportSettings::default();
         assert_eq!(s.out_size(4000, 3000), (4000, 3000));

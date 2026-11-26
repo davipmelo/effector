@@ -33,7 +33,8 @@ void main() {
         float d = L0 - Lb;
         float L = luma(c);
         float w = 1.0 - pow(abs(2.0 * L - 1.0), 2.0);
-        float dl = clamp(d * u[1] * 1.3 * w, -0.25, 0.25);
+        // strong edges get less (no dark / bright halos around them)
+        float dl = clamp(d * u[1] * 1.5 * w / (1.0 + abs(d) * 5.0), -0.2, 0.2);
         c = clamp(c + dl, 0.0, 1.0);
     }
     // Texture: fine detail, gentle on strong edges (no halos)
