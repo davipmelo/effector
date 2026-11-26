@@ -315,7 +315,14 @@ fn mask_editor(ui: &mut Ui, app: &mut AppState, st: &DocumentState, mask: &Mask)
                 ui.add_space(depth as f32 * 12.0);
                 let mut v = on;
                 let sym = if node.is_group { "folder" } else { crate::effects::effect(&node.effect_id).map(|e| e.symbol).unwrap_or("square") };
-                if ui.checkbox(&mut v, egui::RichText::new(format!("{}  {}", icon_text(sym), node.name)).font(regular(12.0)).color(text())).changed() {
+                let changed = ui.checkbox(&mut v, "").changed();
+                let (ir, _) = ui.allocate_exact_size(vec2(14.0, 16.0), Sense::hover());
+                paint_icon(ui, ir, sym, 11.0, text_dim());
+                let name = ui.add(egui::Label::new(egui::RichText::new(&node.name).font(regular(12.0)).color(text())).sense(Sense::click()));
+                if changed || name.clicked() {
+                    if name.clicked() {
+                        v = !on;
+                    }
                     app.set_layer_mask(node.id, if v { Some(MaskRef { id: mid, invert: false }) } else { None });
                 }
                 if let Some(o) = other {
