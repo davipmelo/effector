@@ -91,6 +91,10 @@ pub struct Settings {
     pub canvas_backdrop: String,
     /// Custom shortcuts: action id → shortcut string.
     pub shortcuts: std::collections::BTreeMap<String, String>,
+    /// Histogram panel at the top of the right sidebar: open, and what it shows
+    /// ("rgb", "luma", "red", "green", "blue", "all").
+    pub histogram_open: bool,
+    pub histogram_mode: String,
 }
 
 impl Default for Settings {
@@ -116,6 +120,8 @@ impl Default for Settings {
             check_updates: true,
             last_update_check: 0,
             shortcuts: Default::default(),
+            histogram_open: true,
+            histogram_mode: "rgb".into(),
         }
     }
 }

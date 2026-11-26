@@ -8,6 +8,7 @@ mod depth;
 mod effects;
 mod exif;
 mod gpu;
+mod histogram;
 mod imageio;
 mod l10n;
 mod model;

@@ -1,33 +1,6 @@
-//! Effects added in 0.7: Split Tone, Reeded Glass, LED Display and Print Wear.
+//! Effects added in 0.7: Reeded Glass, LED Display and Print Wear.
 
 use super::*;
-
-pub fn split_tone() -> Effect {
-    Effect::new("splittone", "Split Tone", Category::Adjust, |input, p, ctx| {
-        let mut u = vec![];
-        u.extend(p.color_or("shadow", hex("#1F4E9E")).floats());
-        u.extend(p.color_or("highlight", hex("#FFB46E")).floats());
-        u.extend([
-            p.fd("shadowAmt", 50.0) / 100.0,
-            p.fd("highlightAmt", 30.0) / 100.0,
-            p.f("balance") / 100.0,
-            p.b("preserve"),
-        ]);
-        ctx.apply("k_splittone", &[input], &u)
-    })
-    .symbol("circle.lefthalf.filled")
-    .summary("Tints shadows and highlights with two colours (cool shadows, warm highlights…).")
-    // replaced by Color Grading in 0.8.0; kept so older projects render
-    .hidden()
-    .params(vec![
-        ParamDef::color("shadow", "Shadow Color", hex("#1F4E9E")).sec("Shadows"),
-        s("shadowAmt", "Amount", 0.0, 100.0, 50.0).step(1.0).unit("%").sec("Shadows"),
-        ParamDef::color("highlight", "Highlight Color", hex("#FFB46E")).sec("Highlights"),
-        s("highlightAmt", "Amount", 0.0, 100.0, 30.0).step(1.0).unit("%").sec("Highlights"),
-        s("balance", "Balance", -100.0, 100.0, 0.0).step(1.0).sec("Balance"),
-        ParamDef::toggle("preserve", "Preserve Brightness", true).sec("Balance"),
-    ])
-}
 
 pub fn reeded_glass() -> Effect {
     Effect::new("reeded", "Reeded Glass", Category::Distort, |input, p, ctx| {

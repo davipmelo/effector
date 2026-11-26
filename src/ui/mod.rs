@@ -5,6 +5,7 @@ pub mod browsers;
 pub mod canvas_view;
 pub mod dialogs;
 pub mod filmstrip;
+pub mod histogram;
 pub mod icons;
 pub mod inspector;
 pub mod layers;
@@ -79,6 +80,9 @@ pub struct EffectorUi {
     /// Dev/test: frames left of simulated slider dragging (`drag:N` script step).
     shot_drag: usize,
     shot_grad: usize,
+    /// Tab presses taken out of egui's input before it uses them to move keyboard focus
+    /// (Tab toggles the panels, Lightroom-style). Handled in `handle_keys`.
+    tab_presses: Vec<egui::Modifiers>,
 }
 
 impl EffectorUi {
@@ -118,6 +122,7 @@ impl EffectorUi {
             shot_step: 0,
             shot_drag: 0,
             shot_grad: 0,
+            tab_presses: vec![],
         }
     }
 
@@ -139,6 +144,19 @@ impl EffectorUi {
     fn handle_keys(&mut self, ctx: &egui::Context) {
         if dialogs::is_recording_shortcut(ctx) || self.app.dialog.is_some() || self.app.show_export {
             return;
+        }
+        // Tab (taken out of egui's input in `raw_input_hook`): always toggles the panels, even when a
+        // widget has keyboard focus, and drops that focus so the next press works too.
+        for m in std::mem::take(&mut self.tab_presses) {
+            let Some(combo) = KeyCombo::from_event(egui::Key::Tab, m) else { continue };
+            if let Some(action) = shortcuts::action_for(&combo) {
+                if let Some(f) = ctx.memory(|mem| mem.focused()) {
+                    ctx.memory_mut(|mem| mem.surrender_focus(f));
+                }
+                if !self.app.show_command_palette {
+                    self.app.perform(action, ctx);
+                }
+            }
         }
         let events: Vec<(egui::Key, egui::Modifiers)> = ctx.input(|i| {
             i.events.iter().filter_map(|e| if let egui::Event::Key { key, pressed: true, repeat: false, modifiers, .. } = e { Some((*key, *modifiers)) } else { None }).collect()
@@ -343,6 +361,8 @@ impl EffectorUi {
                 item(ui, app, Action::ShowPresets, has);
                 ui.separator();
                 item(ui, app, Action::ShowDepth, has);
+                item(ui, app, Action::ShowClipping, has);
+                item(ui, app, Action::ToggleHistogram, true);
                 item(ui, app, Action::TogglePanels, true);
                 item(ui, app, Action::ToggleAllPanels, true);
             });
@@ -564,6 +584,24 @@ fn aspect(w: usize, h: usize) -> String {
 fn megapixels(w: usize, h: usize) -> String { format!("{:.1} MP", (w * h) as f64 / 1_000_000.0) }
 
 impl eframe::App for EffectorUi {
+    fn raw_input_hook(&mut self, ctx: &egui::Context, raw: &mut egui::RawInput) {
+        // Leave Tab alone while typing, in dialogs and while recording a shortcut.
+        if ctx.egui_wants_keyboard_input() || dialogs::is_recording_shortcut(ctx) || self.app.dialog.is_some() || self.app.show_export || self.app.show_settings {
+            return;
+        }
+        let mut presses = vec![];
+        raw.events.retain(|e| match e {
+            egui::Event::Key { key: egui::Key::Tab, pressed, repeat, modifiers, .. } if !modifiers.command && !modifiers.ctrl && !modifiers.alt => {
+                if *pressed && !*repeat {
+                    presses.push(*modifiers);
+                }
+                false
+            }
+            _ => true,
+        });
+        self.tab_presses.extend(presses);
+    }
+
     fn ui(&mut self, ui: &mut Ui, frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         self.apply_theme(&ctx);
@@ -650,7 +688,10 @@ impl eframe::App for EffectorUi {
                     .default_size(s.right_width as f32)
                     .size_range(240.0..=max_right)
                     .frame(egui::Frame::new().fill(panel_bg()))
-                    .show(ui, |ui| inspector::inspector(ui, &mut self.app));
+                    .show(ui, |ui| {
+                        histogram::panel(ui, &mut self.app);
+                        inspector::inspector(ui, &mut self.app);
+                    });
                 let (lw, rw) = (left.response.rect.width() as f64, right.response.rect.width() as f64);
                 if (lw - s.left_width).abs() > 1.0 || (rw - s.right_width).abs() > 1.0 {
                     settings::update(|s| {
@@ -745,6 +786,7 @@ impl EffectorUi {
                 }
                 "browser" => self.app.show_effect_browser = true,
                 "depth" => self.app.show_depth = !self.app.show_depth,
+                "clip" => self.app.perform(Action::ShowClipping, ctx),
                 "dm" => {
                     let v: Vec<f64> = arg.split('/').filter_map(|x| x.parse().ok()).collect();
                     if let Some(id) = self.app.selected_id {
@@ -877,7 +919,9 @@ pub fn run(open: Vec<PathBuf>) -> eframe::Result {
             ..Default::default()
         });
     }
-    let options = eframe::NativeOptions { viewport, renderer: eframe::Renderer::Wgpu, wgpu_options, centered: true, ..Default::default() };
+    // test runs (EFFECTOR_SUPPORT_DIR) keep egui's own window / panel state in their folder too
+    let persistence_path = std::env::var("EFFECTOR_SUPPORT_DIR").ok().map(|_| settings::support_dir().join("data").join("app.ron"));
+    let options = eframe::NativeOptions { viewport, renderer: eframe::Renderer::Wgpu, wgpu_options, centered: true, persistence_path, ..Default::default() };
     eframe::run_native("EFFECTOR", options, Box::new(move |cc| Ok(Box::new(EffectorUi::new(cc, open)))))
 }
 

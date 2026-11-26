@@ -8,8 +8,10 @@ fn osd(p: &Params, ctx: &Ctx, w: usize, h: usize, camcorder: bool) -> OverlayCan
     let margin = w.min(h) as f64 * 0.07;
     let color = p.color_or("osdColor", Rgba::WHITE);
     let outline = if camcorder { Some(Rgba::new(0.05, 0.05, 0.05)) } else { None };
+    let font = crate::overlay::font_param(p);
+    let font = font.as_deref();
     let mut draw = |ov: &mut OverlayCanvas, s: &str, x: f64, y: f64| {
-        ov.text(s, x, y, size, color, Weight::Heavy, true, !camcorder, None, 0.0, None, 1.18, outline, 0.04);
+        ov.text(s, x, y, size, color, Weight::Heavy, true, !camcorder, None, 0.0, font, 1.18, outline, 0.04);
     };
     let top = p.text_or("osdTop", "PLAY ▶");
     if !top.is_empty() {
@@ -25,7 +27,7 @@ fn osd(p: &Params, ctx: &Ctx, w: usize, h: usize, camcorder: bool) -> OverlayCan
         }
         if camcorder {
             // camcorders print the date bottom-right
-            let est = l.chars().count() as f64 * size * 0.62 * 1.18;
+            let est = crate::overlay::measure(l, size as f32, true, Weight::Heavy, font, 1.18, 0.04).0 as f64;
             draw(&mut ov, l, w as f64 - margin - est, y);
         } else {
             draw(&mut ov, l, margin, y);
@@ -117,6 +119,7 @@ pub fn vhs() -> Effect {
         ParamDef::text("osdTop", "Top Text", "PLAY ▶").sec("OSD"),
         ParamDef::text("osdBottom", "Bottom Text", "AM 10:24\nNOV. 24 1997").sec("OSD"),
         s("osdSize", "Text Size", 10.0, 80.0, 30.0).step(1.0).sec("OSD"),
+        crate::overlay::font_def("OSD"),
         ParamDef::color("osdColor", "Text Color", Rgba::WHITE).sec("OSD"),
         ParamDef::seed("seed").sec("OSD"),
     ])

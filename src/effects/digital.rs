@@ -63,7 +63,9 @@ pub fn digicam() -> Effect {
             let text = p.text_or("dateText", "'03 8 14");
             let color = p.color_or("dateColor", hex("#FF8A1E"));
             let margin = w.min(h) as f64 * 0.055;
-            let est = text.chars().count() as f64 * size * 0.62;
+            let custom = crate::overlay::font_param(p);
+            let font = custom.as_deref().or(Some("Menlo-Bold"));
+            let est = crate::overlay::measure(&text, size as f32, true, Weight::Bold, font, 1.0, 0.06).0 as f64;
             let (wf, hf) = (w as f64, h as f64);
             let pos = match p.choice_or("datePos", "br").as_str() {
                 "bl" => (margin, hf - margin - size),
@@ -71,7 +73,7 @@ pub fn digicam() -> Effect {
                 "tl" => (margin, margin),
                 _ => (wf - margin - est, hf - margin - size),
             };
-            ov.text(&text, pos.0, pos.1, size, color, Weight::Bold, true, false, None, 0.0, Some("Menlo-Bold"), 1.0, None, 0.06);
+            ov.text(&text, pos.0, pos.1, size, color, Weight::Bold, true, false, None, 0.0, font, 1.0, None, 0.06);
             // a soft glow like the LED imprint
             let t = ov.texture();
             let mut glow = ctx.apply("k_copy", &[&t], &[]);
@@ -113,6 +115,7 @@ pub fn digicam() -> Effect {
         ParamDef::text("dateText", "Text", "'03 8 14").sec("Date Stamp"),
         ParamDef::choice("datePos", "Position", &[("br", "Bottom Right"), ("bl", "Bottom Left"), ("tr", "Top Right"), ("tl", "Top Left")], "br").sec("Date Stamp"),
         s("dateSize", "Size", 8.0, 80.0, 28.0).step(1.0).sec("Date Stamp"),
+        crate::overlay::font_def("Date Stamp"),
         ParamDef::color("dateColor", "Color", hex("#FF8A1E")).sec("Date Stamp"),
     ])
     .looks(vec![

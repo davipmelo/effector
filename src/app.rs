@@ -164,6 +164,10 @@ pub struct AppState {
     pub hide_side_panels: bool,
     /// Canvas shows the depth map instead of the image.
     pub show_depth: bool,
+    /// Lightroom-style clipping warnings on the canvas (J).
+    pub show_clipping: bool,
+    /// Histogram of the current result (None until measured, or while the panel is closed).
+    pub histogram: Option<Arc<crate::histogram::Histogram>>,
     /// The update installer was started: quit now (the UI closes the window).
     pub quit_for_update: bool,
     update_announced: bool,
@@ -249,6 +253,8 @@ impl AppState {
             presenting: false,
             hide_side_panels: false,
             show_depth: false,
+            show_clipping: false,
+            histogram: None,
             depth_pick: None,
             quit_for_update: false,
             update_announced: false,
@@ -1297,6 +1303,8 @@ impl AppState {
             scale,
             want_crop_view: self.is_cropping,
             show_depth: self.show_depth,
+            show_clipping: self.show_clipping,
+            want_histogram: settings::get().histogram_open,
         });
     }
 
@@ -1413,6 +1421,9 @@ impl AppState {
                 self.original = Some(r.original);
                 self.display = Some(r.display);
                 self.display_original = Some(r.display_original);
+                if r.histogram.is_some() {
+                    self.histogram = r.histogram;
+                }
                 if r.crop_view.is_some() {
                     self.crop_view = r.crop_view;
                 }
@@ -1673,7 +1684,7 @@ impl AppState {
         std::thread::spawn(move || {
             let tex = src.make_texture(&st.crop, scale as f64);
             let extras = crate::renderer::Extras::for_render(&src, &st.crop, &st.layers, true);
-            let out = crate::renderer::Renderer::new(false).render(&st.layers, &tex, 0, true, st.active_canvas(), extras);
+            let out = crate::renderer::Renderer::new(false).render(&st.layers, &tex, crate::worker::content_key(src.id, &st.crop), true, st.active_canvas(), extras);
             let r = imageio::write(&out, &path, format, quality, keep_alpha)
                 .map(|_| trf("Exported %@", &[&path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default()]));
             let _ = tx.send(r);
@@ -1713,7 +1724,7 @@ impl AppState {
                 };
                 let tex = src.make_texture(&st.crop, scale as f64);
                 let extras = crate::renderer::Extras::for_render(&src, &st.crop, &st.layers, true);
-                let out = crate::renderer::Renderer::new(false).render(&st.layers, &tex, 0, true, st.active_canvas(), extras);
+                let out = crate::renderer::Renderer::new(false).render(&st.layers, &tex, crate::worker::content_key(src.id, &st.crop), true, st.active_canvas(), extras);
                 let stem = Path::new(&name).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
                 let base = format!("{stem}{suffix}{}", if scale > 1 { format!("@{scale}x") } else { String::new() });
                 let mut path = dir.join(format!("{base}.{}", format.ext()));
@@ -1744,7 +1755,7 @@ impl AppState {
         std::thread::spawn(move || {
             let tex = src.make_texture(&st.crop, 1.0);
             let extras = crate::renderer::Extras::for_render(&src, &st.crop, &st.layers, true);
-            let out = crate::renderer::Renderer::new(false).render(&st.layers, &tex, 0, true, st.active_canvas(), extras);
+            let out = crate::renderer::Renderer::new(false).render(&st.layers, &tex, crate::worker::content_key(src.id, &st.crop), true, st.active_canvas(), extras);
             let px = imageio::read_rgba8(&out);
             let _ = tx.send(Some((px, out.width(), out.height())));
             repaint.request_repaint();
@@ -1947,6 +1958,14 @@ impl AppState {
             Action::ToggleAllPanels => {
                 self.hide_all_panels = !self.hide_all_panels;
                 self.hide_side_panels = self.hide_all_panels;
+            }
+            Action::ShowClipping => {
+                self.show_clipping = !self.show_clipping;
+                self.request_render();
+            }
+            Action::ToggleHistogram => {
+                settings::update(|s| s.histogram_open = !s.histogram_open);
+                self.request_render();
             }
             Action::SelectAll => self.select_all_layers(),
             Action::ShowDepth => {

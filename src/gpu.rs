@@ -363,12 +363,19 @@ pub struct Ctx {
     depth_tex: Option<T>,
     /// Capture date of the photo (EXIF), if known.
     pub taken: Option<crate::exif::DateTaken>,
+    /// Identity of the image content (source + crop), the same for the preview and the export
+    /// of one image; 0 when unknown (thumbnails, tests).
+    pub content_key: u64,
+    /// Resolution-independent key of the layer being applied: content + the layers below it +
+    /// this layer's settings. Lets an effect that analyses the picture (Blob Tracker) give the
+    /// export exactly the result the preview showed. 0 when `content_key` is 0.
+    pub layer_key: u64,
 }
 
 impl Ctx {
     pub fn new(scale: f64, source: T, is_export: bool) -> Ctx {
         let (width, height) = (source.width(), source.height());
-        Ctx { encoder: None, scale, width, height, source, is_export, passes: 0, depth_src: None, depth_tex: None, taken: None }
+        Ctx { encoder: None, scale, width, height, source, is_export, passes: 0, depth_src: None, depth_tex: None, taken: None, content_key: 0, layer_key: 0 }
     }
 
     /// Depth at render size (r = 0 far … 1 near), edge-aware upsampled; None when unavailable.

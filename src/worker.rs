@@ -23,6 +23,10 @@ pub struct RenderRequest {
     pub want_crop_view: bool,
     /// Show the depth map instead of the result.
     pub show_depth: bool,
+    /// Paint clipped highlights / shadows on the display copy (J).
+    pub show_clipping: bool,
+    /// Measure the histogram of the result (only while the histogram panel is open).
+    pub want_histogram: bool,
 }
 
 pub struct RenderResult {
@@ -33,6 +37,7 @@ pub struct RenderResult {
     pub display: T,
     pub display_original: T,
     pub crop_view: Option<T>,
+    pub histogram: Option<Arc<crate::histogram::Histogram>>,
 }
 
 /// What the render thread answers: a finished render, or the generation that failed (the
@@ -80,17 +85,12 @@ impl RenderWorker {
                                 t
                             }
                         };
-                        let skey = {
-                            use std::hash::{Hash, Hasher};
-                            let mut h = std::collections::hash_map::DefaultHasher::new();
-                            req.source.id.hash(&mut h);
-                            crop_key(&req.crop).hash(&mut h);
-                            h.finish()
-                        };
+                        let skey = content_key(req.source.id, &req.crop);
                         let extras = crate::renderer::Extras::for_render(&req.source, &req.crop, &req.layers, false);
                         let out = renderer.render(&req.layers, &src_tex, skey, false, req.canvas.as_ref(), extras);
                         let mut ctx = Ctx::new(1.0, out.clone(), false);
-                        let mut display = to_display(&mut ctx, &out);
+                        let mut display = if req.show_clipping { ctx.apply("k_clipview", &[&out], &[]) } else { to_display(&mut ctx, &out) };
+                        let histogram = if req.want_histogram { Some(Arc::new(crate::histogram::Histogram::of(&mut ctx, &out))) } else { None };
                         if req.show_depth {
                             if let Some(map) = crate::depth::get(req.source.id) {
                                 let mut dc = Ctx::new(1.0, src_tex.clone(), false);
@@ -120,7 +120,7 @@ impl RenderWorker {
                         };
                         ctx.flush();
                         crate::gpu::gpu().trim_pool(512 << 20);
-                        RenderResult { generation: req.generation, output: out, original: src_tex, display, display_original, crop_view }
+                        RenderResult { generation: req.generation, output: out, original: src_tex, display, display_original, crop_view, histogram }
                     }));
                     match res {
                         Ok(r) => {
@@ -149,6 +149,16 @@ impl RenderWorker {
 
     /// The render thread is gone (it should never happen; the app then starts a new one).
     pub fn is_dead(&self) -> bool { self.thread.is_finished() }
+}
+
+/// Identity of an image's content for rendering (source + crop): the preview and the export of
+/// the same image share it (see `Ctx::content_key`). Never 0.
+pub fn content_key(id: Uuid, crop: &CropRect) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    id.hash(&mut h);
+    crop_key(crop).hash(&mut h);
+    h.finish().max(1)
 }
 
 fn crop_key(c: &CropRect) -> u64 {

@@ -52,6 +52,8 @@
 ## Visualização
 - **]** ou o botão na barra alterna **Antes / Depois**.
 - **D** mostra o **mapa de profundidade** da foto.
+- **Histograma** no topo da sidebar da direita: RGB, Luminância, R, G, B ou Tudo. Clique no título (ou ⇧⌘H) para recolher.
+- **J** mostra o **recorte** na imagem: altas luzes estouradas em vermelho, sombras esmagadas em azul. Os triângulos do histograma também ligam e desligam.
 - Pinça ou **⌘ + rolagem** para zoom. Arraste ou role para mover a imagem.
 - Duplo clique na imagem ajusta à janela.
 - **Z** alterna entre ajustar à janela e 100% (como no Lightroom); **⌘0** ajusta e **⌘1** mostra em 100%.
@@ -88,6 +90,8 @@ Baseados no **Lightroom Classic** quando a função existe lá, e no **Photoshop
 | Antes / Depois dividido | Y |
 | Recortar | R |
 | Mapa de profundidade | D |
+| Mostrar recorte | J |
+| Mostrar / ocultar histograma | ⇧⌘H |
 | Agrupar / Desagrupar | ⌘G / ⇧⌘G |
 | Duplicar layer | ⌘J |
 | Excluir layers (ou fechar fotos na filmstrip) | ⌫ |
@@ -153,3 +157,8 @@ Baseados no **Lightroom Classic** quando a função existe lá, e no **Photoshop
 - **Estrela** e **Anamórfico**: controles para afetar só as luzes mais fortes, densidade e intensidade bem sutil; novo filtro de riscos.
 - **Vidro Canelado** refeito com base em vidro real; **Poeira** bem mais fina e densa; **Halo** removido.
 - Sliders revisados: números limpos, passo fino perto do zero (o Min Size do Blob Tracker não pula mais), curvas melhores.
+
+## Novos na 0.8.1
+- **Color Grading** ganhou o modo **Split Tone** (o antigo efeito Split Tone, que saiu do menu). Projetos antigos são convertidos sozinhos.
+- **Fonte** em todo efeito com texto (Blob Tracker, VHS, Camcorder, Digicam, Moldura, ASCII), com 10 fontes novas no estilo web dos anos 2000: VT323, Silkscreen, Press Start 2P, DotGothic16, Share Tech Mono, Space Mono, IBM Plex Mono, Major Mono Display, Courier Prime e Cutive Mono.
+- O Blob Tracker exporta exatamente as caixas do preview.

@@ -195,7 +195,7 @@ pub fn all() -> &'static [Effect] {
     REGISTRY.get_or_init(|| {
         let mut v = vec![
             // Adjust & color
-            adjust::basic(), adjust::curves(), adjust::hsl(), adjust::huesat(), adjust::bw(), color::color_grade(), extra::split_tone(), color::gradient_map(), color::lut(),
+            adjust::basic(), adjust::curves(), adjust::hsl(), adjust::huesat(), adjust::bw(), color::color_grade(), color::gradient_map(), color::lut(),
             lens::sharpen(), adjust::invert(), adjust::posterize(), adjust::threshold(),
             // Print & pixel
             dither::dither(), print::halftone(), ascii::ascii(), extra::print_wear(), copy::photocopy(), copy::thermal(),

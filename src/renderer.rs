@@ -44,6 +44,7 @@ impl Renderer {
     pub fn render(&mut self, layers: &[LayerNode], source: &T, source_key: u64, is_export: bool, canvas: Option<&CanvasSpec>, extras: Extras) -> T {
         let scale = source.width().max(source.height()) as f64 / REFERENCE_SIZE;
         let mut ctx = Ctx::new(scale, source.clone(), is_export);
+        ctx.content_key = source_key;
         let depth_key = extras.depth.as_ref().map(|d| Arc::as_ptr(&d.map) as usize).unwrap_or(0);
         ctx.depth_src = extras.depth;
         ctx.taken = extras.taken;
@@ -55,7 +56,7 @@ impl Renderer {
         source.h.hash(&mut h);
         depth_key.hash(&mut h);
         extras.taken.hash(&mut h);
-        let (mut out, _) = self.render_stack(layers, source.clone(), h.finish(), &mut ctx, &mut new_cache);
+        let (mut out, _, _) = self.render_stack(layers, source.clone(), h.finish(), source_key, &mut ctx, &mut new_cache);
         if let Some(c) = canvas {
             out = crate::canvas::apply(&out, c, &mut ctx);
         }
@@ -66,9 +67,11 @@ impl Renderer {
         out
     }
 
-    fn render_stack(&self, nodes: &[LayerNode], input: T, input_hash: u64, ctx: &mut Ctx, new_cache: &mut HashMap<u64, T>) -> (T, u64) {
+    /// `stable_hash` follows `input_hash` but leaves out the render size (see `Ctx::layer_key`).
+    fn render_stack(&self, nodes: &[LayerNode], input: T, input_hash: u64, stable_hash: u64, ctx: &mut Ctx, new_cache: &mut HashMap<u64, T>) -> (T, u64, u64) {
         let mut current = input;
         let mut current_hash = input_hash;
+        let mut current_stable = stable_hash;
         for node in nodes.iter().rev() {
             if !node.enabled {
                 continue;
@@ -77,19 +80,29 @@ impl Renderer {
             current_hash.hash(&mut h);
             node.render_hash(&mut h);
             let key = h.finish();
+            let stable = if stable_hash == 0 {
+                0
+            } else {
+                let mut h = std::collections::hash_map::DefaultHasher::new();
+                current_stable.hash(&mut h);
+                node.render_hash(&mut h);
+                h.finish()
+            };
             if self.use_cache {
                 if let Some(cached) = self.cache.get(&key).or_else(|| new_cache.get(&key)) {
                     current = cached.clone();
                     current_hash = key;
+                    current_stable = stable;
                     new_cache.insert(key, current.clone());
                     continue;
                 }
             }
             let mut out: T;
             if node.is_group {
-                let (sub, _) = self.render_stack(&node.children, current.clone(), current_hash, ctx, new_cache);
+                let (sub, _, _) = self.render_stack(&node.children, current.clone(), current_hash, current_stable, ctx, new_cache);
                 out = sub;
             } else if let Some(eff) = effects::effect(&node.effect_id) {
+                ctx.layer_key = stable;
                 out = (eff.apply)(&current, &node.params, ctx);
                 if out.w != current.w || out.h != current.h {
                     out = ctx.resize(&out, current.width(), current.height(), false);
@@ -112,8 +125,9 @@ impl Renderer {
             }
             current = out;
             current_hash = key;
+            current_stable = stable;
         }
-        (current, current_hash)
+        (current, current_hash, current_stable)
     }
 }
 

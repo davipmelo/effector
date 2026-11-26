@@ -86,22 +86,23 @@ pub fn frame() -> Effect {
             let mut ov = OverlayCanvas::new(input.width(), input.height());
             let fs = ctx.px(p.num("textSize", 26.0));
             let color = p.color_or("textColor", hex("#F2E36B"));
+            let custom = crate::overlay::font_param(p);
             let max_y = rect.1 + rect.3;
             match style.as_str() {
                 "letterbox" => {
                     let in_bar = p.choice_or("textPlace", "bar") == "bar" && rect.1 > fs * 1.6;
                     let y = if in_bar { max_y + (h - max_y - fs) / 2.0 } else { max_y - fs * 2.2 };
-                    let est = caption.chars().count() as f64 * fs * 0.5;
-                    ov.text(&caption, (w - est) / 2.0, y, fs, color, Weight::Medium, false, !in_bar, None, 0.0, None, 1.0, None, 0.0);
+                    let est = crate::overlay::measure(&caption, fs as f32, false, Weight::Medium, custom.as_deref(), 1.0, 0.0).0 as f64;
+                    ov.text(&caption, (w - est) / 2.0, y, fs, color, Weight::Medium, false, !in_bar, None, 0.0, custom.as_deref(), 1.0, None, 0.0);
                 }
                 "polaroid" => {
                     let bottom = h - max_y;
                     ov.text(&caption, rect.0 + rect.2 * 0.06, max_y + (bottom - fs) * 0.45, fs, color, Weight::Regular, false, false, None,
-                        0.0, Some("Noteworthy-Bold"), 1.0, None, 0.0);
+                        0.0, custom.as_deref().or(Some("Noteworthy-Bold")), 1.0, None, 0.0);
                 }
                 _ => {
                     ov.text(&caption, rect.0, max_y + ((h - max_y - fs) / 2.0).max(2.0), fs, color, Weight::Medium, false, false, None, 0.0,
-                        None, 1.0, None, 0.0);
+                        custom.as_deref(), 1.0, None, 0.0);
                 }
             }
             let t = ov.texture();
@@ -125,6 +126,7 @@ pub fn frame() -> Effect {
         ParamDef::text("caption", "Caption / Subtitle", "I've seen things you people wouldn't believe.").sec("Text"),
         ParamDef::color("textColor", "Text Color", hex("#F2E36B")).sec("Text"),
         s("textSize", "Text Size", 8.0, 80.0, 26.0).step(1.0).sec("Text"),
+        crate::overlay::font_def("Text"),
         ParamDef::segmented("textPlace", "Placement", &[("bar", "In the Bar"), ("image", "On the Image")], "bar").sec("Text").vis(when("style", "letterbox")),
         ParamDef::seed("seed").sec("Text"),
     ])

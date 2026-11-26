@@ -121,25 +121,42 @@ pub fn cube_text(l: &LutData) -> String {
 }
 
 /// Lightroom-style colour grading: hue/saturation wheels and luminance for shadows, midtones,
-/// highlights and the whole image, with Blending and Balance.
+/// highlights and the whole image, with Blending and Balance. The "Split Tone" mode (the old
+/// Split Tone effect, merged in 0.8.1) tints shadows and highlights with two colours.
 pub fn color_grade() -> Effect {
     let zones: [(&'static str, &'static str); 4] = [("sh", "Shadows"), ("mid", "Midtones"), ("hi", "Highlights"), ("gl", "Global")];
+    // older projects have no "mode": they are colour wheels
+    let wheels = || when_not("mode", "split");
+    let split = || when("mode", "split");
     let mut params = vec![
-        ParamDef::segmented("view", "View", &[("all", "3-Way"), ("sh", "Shad."), ("mid", "Mids"), ("hi", "Highs"), ("gl", "Global")], "all").sec("Color Grading"),
-        ParamDef::wheel_row("wheels", &["sh", "mid", "hi"]).sec("Color Grading").vis(when("view", "all")),
-        ParamDef::wheel_row("glWheels", &["gl"]).sec("Color Grading").vis(when("view", "all")),
+        ParamDef::segmented("mode", "Mode", &[("wheels", "Color Wheels"), ("split", "Split Tone")], "wheels").sec("Color Grading"),
+        ParamDef::segmented("view", "View", &[("all", "3-Way"), ("sh", "Shad."), ("mid", "Mids"), ("hi", "Highs"), ("gl", "Global")], "all").sec("Color Grading").vis(wheels()),
+        ParamDef::wheel_row("wheels", &["sh", "mid", "hi"]).sec("Color Grading").vis(when_all(vec![wheels(), when("view", "all")])),
+        ParamDef::wheel_row("glWheels", &["gl"]).sec("Color Grading").vis(when_all(vec![wheels(), when("view", "all")])),
+        ParamDef::color("shadow", "Shadow Color", hex("#1F4E9E")).sec("Color Grading").vis(split()),
+        s("shadowAmt", "Shadow Amount", 0.0, 100.0, 50.0).step(1.0).unit("%").sec("Color Grading").vis(split()),
+        ParamDef::color("highlight", "Highlight Color", hex("#FFB46E")).sec("Color Grading").vis(split()),
+        s("highlightAmt", "Highlight Amount", 0.0, 100.0, 30.0).step(1.0).unit("%").sec("Color Grading").vis(split()),
+        ParamDef::toggle("preserve", "Preserve Brightness", true).sec("Color Grading").vis(split()),
     ];
     let hue_track: Vec<Rgba> = (0..13).map(|i| oklch_rgb(0.72, 0.13, i as f64 * 30.0)).collect();
     for (z, label) in zones {
-        let v = when("view", z);
+        let v = when_all(vec![wheels(), when("view", z)]);
         params.push(ParamDef::wheel(&format!("{z}Wheel"), label, z).sec("Color Grading").vis(v.clone()));
         params.push(s(&format!("{z}Hue"), "Hue", 0.0, 360.0, 0.0).step(1.0).unit("°").sec("Color Grading").track(hue_track.clone()).vis(v.clone()));
         params.push(s(&format!("{z}Sat"), "Saturation", 0.0, 100.0, 0.0).step(1.0).sec("Color Grading").vis(v.clone()));
         params.push(s(&format!("{z}Lum"), "Luminance", -100.0, 100.0, 0.0).step(1.0).sec("Color Grading").vis(v));
     }
-    params.push(s("blending", "Blending", 0.0, 100.0, 50.0).step(1.0).sec("Color Grading"));
+    params.push(s("blending", "Blending", 0.0, 100.0, 50.0).step(1.0).sec("Color Grading").vis(wheels()));
     params.push(s("balance", "Balance", -100.0, 100.0, 0.0).step(1.0).sec("Color Grading").track(vec![hex("#3A3A3A"), hex("#9A9A9A"), hex("#E8E8E8")]));
     Effect::new("colorgrade", "Color Grading", Category::Adjust, |input, p, ctx| {
+        if p.choice("mode") == "split" {
+            let mut u = vec![];
+            u.extend(p.color_or("shadow", hex("#1F4E9E")).floats());
+            u.extend(p.color_or("highlight", hex("#FFB46E")).floats());
+            u.extend([p.fd("shadowAmt", 50.0) / 100.0, p.fd("highlightAmt", 30.0) / 100.0, p.f("balance") / 100.0, p.b("preserve")]);
+            return ctx.apply("k_splittone", &[input], &u);
+        }
         let mut u = vec![];
         for z in ["sh", "mid", "hi", "gl"] {
             u.push(p.f(&format!("{z}Hue")).to_radians());
@@ -151,7 +168,7 @@ pub fn color_grade() -> Effect {
         ctx.apply("k_colorgrade", &[input], &u)
     })
     .symbol("circle.lefthalf.filled")
-    .summary("Color wheels for shadows, midtones, highlights and global, like Lightroom's Color Grading.")
+    .summary("Color wheels for shadows, midtones, highlights and global, like Lightroom's Color Grading — or a two-colour Split Tone.")
     .params(params)
     .depth_bias()
     .looks({
@@ -167,6 +184,11 @@ pub fn color_grade() -> Effect {
             look_g("faded", "Faded Pastel", "Cool", g(&[("shHue", 230.0), ("shSat", 20.0), ("shLum", 18.0), ("hiHue", 20.0), ("hiSat", 15.0), ("hiLum", -6.0), ("blending", 80.0)])),
             look_g("split", "Classic Split Tone", "Classic", g(&[("shHue", 262.0), ("shSat", 40.0), ("hiHue", 65.0), ("hiSat", 30.0)])),
             look_g("sepia", "Sepia Wash", "Classic", g(&[("glHue", 65.0), ("glSat", 30.0), ("shHue", 40.0), ("shSat", 15.0)])),
+            look_g("stcool", "Cool Shadows, Warm Highlights", "Split Tone", vals!["mode" => "split"]),
+            look_g("stteal", "Teal & Cream", "Split Tone", vals!["mode" => "split", "shadow" => hex("#0F3B36"), "shadowAmt" => 55.0, "highlight" => hex("#F6E7CF"), "highlightAmt" => 18.0]),
+            look_g("stnavy", "Navy & Peach", "Split Tone", vals!["mode" => "split", "shadow" => hex("#0E3A66"), "shadowAmt" => 50.0, "highlight" => hex("#FFC9A0"), "highlightAmt" => 15.0]),
+            look_g("stforest", "Forest & Sage", "Split Tone", vals!["mode" => "split", "shadow" => hex("#12281A"), "shadowAmt" => 60.0, "highlight" => hex("#D9E9C2"), "highlightAmt" => 25.0]),
+            look_g("stember", "Ember", "Split Tone", vals!["mode" => "split", "shadow" => hex("#0B2A33"), "shadowAmt" => 45.0, "highlight" => hex("#FF7A2A"), "highlightAmt" => 50.0]),
         ]
     })
 }

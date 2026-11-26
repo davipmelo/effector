@@ -181,6 +181,10 @@ pub fn run(args: &[String]) {
             return;
         }
     };
+    if args.iter().any(|a| a == "--parity") {
+        parity(&src, &specs);
+        return;
+    }
     let full = args.iter().any(|a| a == "--full");
     let scale = if args.iter().any(|a| a == "--full2x") {
         2.0
@@ -233,6 +237,36 @@ pub fn run(args: &[String]) {
         println!("ok {spec} {ms}ms -> {}", path.display());
     }
     write_sheet(&sheet, &out_dir.join("_sheet.jpg"));
+}
+
+/// `--parity`: renders each spec like the app does (preview at ~900 px, then the full-size export
+/// of the same image) and prints how far the export, scaled down, is from the preview.
+/// "shared" uses the preview/export content key (what the app does), "fresh" renders the export
+/// without it (analysis effects such as Blob Tracker redo their work at full size).
+fn parity(src: &SourceImage, specs: &[&String]) {
+    let crop = CropRect::default();
+    let key = crate::worker::content_key(src.id, &crop);
+    let ps = (900.0 / src.width.max(src.height) as f64).min(1.0);
+    let ptex = src.make_texture(&crop, ps);
+    let ftex = src.make_texture(&crop, 1.0);
+    for spec in specs {
+        let layers = parse_spec(spec);
+        let extras = || crate::renderer::Extras::for_render(src, &crop, &layers, true);
+        let preview = Renderer::new(false).render(&layers, &ptex, key, false, None, extras());
+        let mut diff = |k: u64| {
+            let out = Renderer::new(false).render(&layers, &ftex, k, true, None, extras());
+            let mut c = crate::gpu::Ctx::new(1.0, out.clone(), true);
+            let small = c.resize(&out, preview.width(), preview.height(), false);
+            let (a, b) = (c.read_floats(&preview), c.read_floats(&small));
+            let n = (a.len() / 4).max(1) as f32;
+            let mean = a.chunks(4).zip(b.chunks(4)).map(|(x, y)| ((x[0] - y[0]).abs() + (x[1] - y[1]).abs() + (x[2] - y[2]).abs()) / 3.0).sum::<f32>() / n;
+            let big = a.chunks(4).zip(b.chunks(4)).filter(|(x, y)| (x[0] - y[0]).abs() + (x[1] - y[1]).abs() + (x[2] - y[2]).abs() > 0.3).count() as f32 / n;
+            (mean, big)
+        };
+        let (m1, b1) = diff(key);
+        let (m0, b0) = diff(0);
+        println!("parity {spec}: shared mean {:.4} far-off {:.3}%   fresh mean {:.4} far-off {:.3}%", m1, b1 * 100.0, m0, b0 * 100.0);
+    }
 }
 
 /// Contact sheet: grid of results with labels.

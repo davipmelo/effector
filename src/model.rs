@@ -550,7 +550,7 @@ impl BlendMode {
 
 /// A node in the layer tree. `children` is ordered top-first (index 0 = applied last).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", from = "LayerNodeWire")]
 pub struct LayerNode {
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
@@ -574,6 +574,59 @@ pub struct LayerNode {
     /// Limits the layer to a range of distances (needs the depth map).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub depth_mask: Option<DepthMask>,
+}
+
+
+/// What projects, sessions and presets store; read through `From` so retired effects are
+/// converted on load (Split Tone → Color Grading in "Split Tone" mode, 0.8.1).
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LayerNodeWire {
+    #[serde(default = "Uuid::new_v4")]
+    pub id: Uuid,
+    pub name: String,
+    #[serde(default)]
+    pub is_group: bool,
+    #[serde(default, rename = "effectID")]
+    pub effect_id: String,
+    #[serde(default)]
+    pub params: Params,
+    #[serde(default = "yes")]
+    pub enabled: bool,
+    #[serde(default = "one")]
+    pub opacity: f64,
+    #[serde(default)]
+    pub blend: BlendMode,
+    #[serde(default = "yes")]
+    pub expanded: bool,
+    #[serde(default)]
+    pub children: Vec<LayerNode>,
+    /// Limits the layer to a range of distances (needs the depth map).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub depth_mask: Option<DepthMask>,
+}
+
+impl From<LayerNodeWire> for LayerNode {
+    fn from(w: LayerNodeWire) -> LayerNode {
+        let mut n = LayerNode {
+            id: w.id,
+            name: w.name,
+            is_group: w.is_group,
+            effect_id: w.effect_id,
+            params: w.params,
+            enabled: w.enabled,
+            opacity: w.opacity,
+            blend: w.blend,
+            expanded: w.expanded,
+            children: w.children,
+            depth_mask: w.depth_mask,
+        };
+        if n.effect_id == "splittone" {
+            n.effect_id = "colorgrade".into();
+            n.params.set("mode", ParamValue::Choice("split".into()));
+        }
+        n
+    }
 }
 
 /// Per-layer depth mask: the layer only shows between `from` and `to` (0 = farthest, 1 = nearest).
@@ -929,3 +982,22 @@ pub struct ProjectManifest {
 
 fn one_i() -> i64 { 1 }
 fn app_name() -> String { "EFFECTOR".into() }
+
+#[cfg(test)]
+mod migration_tests {
+    use super::*;
+
+    #[test]
+    fn split_tone_layers_open_as_color_grading() {
+        let mut n = LayerNode::group("Split Tone", vec![]);
+        n.is_group = false;
+        n.effect_id = "splittone".into();
+        n.params.set("shadowAmt", ParamValue::Number(42.0));
+        let json = serde_json::to_string(&vec![LayerNode::group("g", vec![n])]).unwrap();
+        let back: Vec<LayerNode> = serde_json::from_str(&json).unwrap();
+        let c = &back[0].children[0];
+        assert_eq!(c.effect_id, "colorgrade");
+        assert_eq!(c.params.choice("mode"), "split");
+        assert_eq!(c.params.num("shadowAmt", 0.0), 42.0);
+    }
+}

@@ -613,6 +613,13 @@ pub fn picker_field(
     let mut order: Vec<String> = favs.clone();
     order.extend(items.iter().map(|i| i.id.clone()).filter(|i| !favs.contains(i)));
 
+    // The field handles ↑/↓/←/→ itself: without this egui moves keyboard focus to the next
+    // widget on an arrow press, and that widget (another picker, a slider…) reacts to the same keys.
+    if resp.has_focus() {
+        ui.memory_mut(|m| m.set_focus_lock_filter(resp.id, egui::EventFilter { vertical_arrows: true, horizontal_arrows: true, tab: false, escape: true }));
+    } else if mem.open && ui.memory(|m| m.focused().is_none()) {
+        resp.request_focus();
+    }
     if resp.clicked() {
         resp.request_focus();
         if mem.open {
@@ -674,20 +681,28 @@ pub fn picker_field(
             rows.push((it.id.clone(), it, header));
         }
         // keyboard
-        let (up, down, enter, esc, typed) = ui.input(|i| {
+        // consumed, so nothing drawn after this (behind the menu) sees them too
+        let (up, down, enter, esc, typed) = ui.input_mut(|i| {
             let txt: String = i
                 .events
                 .iter()
                 .filter_map(|e| if let egui::Event::Text(t) = e { Some(t.clone()) } else { None })
                 .collect::<String>();
+            let none = egui::Modifiers::NONE;
+            i.consume_key(none, egui::Key::ArrowLeft);
+            i.consume_key(none, egui::Key::ArrowRight);
             (
-                i.key_pressed(egui::Key::ArrowUp),
-                i.key_pressed(egui::Key::ArrowDown),
-                i.key_pressed(egui::Key::Enter),
-                i.key_pressed(egui::Key::Escape),
+                i.consume_key(none, egui::Key::ArrowUp),
+                i.consume_key(none, egui::Key::ArrowDown),
+                i.consume_key(none, egui::Key::Enter),
+                i.consume_key(none, egui::Key::Escape),
                 txt,
             )
         });
+        if !typed.is_empty() {
+            // W/S/type-ahead belong to the menu as well
+            ui.input_mut(|i| i.events.retain(|e| !matches!(e, egui::Event::Text(_))));
+        }
         let mut choose = |mem: &mut PickerMem, key: &str, item_id: &str, out: &mut PickerOut| {
             mem.highlight = key.to_string();
             mem.scroll_to = true;
@@ -893,10 +908,23 @@ pub fn view_mode_toggle(ui: &mut Ui, id: Id, list_mode: bool) -> Option<bool> {
 }
 
 /// Thin footer line with a hint.
+fn footer_galley(ui: &Ui, s: &str, w: f32) -> std::sync::Arc<egui::Galley> {
+    let mut job = egui::text::LayoutJob::simple(s.to_string(), regular(10.0), text_faint(), (w - 16.0).max(40.0));
+    job.halign = egui::Align::Center;
+    ui.painter().layout_job(job)
+}
+
+/// Height `browser_footer` will take at the current width.
+pub fn browser_footer_height(ui: &Ui, s: &str) -> f32 { footer_galley(ui, s, ui.available_width()).size().y + 11.0 }
+
 pub fn browser_footer(ui: &mut Ui, s: &str) {
     separator_line(ui);
     ui.add_space(5.0);
-    ui.vertical_centered(|ui| ui.label(egui::RichText::new(s).font(regular(10.0)).color(text_faint())));
+    // wraps (centred) instead of widening or overflowing the sidebar when it is narrow
+    let w = ui.available_width();
+    let g = footer_galley(ui, s, w);
+    let (r, _) = ui.allocate_exact_size(vec2(w, g.size().y), Sense::hover());
+    ui.painter().galley(pos2(r.center().x, r.top()), g, text_faint());
     ui.add_space(5.0);
 }
 

@@ -166,17 +166,18 @@ pub enum Action {
     PrevImage, NextImage, Filmstrip, SyncSettings, CloseImage,
     ZoomIn, ZoomOut, ZoomFit, Zoom100, Present, Compare, Randomize, CopyLayers, PasteLayers, ShowLayers, ShowPresets,
     CopySettings, PasteSettings, ResetSettings, TogglePanels, ToggleAllPanels, SelectAll, Deselect, ShowDepth,
+    ShowClipping, ToggleHistogram,
 }
 
 impl Action {
-    pub const ALL: [Action; 43] = [
+    pub const ALL: [Action; 45] = [
         Action::Open, Action::Save, Action::SaveAs, Action::Export, Action::CopyResult, Action::Paste, Action::Undo, Action::Redo,
         Action::CommandPalette, Action::AddEffect, Action::BeforeAfter, Action::Crop, Action::Group, Action::Ungroup, Action::Duplicate,
         Action::Delete, Action::ToggleVisibility, Action::MoveUp, Action::MoveDown, Action::PrevImage, Action::NextImage,
         Action::Filmstrip, Action::SyncSettings, Action::CloseImage, Action::ZoomIn, Action::ZoomOut, Action::ZoomFit, Action::Zoom100,
         Action::Present, Action::Compare, Action::Randomize, Action::CopyLayers, Action::PasteLayers, Action::ShowLayers,
         Action::ShowPresets, Action::CopySettings, Action::PasteSettings, Action::ResetSettings, Action::TogglePanels,
-        Action::ToggleAllPanels, Action::SelectAll, Action::Deselect, Action::ShowDepth,
+        Action::ToggleAllPanels, Action::SelectAll, Action::Deselect, Action::ShowDepth, Action::ShowClipping, Action::ToggleHistogram,
     ];
 
     /// Stable id (same raw values as the macOS app).
@@ -193,6 +194,7 @@ impl Action {
             ShowLayers => "showLayers", ShowPresets => "showPresets", CopySettings => "copySettings",
             PasteSettings => "pasteSettings", ResetSettings => "resetSettings", TogglePanels => "togglePanels",
             ToggleAllPanels => "toggleAllPanels", SelectAll => "selectAll", Deselect => "deselect", ShowDepth => "showDepth",
+            ShowClipping => "showClipping", ToggleHistogram => "toggleHistogram",
         }
     }
 
@@ -242,6 +244,8 @@ impl Action {
             SelectAll => "Select All",
             Deselect => "Deselect All",
             ShowDepth => "View Depth Map",
+            ShowClipping => "Show Clipping",
+            ToggleHistogram => "Show / Hide Histogram",
         }
     }
 
@@ -293,6 +297,8 @@ impl Action {
             SelectAll => k("a", true, false, false),
             Deselect => k("d", true, false, false),
             ShowDepth => k("d", false, false, false),
+            ShowClipping => k("j", false, false, false),
+            ToggleHistogram => k("h", true, true, false),
         }
     }
 

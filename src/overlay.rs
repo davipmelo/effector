@@ -64,9 +64,92 @@ fn fonts() -> &'static Fonts {
     })
 }
 
+// MARK: - User-selectable fonts (the "Font" option of text effects)
+
+/// (id, file data) — extra faces with a 2000s / old-web feel (all SIL Open Font License, see
+/// assets/fonts/OFL-*.txt). Bold variants use the "-bold" id.
+const EXTRA: [(&str, &[u8]); 14] = [
+    ("vt323", include_bytes!("../assets/fonts/VT323-Regular.ttf")),
+    ("silkscreen", include_bytes!("../assets/fonts/Silkscreen-Regular.ttf")),
+    ("silkscreen-bold", include_bytes!("../assets/fonts/Silkscreen-Bold.ttf")),
+    ("pressstart", include_bytes!("../assets/fonts/PressStart2P-Regular.ttf")),
+    ("dotgothic", include_bytes!("../assets/fonts/DotGothic16-Regular.ttf")),
+    ("sharetech", include_bytes!("../assets/fonts/ShareTechMono-Regular.ttf")),
+    ("spacemono", include_bytes!("../assets/fonts/SpaceMono-Regular.ttf")),
+    ("spacemono-bold", include_bytes!("../assets/fonts/SpaceMono-Bold.ttf")),
+    ("plexmono", include_bytes!("../assets/fonts/IBMPlexMono-Regular.ttf")),
+    ("plexmono-bold", include_bytes!("../assets/fonts/IBMPlexMono-Bold.ttf")),
+    ("courier", include_bytes!("../assets/fonts/CourierPrime-Regular.ttf")),
+    ("courier-bold", include_bytes!("../assets/fonts/CourierPrime-Bold.ttf")),
+    ("cutive", include_bytes!("../assets/fonts/CutiveMono-Regular.ttf")),
+    ("majormono", include_bytes!("../assets/fonts/MajorMonoDisplay-Regular.ttf")),
+];
+
+/// Choices of the "Font" parameter (id, label, group). "default" keeps each effect's own font.
+pub const FONT_CHOICES: [(&str, &str, &str); 14] = [
+    ("default", "Effect Default", ""),
+    ("vt323", "VT323", "Terminal & Pixel"),
+    ("silkscreen", "Silkscreen", "Terminal & Pixel"),
+    ("pressstart", "Press Start 2P", "Terminal & Pixel"),
+    ("dotgothic", "DotGothic16", "Terminal & Pixel"),
+    ("sharetech", "Share Tech Mono", "Mono"),
+    ("spacemono", "Space Mono", "Mono"),
+    ("plexmono", "IBM Plex Mono", "Mono"),
+    ("jetbrains", "JetBrains Mono", "Mono"),
+    ("majormono", "Major Mono Display", "Mono"),
+    ("courier", "Courier Prime", "Typewriter"),
+    ("cutive", "Cutive Mono", "Typewriter"),
+    ("inter", "Inter", "Sans & Hand"),
+    ("hand", "Caveat", "Sans & Hand"),
+];
+
+/// The standard "Font" parameter (grouped picker) for effects that draw text.
+pub fn font_def(section: &str) -> crate::model::ParamDef {
+    let opts = FONT_CHOICES
+        .iter()
+        .map(|(id, label, group)| crate::model::ChoiceOption { id: id.to_string(), label: label.to_string(), group: if group.is_empty() { None } else { Some(group.to_string()) } })
+        .collect();
+    crate::model::ParamDef::choice_opts("font", "Font", opts, "default").sec(section)
+}
+
+fn extra_fonts() -> &'static Vec<(&'static str, FontRef<'static>)> {
+    static F: OnceLock<Vec<(&'static str, FontRef<'static>)>> = OnceLock::new();
+    F.get_or_init(|| EXTRA.iter().filter_map(|(id, d)| FontRef::try_from_slice(d).ok().map(|f| (*id, f))).collect())
+}
+
+/// `font_name` for a "Font" parameter value (None = the effect's own font).
+pub fn font_param(p: &crate::model::Params) -> Option<String> {
+    let id = p.choice_or("font", "default");
+    if id == "default" || id.is_empty() { None } else { Some(format!("fx:{id}")) }
+}
+
+fn pick_extra(id: &str, weight: Weight) -> Option<&'static FontRef<'static>> {
+    let f = fonts();
+    let bold = matches!(weight, Weight::Bold | Weight::Heavy);
+    match id {
+        "jetbrains" => return Some(&f.mono[weight.index()]),
+        "inter" => return Some(&f.inter[weight.index()]),
+        "hand" => return Some(&f.hand),
+        _ => {}
+    }
+    let ex = extra_fonts();
+    let find = |k: &str| ex.iter().find(|e| e.0 == k).map(|e| &e.1);
+    if bold {
+        if let Some(b) = find(&format!("{id}-bold")) {
+            return Some(b);
+        }
+    }
+    find(id)
+}
+
 /// Picks the bundled font for a CoreText-style request (`fontName` wins over mono/weight).
 fn pick(mono: bool, weight: Weight, font_name: Option<&str>) -> &'static FontRef<'static> {
     let f = fonts();
+    if let Some(id) = font_name.and_then(|n| n.strip_prefix("fx:")) {
+        if let Some(font) = pick_extra(id, weight) {
+            return font;
+        }
+    }
     match font_name {
         Some(n) if n.starts_with("Menlo") || n.contains("Mono") || n.starts_with("Courier") => {
             return &f.mono[if n.contains("Bold") { 3 } else { 0 }];

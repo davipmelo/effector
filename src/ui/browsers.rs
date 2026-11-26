@@ -75,7 +75,10 @@ pub fn effect_browser(ui: &mut Ui, app: &mut AppState) {
     let mouse = ui.ctx().pointer_hover_pos();
     egui::Frame::new().inner_margin(egui::Margin::symmetric(10, 8)).show(ui, |ui| {
         ui.horizontal(|ui| {
-            let avail = ui.available_width() - 62.0 - 26.0 - 10.0;
+            // exactly what the toggle (62) and close button (26) leave: a row even a pixel wider than
+            // the sidebar makes egui widen the panel every frame (the sidebar jumped to its max width)
+            let sp = ui.spacing().item_spacing.x;
+            let avail = (ui.available_width() - 62.0 - 26.0 - 2.0 * sp).floor().max(40.0);
             ui.allocate_ui(vec2(avail, 34.0), |ui| {
                 let before = mem.query.clone();
                 let r = search_field(ui, id.with("q"), &tr("Search effects"), &mut mem.query, !mem.focus_done);
@@ -122,7 +125,8 @@ pub fn effect_browser(ui: &mut Ui, app: &mut AppState) {
     } else if enter && add.is_none() {
         add = mem.highlight.as_deref().and_then(|h| list.iter().find(|e| e.id == h).map(|e| e.id)).or(list.first().map(|e| e.id));
     }
-    let footer_h = 28.0;
+    let hint = keys_hint(&tr("Hover or ↑↓ to preview · click or ↩ to add · ⎋ close"));
+    let footer_h = browser_footer_height(ui, &hint);
     let avail_h = ui.available_height() - footer_h;
     egui::ScrollArea::vertical().id_salt("browser-scroll").max_height(avail_h).auto_shrink([false, false]).show(ui, |ui| {
         egui::Frame::new().inner_margin(egui::Margin { left: 10, right: 10, top: 0, bottom: 14 }).show(ui, |ui| {
@@ -162,7 +166,8 @@ pub fn effect_browser(ui: &mut Ui, app: &mut AppState) {
                     }
                 } else {
                     let w = ui.available_width();
-                    let cols = ((w + 10.0) / (116.0 + 10.0)).floor().max(1.0) as usize;
+                    // as many columns as fit (cards between ~96 and ~190 px wide); never wider than the sidebar
+                    let cols = ((w + 10.0) / (96.0 + 10.0)).floor().max(1.0) as usize;
                     let cw = (w - (cols - 1) as f32 * 10.0) / cols as f32;
                     for chunk in items.chunks(cols) {
                         ui.horizontal(|ui| {
@@ -191,7 +196,7 @@ pub fn effect_browser(ui: &mut Ui, app: &mut AppState) {
             }
         });
     });
-    browser_footer(ui, &keys_hint(&tr("Hover or ↑↓ to preview · click or ↩ to add · ⎋ close")));
+    browser_footer(ui, &hint);
     if let Some(eid) = add {
         app.set_preview_layers(None);
         app.add_effect(eid);
@@ -262,7 +267,8 @@ pub fn presets_panel(ui: &mut Ui, app: &mut AppState) {
     let hovering = mouse.map(|m| panel_rect.contains(m)).unwrap_or(false);
     egui::Frame::new().inner_margin(egui::Margin::symmetric(10, 8)).show(ui, |ui| {
         ui.horizontal(|ui| {
-            let avail = ui.available_width() - 62.0 - 26.0 - 26.0 - 18.0;
+            let sp = ui.spacing().item_spacing.x;
+            let avail = (ui.available_width() - 62.0 - 26.0 - 26.0 - 3.0 * sp).floor().max(40.0);
             ui.allocate_ui(vec2(avail, 34.0), |ui| {
                 let before = mem.query.clone();
                 let r = search_field(ui, id.with("q"), &tr("Search presets"), &mut mem.query, false);

@@ -25,10 +25,10 @@ const CELL_W: usize = 40;
 const CELL_H: usize = 72;
 
 /// Builds and caches glyph atlases sorted by ink density.
-fn atlas(chars: &str, bold: bool) -> (T, usize) {
+fn atlas(chars: &str, bold: bool, font: Option<&str>) -> (T, usize) {
     static CACHE: OnceLock<Mutex<HashMap<String, (T, usize)>>> = OnceLock::new();
     let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
-    let key = format!("{chars}{}", if bold { "|b" } else { "|r" });
+    let key = format!("{chars}{}|{}", if bold { "|b" } else { "|r" }, font.unwrap_or(""));
     let mut c = cache.lock().unwrap();
     if let Some(v) = c.get(&key) {
         return v.clone();
@@ -39,12 +39,12 @@ fn atlas(chars: &str, bold: bool) -> (T, usize) {
     let (gw, gh) = (CELL_W, CELL_H);
     let size = gh as f64 * 0.78;
     let weight = if bold { Weight::Heavy } else { Weight::Medium };
-    let (_, asc, desc) = overlay::measure("Hg", size as f32, true, weight, None, 1.0, 0.0);
+    let (_, asc, desc) = overlay::measure("Hg", size as f32, true, weight, font, 1.0, 0.0);
     let mut rendered: Vec<(f64, Vec<u8>)> = vec![];
     for g in chars.chars() {
         let s = g.to_string();
         let mut ov = overlay::OverlayCanvas::new(gw, gh);
-        let (wdt, _, _) = overlay::measure(&s, size as f32, true, weight, None, 1.0, 0.0);
+        let (wdt, _, _) = overlay::measure(&s, size as f32, true, weight, font, 1.0, 0.0);
         // block elements fill the whole cell: stretch them
         let is_block = (0x2580..=0x259F).contains(&(g as u32));
         if is_block {
@@ -54,7 +54,7 @@ fn atlas(chars: &str, bold: bool) -> (T, usize) {
         } else {
             // baseline at 80 % of the cell height (CoreText: 20 % from the bottom)
             let top = gh as f64 * 0.8 - asc as f64;
-            ov.text(&s, (gw as f64 - wdt as f64) / 2.0, top, size, Rgba::WHITE, weight, true, false, None, 0.0, None, 1.0, None, 0.0);
+            ov.text(&s, (gw as f64 - wdt as f64) / 2.0, top, size, Rgba::WHITE, weight, true, false, None, 0.0, font, 1.0, None, 0.0);
         }
         let buf: Vec<u8> = (0..gw * gh).map(|i| ov.data()[i * 4 + 3]).collect();
         let density = buf.iter().map(|v| *v as f64).sum::<f64>() / (gw * gh) as f64 / 255.0;
@@ -100,7 +100,8 @@ pub fn ascii() -> Effect {
             let chars: String = format!(" {}", p.text_or("customChars", " .oO@")).chars().filter(|c| *c != '\n' && seen.insert(*c)).collect();
             set = if chars.chars().count() >= 2 { chars } else { " .oO@".into() };
         }
-        let (atl, n) = atlas(&set, p.bool("bold"));
+        let font = overlay::font_param(p);
+        let (atl, n) = atlas(&set, p.bool("bold"), font.as_deref());
         let mode = match p.choice_or("mode", "mono").as_str() { "palette" => 1.0, "original" => 2.0, _ => 0.0 };
         let mut pal = p.palette("palette").unwrap_or_else(swatches::one_bit);
         pal.colors.sort_by(|a, b| a.luma().partial_cmp(&b.luma()).unwrap());
@@ -124,6 +125,7 @@ pub fn ascii() -> Effect {
         s("cell", "Cell Size", 2.0, 40.0, 8.0).step(0.5).curve(1.6).sec("Characters"),
         s("aspect", "Cell Height", 100.0, 250.0, 180.0).step(1.0).unit("%").sec("Characters"),
         ParamDef::toggle("bold", "Bold", false).sec("Characters"),
+        overlay::font_def("Characters"),
         ParamDef::segmented("mode", "Color", &[("mono", "Mono"), ("palette", "Palette"), ("original", "Original")], "mono").sec("Color"),
         ParamDef::color("fg", "Characters", hex("#F2F2F2")).sec("Color").vis(when("mode", "mono")),
         ParamDef::color("bg", "Background", hex("#0A0A0A")).sec("Color"),

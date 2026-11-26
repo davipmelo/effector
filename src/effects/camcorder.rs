@@ -61,7 +61,8 @@ fn draw_osd(p: &Params, ctx: &Ctx, w: usize, h: usize) -> Option<(OverlayCanvas,
     let (weight, shadow, stretch, outline, glow) = text_style(&style);
     let color = p.color_or("dateColor", Rgba::WHITE);
     let size = ctx.px(p.num("dateSize", 30.0));
-    let font = if style == "led" { Some("Menlo-Bold") } else { None };
+    let custom = crate::overlay::font_param(p);
+    let font = custom.as_deref().or(if style == "led" { Some("Menlo-Bold") } else { None });
     let mut put = |ov: &mut OverlayCanvas, s: &str, x: f64, y: f64, size: f64, c: Rgba| {
         ov.text(s, x, y, size, c, weight, true, shadow, None, 0.0, font, stretch, outline, 0.04);
     };
@@ -300,6 +301,7 @@ pub fn camcorder() -> Effect {
             ParamDef::choice("datePos", "Position", &[("br", "Bottom Right"), ("bl", "Bottom Left"), ("tr", "Top Right"), ("tl", "Top Left")], "br").sec("Date Stamp"),
             ParamDef::choice("dateStyle", "Style", &[("camcorder", "Camcorder (outlined)"), ("vcr", "VCR (flat)"), ("led", "Digicam LED"), ("cctv", "CCTV")], "camcorder").sec("Date Stamp"),
             s("dateSize", "Size", 8.0, 80.0, 30.0).step(1.0).sec("Date Stamp"),
+            crate::overlay::font_def("Date Stamp"),
             ParamDef::color("dateColor", "Color", Rgba::WHITE).sec("Date Stamp"),
             // osd
             ParamDef::section_switch("osdOn", "Camera Display", false),

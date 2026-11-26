@@ -259,50 +259,80 @@ pub fn saliency(px: &[f32], w: usize, h: usize, min_area: f64, max_area: f64) ->
     out
 }
 
+/// What the preview detected, per layer (`Ctx::layer_key`): the export reuses it so the boxes land
+/// exactly where they were on screen (detecting again at full resolution can split, merge or
+/// reorder blobs that sit right at the threshold).
+static DETECTED: std::sync::Mutex<Vec<(u64, Vec<Blob>)>> = std::sync::Mutex::new(Vec::new());
+
+fn detect_cached(input: &T, p: &Params, ctx: &mut Ctx) -> Vec<Blob> {
+    let key = ctx.layer_key;
+    if key != 0 && ctx.is_export {
+        if let Some(b) = DETECTED.lock().ok().and_then(|c| c.iter().find(|e| e.0 == key).map(|e| e.1.clone())) {
+            return b;
+        }
+    }
+    let blobs = detect(input, p, ctx);
+    if key != 0 && !ctx.is_export {
+        if let Ok(mut c) = DETECTED.lock() {
+            c.retain(|e| e.0 != key);
+            c.push((key, blobs.clone()));
+            let n = c.len();
+            if n > 48 {
+                c.drain(0..n - 48);
+            }
+        }
+    }
+    blobs
+}
+
+fn detect(input: &T, p: &Params, ctx: &mut Ctx) -> Vec<Blob> {
+    let mode = p.choice_or("detect", "brightness");
+    let (min_a, max_a) = (p.num("minSize", 0.3) / 100.0, p.num("maxSize", 40.0) / 100.0);
+    let mut blobs: Vec<Blob> = if mode == "contours" || mode == "saliency" {
+        let f = (768.0 / input.width().max(input.height()) as f64).min(1.0);
+        let (w, h) = (((input.width() as f64 * f) as usize).max(1), ((input.height() as f64 * f) as usize).max(1));
+        let small = ctx.resize(input, w, h, false);
+        let px = ctx.read_floats(&small);
+        if mode == "saliency" { saliency(&px, w, h, min_a, 1.0) } else {
+            // Vision worked at ≤ 512 px
+            let f2 = (512.0 / w.max(h) as f64).min(1.0);
+            let (w2, h2) = (((w as f64 * f2) as usize).max(1), ((h as f64 * f2) as usize).max(1));
+            let s2 = ctx.resize(&small, w2, h2, false);
+            let px2 = ctx.read_floats(&s2);
+            contours(&px2, w2, h2, min_a, max_a)
+        }
+    } else {
+        let detail = p.num("detail", 160.0);
+        let sc = detail / input.width().max(input.height()) as f64;
+        let (w, h) = (((input.width() as f64 * sc) as usize).max(8), ((input.height() as f64 * sc) as usize).max(8));
+        let small = ctx.resize(input, w, h, false);
+        let px = ctx.read_floats(&small);
+        let th = (p.num("threshold", 65.0) / 100.0) as f32;
+        let target = p.color_or("target", hex("#E03020"));
+        let tol = (p.num("tolerance", 25.0) / 100.0) as f32;
+        let (tr, tg, tb) = (target.r as f32, target.g as f32, target.b as f32);
+        match mode.as_str() {
+            "darkness" => components(w, h, &|i| luma_of(&px, i) < 1.0 - th, min_a, max_a),
+            "color" => components(w, h, &|i| {
+                let (dr, dg, db) = (px[i * 4] - tr, px[i * 4 + 1] - tg, px[i * 4 + 2] - tb);
+                (dr * dr + dg * dg + db * db).sqrt() < tol * 1.2
+            }, min_a, max_a),
+            _ => components(w, h, &|i| luma_of(&px, i) > th, min_a, max_a),
+        }
+    };
+    blobs.sort_by(|a, b| b.area.partial_cmp(&a.area).unwrap());
+    blobs.truncate(p.num("maxBlobs", 14.0).max(0.0) as usize);
+    // stable reading order for IDs / sequence: left-to-right, top-to-bottom
+    blobs.sort_by(|a, b| {
+        let (ac, bc) = (a.center(), b.center());
+        if (ac.1 * 4.0).round() == (bc.1 * 4.0).round() { ac.0.partial_cmp(&bc.0).unwrap() } else { ac.1.partial_cmp(&bc.1).unwrap() }
+    });
+    blobs
+}
+
 pub fn blob_tracker() -> Effect {
     Effect::new("blob", "Blob Tracker", Category::Overlay, |input, p, ctx| {
-        let mode = p.choice_or("detect", "brightness");
-        let (min_a, max_a) = (p.num("minSize", 0.3) / 100.0, p.num("maxSize", 40.0) / 100.0);
-        let mut blobs: Vec<Blob> = if mode == "contours" || mode == "saliency" {
-            let f = (768.0 / input.width().max(input.height()) as f64).min(1.0);
-            let (w, h) = (((input.width() as f64 * f) as usize).max(1), ((input.height() as f64 * f) as usize).max(1));
-            let small = ctx.resize(input, w, h, false);
-            let px = ctx.read_floats(&small);
-            if mode == "saliency" { saliency(&px, w, h, min_a, 1.0) } else {
-                // Vision worked at ≤ 512 px
-                let f2 = (512.0 / w.max(h) as f64).min(1.0);
-                let (w2, h2) = (((w as f64 * f2) as usize).max(1), ((h as f64 * f2) as usize).max(1));
-                let s2 = ctx.resize(&small, w2, h2, false);
-                let px2 = ctx.read_floats(&s2);
-                contours(&px2, w2, h2, min_a, max_a)
-            }
-        } else {
-            let detail = p.num("detail", 160.0);
-            let sc = detail / input.width().max(input.height()) as f64;
-            let (w, h) = (((input.width() as f64 * sc) as usize).max(8), ((input.height() as f64 * sc) as usize).max(8));
-            let small = ctx.resize(input, w, h, false);
-            let px = ctx.read_floats(&small);
-            let th = (p.num("threshold", 65.0) / 100.0) as f32;
-            let target = p.color_or("target", hex("#E03020"));
-            let tol = (p.num("tolerance", 25.0) / 100.0) as f32;
-            let (tr, tg, tb) = (target.r as f32, target.g as f32, target.b as f32);
-            match mode.as_str() {
-                "darkness" => components(w, h, &|i| luma_of(&px, i) < 1.0 - th, min_a, max_a),
-                "color" => components(w, h, &|i| {
-                    let (dr, dg, db) = (px[i * 4] - tr, px[i * 4 + 1] - tg, px[i * 4 + 2] - tb);
-                    (dr * dr + dg * dg + db * db).sqrt() < tol * 1.2
-                }, min_a, max_a),
-                _ => components(w, h, &|i| luma_of(&px, i) > th, min_a, max_a),
-            }
-        };
-        blobs.sort_by(|a, b| b.area.partial_cmp(&a.area).unwrap());
-        blobs.truncate(p.num("maxBlobs", 14.0).max(0.0) as usize);
-        // stable reading order for IDs / sequence: left-to-right, top-to-bottom
-        blobs.sort_by(|a, b| {
-            let (ac, bc) = (a.center(), b.center());
-            if (ac.1 * 4.0).round() == (bc.1 * 4.0).round() { ac.0.partial_cmp(&bc.0).unwrap() } else { ac.1.partial_cmp(&bc.1).unwrap() }
-        });
-
+        let blobs = detect_cached(input, p, ctx);
         let (ww, hh) = (input.width() as f64, input.height() as f64);
         let mut ov = OverlayCanvas::new(input.width(), input.height());
         let mut mask = OverlayCanvas::new(input.width(), input.height());
@@ -433,12 +463,14 @@ pub fn blob_tracker() -> Effect {
         if label_mode != "none" {
             let size = ctx.px(p.num("labelSize", 16.0));
             let inv = if color.luma() > 0.5 { Rgba::BLACK } else { Rgba::WHITE };
+            let font = crate::overlay::font_param(p);
             for (i, r) in rects.iter().enumerate() {
                 let (mx, my) = mid(r);
                 let text = match label_mode.as_str() {
                     "coords" => format!("X{:04} Y{:04}", (mx / ww * 1000.0) as i64, (my / hh * 1000.0) as i64),
                     "size" => format!("{}×{}", (r.2 / ww * 1000.0) as i64, (r.3 / hh * 1000.0) as i64),
-                    "hex" => format!("0x{:04X}", (i as i64 * 7919 + mx as i64 * 31 + my as i64) & 0xFFFF),
+                    // from the normalised position, so the preview and the export print the same id
+                    "hex" => format!("0x{:04X}", (i as i64 * 7919 + (mx / ww * 1000.0) as i64 * 31 + (my / hh * 1000.0) as i64) & 0xFFFF),
                     "custom" => {
                         let t = p.text_or("labelText", "TARGET");
                         if rects.len() > 1 { format!("{t} {}", i + 1) } else { t }
@@ -448,7 +480,7 @@ pub fn blob_tracker() -> Effect {
                 let bg = p.bool_or("labelBG", true);
                 let y = (r.1 - size * 1.35 - lw).max(0.0);
                 ov.text(&text, r.0 + if bg { size * 0.25 } else { 0.0 }, y + size * 0.12, size, if bg { inv } else { color }, Weight::Semibold,
-                    true, false, if bg { Some(color) } else { None }, if bg { size * 0.2 } else { 0.0 }, None, 1.0, None, 0.0);
+                    true, false, if bg { Some(color) } else { None }, if bg { size * 0.2 } else { 0.0 }, font.as_deref(), 1.0, None, 0.0);
             }
         }
         let (ot, mt) = (ov.texture(), mask.texture());
@@ -483,6 +515,7 @@ pub fn blob_tracker() -> Effect {
         ParamDef::choice("label", "Label", &[("id", "ID"), ("coords", "Coordinates"), ("size", "Size"), ("hex", "Hex ID"), ("custom", "Custom Text")], "id").sec("Labels"),
         ParamDef::text("labelText", "Text", "TARGET").sec("Labels").vis(when("label", "custom")),
         s("labelSize", "Label Size", 4.0, 60.0, 16.0).step(0.5).curve(1.5).sec("Labels"),
+        crate::overlay::font_def("Labels"),
         ParamDef::toggle("labelBG", "Label Background", true).sec("Labels"),
         ParamDef::section_switch("connectOn", "Connections", true),
         ParamDef::choice("connect", "Style", &[("sequence", "Sequence"), ("nearest", "Nearest"), ("center", "To Center"), ("all", "All")], "nearest").sec("Connections"),

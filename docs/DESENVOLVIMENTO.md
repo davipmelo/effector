@@ -40,7 +40,18 @@
 - **Ferramentas de dev:** `--list-looks`, `--slider-audit`, `--missing-pt` (textos sem tradução), `look=<id>` e
   `dm=from/to/feather[/inv]` nas specs do `--render-test`, passos `dm:` e `depth` no script de screenshot.
 - **CI:** `.github/workflows/ci.yml` compila e roda o lint no Windows e no Mac a cada push na `main`.
-- **Traduções 0.8:** `src/l10n_pt_080.rs` (sobrepõe `PT`).
+- **Traduções 0.8:** `src/l10n_pt_080.rs` (sobrepõe `PT`); 0.8.1 em `src/l10n_pt_081.rs`.
+- **Histograma (0.8.1):** `src/histogram.rs` mede a saída na thread de render (cópia de ≤640 px, só com o painel aberto);
+  `ui/histogram.rs` desenha. **J** = `Action::ShowClipping` (cópia de exibição via `k_clipview`), ⇧⌘H abre/fecha.
+- **Paridade preview/export (0.8.1):** `Ctx::content_key` (imagem + recorte, `worker::content_key`) e `Ctx::layer_key`
+  (cadeia de hashes sem a resolução) são iguais no preview e no export. Efeitos que analisam a foto (Blob Tracker) guardam
+  o resultado do preview por `layer_key`, e o export reaproveita. `--render-test <img> <dir> <specs> --parity` mede a diferença.
+- **Fontes (0.8.1):** parâmetro padrão `overlay::font_def(seção)` + `overlay::font_param(p)` → `font_name` `"fx:<id>"`.
+  Fontes extras em `overlay::EXTRA` (OFL, `assets/fonts/OFL-*.txt`).
+- **Tab / setas:** `raw_input_hook` tira o Tab da entrada do egui (senão ele move o foco); pickers usam `set_focus_lock_filter`
+  e consomem as setas enquanto estão abertos.
+- **Largura das sidebars:** uma linha mais larga que o painel faz o egui alargar a sidebar a cada frame. Calcule larguras
+  com `item_spacing` e nunca passe de `available_width()`.
 - **Unidades de tamanho:** relativas a 1000 px no lado maior (`renderer::REFERENCE_SIZE`).
 - **Regra P&B:** saída com R=G=B exato; o renderer restaura o alfa de entrada (`k_withalpha`).
 - **Dados do usuário:** pasta `EFFECTOR` em Application Support (Mac) / `%APPDATA%` (Windows): `settings.json`,

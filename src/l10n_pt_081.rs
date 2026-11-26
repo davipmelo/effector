@@ -1,0 +1,42 @@
+// Portuguese strings added in v0.8.1 (key = English text). Later entries override `PT` / `PT_080`.
+pub const PT_081: &[(&str, &str)] = &[
+    // histogram
+    ("Histogram", "Histograma"),
+    ("Show histogram", "Mostrar histograma"),
+    ("Hide histogram", "Ocultar histograma"),
+    ("Show / Hide Histogram", "Mostrar / Ocultar Histograma"),
+    ("Show Clipping", "Mostrar Recorte"),
+    ("Show clipping on the image", "Mostrar recorte na imagem"),
+    ("Clipping", "Recorte"),
+    ("Shadows clipped", "Sombras recortadas"),
+    ("Highlights clipped", "Altas luzes recortadas"),
+    ("No image", "Sem imagem"),
+    ("Red, green and blue on top of each other", "Vermelho, verde e azul sobrepostos"),
+    ("Luminance (brightness)", "Luminância (brilho)"),
+    ("Red channel", "Canal vermelho"),
+    ("Green channel", "Canal verde"),
+    ("Blue channel", "Canal azul"),
+    ("RGB with the luminance outline", "RGB com o contorno da luminância"),
+    // fonts
+    ("Font", "Fonte"),
+    ("Effect Default", "Padrão do Efeito"),
+    ("Terminal & Pixel", "Terminal & Pixel"),
+    ("Typewriter", "Máquina de Escrever"),
+    ("Sans & Hand", "Sem Serifa & Manuscrita"),
+    // color grading modes
+    ("Mode", "Modo"),
+    ("Color Wheels", "Rodas de Cor"),
+    ("Shadow Color", "Cor das Sombras"),
+    ("Shadow Amount", "Quantidade nas Sombras"),
+    ("Highlight Color", "Cor das Altas Luzes"),
+    ("Highlight Amount", "Quantidade nas Altas Luzes"),
+    ("Cool Shadows, Warm Highlights", "Sombras Frias, Altas Luzes Quentes"),
+    ("Teal & Cream", "Petróleo & Creme"),
+    ("Navy & Peach", "Marinho & Pêssego"),
+    ("Forest & Sage", "Floresta & Sálvia"),
+    ("Ember", "Brasa"),
+    (
+        "Color wheels for shadows, midtones, highlights and global, like Lightroom's Color Grading — or a two-colour Split Tone.",
+        "Rodas de cor para sombras, meios-tons, altas luzes e global, como o Color Grading do Lightroom — ou um Split Tone de duas cores.",
+    ),
+];
