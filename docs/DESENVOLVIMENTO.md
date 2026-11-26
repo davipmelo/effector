@@ -40,7 +40,8 @@
 - **Ferramentas de dev:** `--list-looks`, `--slider-audit`, `--missing-pt` (textos sem tradução), `look=<id>` e
   `dm=from/to/feather[/inv]` nas specs do `--render-test`, passos `dm:` e `depth` no script de screenshot.
 - **CI:** `.github/workflows/ci.yml` compila e roda o lint no Windows e no Mac a cada push na `main`.
-- **Traduções 0.8:** `src/l10n_pt_080.rs` (sobrepõe `PT`); 0.8.1 em `src/l10n_pt_081.rs`.
+- **Traduções 0.8:** `src/l10n_pt_080.rs` (sobrepõe `PT`); 0.8.1 em `src/l10n_pt_081.rs`; 0.8.2 em `src/l10n_pt_082.rs`.
+  Cuidado com chaves curtas ("Add", "Custom Text"…): uma tabela nova sobrepõe a tradução antiga em todo o app.
 - **Histograma (0.8.1):** `src/histogram.rs` mede a saída na thread de render (cópia de ≤640 px, só com o painel aberto);
   `ui/histogram.rs` desenha. **J** = `Action::ShowClipping` (cópia de exibição via `k_clipview`), ⇧⌘H abre/fecha.
 - **Paridade preview/export (0.8.1):** `Ctx::content_key` (imagem + recorte, `worker::content_key`) e `Ctx::layer_key`
@@ -48,6 +49,25 @@
   o resultado do preview por `layer_key`, e o export reaproveita. `--render-test <img> <dir> <specs> --parity` mede a diferença.
 - **Fontes (0.8.1):** parâmetro padrão `overlay::font_def(seção)` + `overlay::font_param(p)` → `font_name` `"fx:<id>"`.
   Fontes extras em `overlay::EXTRA` (OFL, `assets/fonts/OFL-*.txt`).
+- **Ferramentas (0.8.2):** `app::Tool` (Edit, Crop, Canvas, Masks) + `ui/tools.rs` (fileira de ícones, painéis de Crop,
+  Canvas e Masks, linha "Máscara" do layer). `set_tool` aplica o recorte ao sair de Crop. Atalhos `ToolEdit` (E),
+  `ToolCanvas` (⇧B), `ToolMasks` (⇧W), `Crop` (R).
+- **Máscaras (0.8.2):** `DocumentState.masks: Vec<Mask>` (partes `MaskPart` com `MaskMode` add/subtract/intersect e
+  `MaskShape::Depth`); o layer aponta com `LayerNode.mask: Option<MaskRef>`. Para renderizar use sempre
+  `DocumentState::render_layers()` (preenche `resolved_mask`); `renderer::mask_texture` desenha a máscara
+  (`k_depthmask` + `k_maskop`). `adopt_masks` (chamado em todo `edit` e ao ler um `DocumentState`) converte
+  `depth_mask` antigo e `embedded_mask` (cópia que viaja em presets, clipboard e sync, via `portable`) em máscaras
+  da imagem. Sobreposição vermelha: `RenderRequest.mask_overlay` → `k_maskview` → `ui/tools::paint_mask_overlay`.
+- **Export (0.8.2):** `src/export.rs` (`ExportSettings`, modelo de nome `NameToken`, `plan` / `run`, limite de tamanho
+  do JPG por busca binária na qualidade, `reveal`) + `ui/export_dialog.rs`. As configurações e os presets de export
+  ficam em `settings.json` (`export`, `exportPresets`).
+- **Zoom e padrões finos (0.8.2):** efeitos com `.fine_pattern()` (Dither, Halftone, ASCII) renderizam o preview na
+  escala 1; o worker reduz a cópia de exibição para `RenderRequest.display_size` (tamanho na tela) com Lanczos.
+  Mudança isolada no commit "Zoomed-out preview without false patterns" (fácil de reverter).
+- **Atualização ao abrir (0.8.2):** verifica a cada abertura; `AppState.show_update_popup` → `dialogs::update_popup`
+  (respeita `settings.skipped_version`). Passo `update` no script de screenshot simula uma versão nova.
+- **Passos novos do script de screenshot:** `masks`, `canvas`, `edit`, `hsladj`, `update`; `dm:a/b` agora cria uma
+  máscara da imagem no layer selecionado.
 - **Tab / setas:** `raw_input_hook` tira o Tab da entrada do egui (senão ele move o foco); pickers usam `set_focus_lock_filter`
   e consomem as setas enquanto estão abertos.
 - **Largura das sidebars:** uma linha mais larga que o painel faz o egui alargar a sidebar a cada frame. Calcule larguras
@@ -56,6 +76,8 @@
 - **Regra P&B:** saída com R=G=B exato; o renderer restaura o alfa de entrada (`k_withalpha`).
 - **Dados do usuário:** pasta `EFFECTOR` em Application Support (Mac) / `%APPDATA%` (Windows): `settings.json`,
   `presets.json`, `swatches.json`, `LUTs/`, `Session/`. Os formatos de presets e paletas são os mesmos do app Swift.
+- **README (obrigatório):** o `README.md` resume todas as funções do app. Toda vez que uma função, efeito, ferramenta
+  ou preset for adicionado ou removido, atualizar o README (contagens de efeitos e presets incluídas) no mesmo commit.
 - **Patch notes (obrigatório):** antes de cada release, escrever `docs/releases/vX.Y.Z.md` em PT-BR explicando tudo
   o que mudou (correções, efeitos, presets, bastidores) + instruções de instalação. O workflow publica esse arquivo como
   texto do release. Modelo: `docs/releases/v0.7.0.md`.

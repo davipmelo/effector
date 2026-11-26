@@ -1,0 +1,59 @@
+# EFFECTOR
+
+Editor de efeitos para fotos em camadas, para **Windows** e **macOS**. Você empilha efeitos analógicos, digitais, de lente e de impressão sobre uma foto, ajusta cada um e exporta o resultado. A interface segue o Lightroom Classic e os atalhos também.
+
+**Baixar:** [última versão em Releases](https://github.com/davipmelo/effector/releases/latest) (instalador para Windows, `.dmg` para Mac). O app avisa sozinho quando sai uma versão nova.
+
+## Funções
+
+### Edição em camadas
+- Pilha de **layers** com grupos, opacidade, 18 modos de mesclagem, mostrar / ocultar, solo, duplicar, reordenar arrastando e seleção múltipla.
+- **Looks** prontos em todo efeito, **paletas** de cores combinadas, degradês e paletas salvos, **LUTs** `.cube`.
+- Prévia ao vivo ao passar o mouse sobre efeitos e presets; **paleta de comandos** (⌘K / Ctrl+K); desfazer ilimitado por imagem.
+
+### Efeitos (47)
+- **Ajuste & Cor:** Ajustes Básicos, Curvas, HSL (por cor ou por ajuste), Matiz / Saturação, Preto & Branco, Color Grading (rodas de cor e Split Tone), Mapa de Degradê, LUT, Detalhe (textura, claridade, remover névoa e nitidez), Inverter, Posterizar, Threshold.
+- **Impressão & Pixel:** Dither, Halftone, ASCII, Desgaste de Impressão.
+- **Filme & Luz:** Emulação de Filme, Grão, Glow, Bloom, Halation, Vazamento de Luz, Neblina & Névoa.
+- **Filtros de Lente:** Emulação de Lentes, Flare Anamórfico, Filtro Estrela, Prisma & Caleidoscópio, Aberração Cromática, Vinheta.
+- **Desfoque:** Desfoque, Desfoque de Profundidade (bokeh), Desfoque de Lente & Tilt-Shift, Desfoque de Movimento, Desfoque Radial.
+- **Distorção:** Olho de Peixe, Distorção de Borda, Vidro Canelado, Espelho & Repetição, Pixel Stretch, Paralaxe & Relevo.
+- **Glitch & Retrô:** Camcorder (VHS, Digicam, NightShot, carimbo de data), Tela CRT, Display de LED, Trail & Rastro.
+- **Sobreposições:** Blob Tracker, Poeira & Arranhões, Moldura & Letterbox.
+
+### Presets
+- **87 presets** do app em 10 categorias (DM's Specials, Cinema, Filme, Retrato & Luz, Y2K & Digital, Vídeo Retrô, Impressão & Gráfico, Pixel & Código, Sonho & Surreal, Rastreio & HUD), em grade ou lista compacta. Presets com moldura vêm com ela desligada.
+- Presets próprios: salvar a pilha, renomear, importar e exportar (`.effectorpreset`).
+
+### Ferramentas (fileira de ícones da direita)
+- **Editar:** os controles do layer selecionado.
+- **Recorte** com proporções prontas.
+- **Canvas & Bordas:** encaixa a foto em outra proporção (Instagram, impressão…) com borda de cor, degradê ou foto desfocada, cantos arredondados e sombra.
+- **Máscaras:** máscaras da imagem usadas por quantos efeitos você quiser, feitas de faixas de profundidade que somam, subtraem ou se cruzam, com sobreposição vermelha.
+
+### Profundidade por IA
+- Mapa de profundidade estimado no próprio computador (Depth Anything V2): máscaras por distância, efeitos mais fortes no fundo ou na frente, bokeh com foco escolhido clicando na foto, neblina que engrossa com a distância.
+
+### Visualização
+- **Histograma** com avisos de recorte (**J**), antes / depois (**]**) e dividido (**Y**), tela cheia, zoom, mapa de profundidade (**D**), fundo da área central escolhido com o botão direito.
+
+### Várias imagens
+- **Filmstrip** com várias fotos abertas, cada uma com os próprios layers; **sincronizar**, copiar e colar ajustes entre fotos.
+- Formatos: JPG, PNG, HEIC, TIFF, RAW (CR3, ARW, NEF, DNG…).
+
+### Exportar
+- **JPG** (qualidade e limite de tamanho do arquivo) ou **PNG** (com transparência).
+- Pasta específica, mesma pasta do original ou escolhida na hora, subpasta, o que fazer com arquivos que já existem.
+- **Nome dos arquivos** montado com blocos (nome, texto, sequência, datas, dimensões), com modelos prontos.
+- **Redimensionar** por largura e altura, lado maior, lado menor, megapixels ou porcentagem, em pixels, polegadas ou centímetros.
+- Mostrar no Explorer / Finder ao terminar; **presets de exportação**.
+- Copiar o resultado para a área de transferência.
+
+### Projetos e app
+- Projetos `.effector` (foto original + todos os layers editáveis); o app reabre a última sessão.
+- Português e inglês, tema escuro e claro, todos os atalhos personalizáveis.
+- Atualizações dentro do app (verifica a cada abertura e instala sozinho).
+
+## Desenvolvimento
+
+Rust + wgpu + egui. `cargo run --release` compila e abre o app. Notas técnicas em [`docs/DESENVOLVIMENTO.md`](docs/DESENVOLVIMENTO.md), guia de uso em [`docs/GUIA.md`](docs/GUIA.md) e notas de cada versão em [`docs/releases`](docs/releases).

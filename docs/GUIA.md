@@ -69,7 +69,7 @@
 
 ## Máscaras
 - As máscaras são da **imagem**, não de cada efeito: crie uma vez e use em quantos efeitos quiser. Ícone **Máscaras** (ou **⇧W**) → **Criar Máscara** → Assunto (perto), Fundo (longe) ou Distância média.
-- Cada máscara tem partes: a primeira é a base; **Somar / Subtrair** acrescentam outras faixas de profundidade, que podem **Adicionar**, **Subtrair** ou fazer **Interseção**. Cada parte tem borda longe, borda perto, suavidade, inverter e olho.
+- Cada máscara tem partes: a primeira é a base; os botões **Adicionar / Subtrair** acrescentam outras faixas de profundidade, que podem **Adicionar**, **Subtrair** ou fazer **Interseção**. Cada parte tem borda longe, borda perto, suavidade, inverter e olho.
 - **Efeitos que Usam Esta Máscara**: marque os efeitos que a máscara limita. No Editar, a linha **Máscara** do layer escolhe a máscara (ou "Nenhuma"), tem **Inverter Máscara** e atalhos para criar ou editar máscaras.
 - **Mostrar Sobreposição** (**O**) pinta de vermelho a área da máscara selecionada. Layers com máscara mostram um ícone na lista.
 - Projetos e presets antigos com Máscara de Profundidade abrem com uma máscara criada sozinha (camadas com a mesma faixa dividem a mesma máscara). Presets e layers copiados levam as máscaras junto para outras imagens.
