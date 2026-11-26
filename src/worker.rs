@@ -114,12 +114,9 @@ impl RenderWorker {
                                     dc.subject_src = Some(crate::subject::SubjectSrc { map, crop: req.crop });
                                 }
                             }
+                            // only the final selection, in red (what subtract parts cut out simply shows through)
                             if let Some(t) = crate::renderer::mask_texture(m, false, &mut dc) {
-                                // what Subtract parts cut out, for the stripes
-                                let cut: Vec<crate::model::MaskPart> = m.parts.iter().skip(1).filter(|p| p.enabled && p.mode == crate::model::MaskMode::Subtract).map(|p| crate::model::MaskPart { mode: crate::model::MaskMode::Add, ..p.clone() }).collect();
-                                let sub = if cut.is_empty() { None } else { crate::renderer::mask_texture(&crate::model::Mask { parts: cut, ..m.clone() }, false, &mut dc) };
-                                let s = sub.clone().unwrap_or_else(|| t.clone());
-                                mask_view = Some(dc.apply("k_maskview", &[&t, &s], &[0.55, if sub.is_some() { 1.0 } else { 0.0 }]));
+                                mask_view = Some(dc.apply("k_maskview", &[&t], &[0.55]));
                             }
                             dc.flush();
                         }
