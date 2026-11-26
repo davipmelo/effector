@@ -127,7 +127,9 @@ pub fn interact(ui: &mut Ui, app: &mut AppState, resp: &egui::Response, img_rect
 
     // ---- what is under the pointer (or being dragged), then draw the handles
     let hover = if app.mask_draw.is_none() { op.filter(|o| o.part().is_some()).or_else(|| pointer.and_then(|p| hit_test(&g, mask.as_ref(), app.selected_part, p))) } else { None };
-    if app.mask_draw.is_none() {
+    // also while a new gradient is being dragged out, so its lines show from the first click
+    let creating = matches!(op, Some(Op::Create { .. }));
+    if app.mask_draw.is_none() || creating {
         if let Some(m) = &mask {
             for p in &m.parts {
                 draw_part(&painter, &g, p, Some(p.id) == app.selected_part, hover.as_ref());
