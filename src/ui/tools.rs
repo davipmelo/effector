@@ -643,7 +643,9 @@ fn mask_part(ui: &mut Ui, app: &mut AppState, mask: &Mask, i: usize, part: &Mask
         // colour stripe on the left edge (the mode at a glance)
         let r = fr.response.rect;
         ui.painter().rect_filled(Rect::from_min_size(r.min + vec2(1.0, 8.0), vec2(3.0, r.height() - 16.0)), CornerRadius::same(2), mc);
-        if fr.response.interact(Sense::click()).clicked() {
+        // a click anywhere on the card selects the part, without covering its buttons (an
+        // interact() over the whole card would sit on top of them and swallow their clicks)
+        if ui.input(|i| i.pointer.primary_clicked() && i.pointer.interact_pos().map(|p| r.contains(p)).unwrap_or(false)) {
             app.selected_part = Some(pid);
         }
     });
