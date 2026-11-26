@@ -22,7 +22,7 @@ pub fn inspector(ui: &mut Ui, app: &mut AppState) {
     }
 }
 
-fn blend_items() -> Vec<PickerItem> {
+pub fn blend_items() -> Vec<PickerItem> {
     BlendMode::MENU_ORDER.iter().map(|b| PickerItem::new(&b.id(), &tr(b.label()), Some(tr(b.group())))).collect()
 }
 
@@ -46,19 +46,9 @@ fn blend_row(ui: &mut Ui, app: &mut AppState, selected: &str) -> Option<BlendMod
 
 fn multi_inspector(ui: &mut Ui, app: &mut AppState) {
     let nodes: Vec<LayerNode> = app.selection_roots().iter().filter_map(|id| app.layers().find(*id).cloned()).collect();
-    let opacity = nodes.iter().map(|n| n.opacity).sum::<f64>() / nodes.len().max(1) as f64;
-    let blends: std::collections::HashSet<BlendMode> = nodes.iter().map(|n| n.blend).collect();
-    let blend = if blends.len() == 1 { nodes[0].blend.id() } else { String::new() };
+    let _ = &nodes;
     header(ui, &trf("%d layers selected", &[&app.selected_ids.len()]), Some("square.stack.3d.up"));
     egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-        panel_section(ui, Id::new("multi-layers"), "Layers", None, None, |ui| {
-            if let Some(b) = blend_row(ui, app, &blend) {
-                app.update_selected(None, |n| n.blend = b);
-            }
-            if let Some(v) = value_slider(ui, Id::new("multi-opacity"), SliderSpec::new("Opacity", opacity * 100.0, 0.0, 100.0, 100.0).step(1.0).unit("%")) {
-                app.update_selected(Some("multi-opacity".into()), |n| n.opacity = v / 100.0);
-            }
-        });
         egui::Frame::new().inner_margin(14).show(ui, |ui| {
             ui.horizontal(|ui| {
                 if pill_icon_button(ui, "folder.badge.plus", &tr("Group"), false).on_hover_text(action_hint("Group selected layers", crate::shortcuts::Action::Group)).clicked() {
@@ -268,15 +258,7 @@ fn layer_inspector(ui: &mut Ui, app: &mut AppState, layer: &LayerNode) {
         });
     });
     egui::ScrollArea::vertical().id_salt(("insp", layer.id)).auto_shrink([false, false]).show(ui, |ui| {
-        panel_section(ui, Id::new(("sec-layer", layer.id)), if layer.is_group { "Group" } else { "Layer" }, None, None, |ui| {
-            if let Some(b) = blend_row(ui, app, &layer.blend.id()) {
-                app.update_layer(layer.id, None, |n| n.blend = b);
-            }
-            if let Some(v) = value_slider(ui, Id::new(("opacity", layer.id)), SliderSpec::new("Opacity", layer.opacity * 100.0, 0.0, 100.0, 100.0).step(1.0).unit("%")) {
-                app.update_layer(layer.id, Some(format!("{}-opacity", layer.id)), |n| n.opacity = v / 100.0);
-            }
-            super::tools::layer_mask_row(ui, app, layer);
-        });
+        // blend, opacity and mask live in the layers panel (0.8.3)
         if let Some(effect) = effect {
             if !effect.looks.is_empty() {
                 look_row(ui, app, layer, effect);

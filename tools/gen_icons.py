@@ -34,6 +34,8 @@ SF = {
     'square': 'square', 'folder.open': 'folder-open', 'arrow.down.to.line': 'download-simple', 'square.and.pencil': 'pencil-simple',
     'checkmark.circle': 'check-circle', 'info.circle': 'info', 'keyboard': 'keyboard', 'paintpalette': 'palette',
     'drop': 'drop', 'swatchpalette': 'swatches', 'questionmark': 'question', 'lock': 'lock', 'link': 'link', 'grid': 'grid-four',
+    'paintbrush': 'paint-brush', 'eraser': 'eraser', 'mask.linear': 'gradient', 'mask.radial': 'circle-half',
+    'mask.subject': 'user-focus', 'mask.background': 'mountains', 'ghost': 'ghost',
     'arrow.up': 'arrow-up', 'arrow.down': 'arrow-down', 'pencil': 'pencil-simple', 'sidebar': 'sidebar-simple',
 }
 missing = [v for v in SF.values() if v not in cp]

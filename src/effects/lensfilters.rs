@@ -469,7 +469,7 @@ pub fn diffusion() -> Effect {
         }
         out
     })
-    .symbol("camera.filters")
+    .symbol("sun.haze")
     .summary("Real diffusion glass — Black Pro-Mist, Pro-Mist, Glimmerglass, Cinebloom, Pearlescent, Hollywood Black Magic, Black Satin, Soft Focus and Fog. Simulated in linear light: light is only spread around, never added.")
     .params(vec![
         ParamDef::choice("filter", "Filter", &[
@@ -522,7 +522,7 @@ pub fn ghost() -> Effect {
             amt, p.fd("cx", 50.0) / 100.0, p.fd("cy", 50.0) / 100.0, p.f("fringe") / 100.0,
         ])
     })
-    .symbol("person.2.fill")
+    .symbol("ghost")
     .summary("In-camera ghost glass: a faint displaced copy or a shutter-drag smear on one side, both sides, the corners or around a clear centre. Mixed in linear light, so brightness and colour stay the same.")
     .params(vec![
         ParamDef::choice("zone", "Glass", &[("half", "One Side"), ("both", "Both Sides"), ("quad", "Four Corners"), ("around", "Around the Centre"), ("full", "Whole Frame")], "half").sec("Ghost"),

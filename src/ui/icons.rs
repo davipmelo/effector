@@ -2,6 +2,13 @@
 /// Glyph for an SF Symbols name (falls back to a circle).
 pub fn sf(name: &str) -> char {
     match name {
+        "paintbrush" => '\u{e6f0}',
+        "eraser" => '\u{e21e}',
+        "mask.linear" => '\u{eb42}',
+        "mask.radial" => '\u{e18c}',
+        "mask.subject" => '\u{e6fc}',
+        "mask.background" => '\u{e7ae}',
+        "ghost" => '\u{e62a}',
         "aqi.high" => '\u{e1fc}',
         "eyedropper" => '\u{e568}',
         "video" => '\u{e4da}',

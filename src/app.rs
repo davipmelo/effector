@@ -218,6 +218,8 @@ pub struct AppState {
     pub tool: Tool,
     /// Mask selected in the Masks tool.
     pub selected_mask: Option<Uuid>,
+    /// Layer that a mask created next in the Masks tool is applied to (set from the layer's mask slot).
+    pub mask_new_for: Option<Uuid>,
     pub is_exporting: bool,
     pub export_progress: Option<String>,
     /// Files done / total of the running export.
@@ -310,6 +312,7 @@ impl AppState {
             show_settings: false,
             tool: Tool::Edit,
             selected_mask: None,
+            mask_new_for: None,
             is_exporting: false,
             export_progress: None,
             export_counter: None,

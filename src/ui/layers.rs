@@ -75,6 +75,9 @@ pub fn layers_panel(ui: &mut Ui, app: &mut AppState) {
             });
         });
     });
+    if has {
+        egui::Frame::new().inner_margin(egui::Margin { left: 10, right: 10, top: 0, bottom: 8 }).show(ui, |ui| layer_props_bar(ui, app));
+    }
     separator_line(ui);
     if app.is_multi_selection() {
         selection_bar(ui, app);
@@ -316,13 +319,32 @@ fn layer_row(ui: &mut Ui, app: &mut AppState, node: &LayerNode, depth: usize, di
         right -= g.size().x + 6.0;
         ui.painter().galley(pos2(right, cy - g.size().y / 2.0), g, text_faint());
     }
-    // limited by a mask (Masks tool)
-    if let Some(m) = node.mask.and_then(|r| app.state().mask(r.id).map(|m| (m.name.clone(), r.invert))) {
-        right -= 16.0;
-        let mr = Rect::from_center_size(pos2(right + 7.0, cy), vec2(14.0, 18.0));
-        paint_icon(ui, mr, "circle.dashed.inset.filled", 11.0, with_alpha(accent_text(), 0.85 * opacity));
-        let tip = if m.1 { crate::l10n::trf("Mask: %@ (inverted)", &[&m.0]) } else { crate::l10n::trf("Mask: %@", &[&m.0]) };
-        ui.interact(mr, Id::new(("maskbadge", node.id)), Sense::hover()).on_hover_text(tip);
+    // mask slot (Photoshop-style): filled when a mask limits the layer, click for the mask menu
+    {
+        let linked = node.mask.and_then(|r| app.state().mask(r.id).map(|m| (m.name.clone(), r.invert)));
+        let mr = Rect::from_center_size(pos2(right - 9.0, cy), vec2(18.0, 20.0));
+        right -= 20.0;
+        let mresp = ui.interact(mr, Id::new(("maskslot", node.id)), Sense::click());
+        if mresp.hovered() {
+            ui.painter().rect_filled(mr.expand(1.0), CornerRadius::same(4), row_hover());
+        }
+        match &linked {
+            Some((_, inv)) => {
+                paint_icon(ui, mr, if *inv { "circle.dashed" } else { "circle.dashed.inset.filled" }, 12.0, with_alpha(accent_text(), 0.9 * opacity));
+            }
+            None if hover || selected || mresp.hovered() => {
+                paint_icon(ui, mr, "circle.dashed", 12.0, with_alpha(text_faint(), opacity));
+            }
+            None => {}
+        }
+        let tip = match &linked {
+            Some((n, true)) => crate::l10n::trf("Mask: %@ (inverted)", &[n]),
+            Some((n, false)) => crate::l10n::trf("Mask: %@", &[n]),
+            None => tr("Add a mask to this layer"),
+        };
+        let mresp = mresp.on_hover_text(tip);
+        let lid = node.id;
+        egui::Popup::menu(&mresp).id(Id::new(("maskmenu", lid))).show(|ui| layer_mask_menu(ui, app, lid));
     }
     // name / rename field
     let name_rect = Rect::from_min_max(pos2(x, rect.top() + 6.0), pos2(right - 4.0, rect.bottom() - 6.0));
@@ -439,6 +461,118 @@ fn layer_row(ui: &mut Ui, app: &mut AppState, node: &LayerNode, depth: usize, di
         }
     });
     resp
+}
+
+/// Blend mode + opacity of the selected layer(s), Photoshop-style, on top of the list.
+fn layer_props_bar(ui: &mut Ui, app: &mut AppState) {
+    let nodes: Vec<LayerNode> = app.selection_roots().iter().filter_map(|id| app.layers().find(*id).cloned()).collect();
+    let any = !nodes.is_empty();
+    let blends: std::collections::HashSet<BlendMode> = nodes.iter().map(|n| n.blend).collect();
+    let blend = if blends.len() == 1 { nodes[0].blend.id() } else { String::new() };
+    let opacity = if any { nodes.iter().map(|n| n.opacity).sum::<f64>() / nodes.len() as f64 } else { 1.0 };
+    let w = ui.available_width();
+    ui.add_enabled_ui(any, |ui| {
+        if !any {
+            ui.set_opacity(0.45);
+        }
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 6.0;
+            let bw = ((w - 6.0) * 0.52).floor();
+            ui.allocate_ui_with_layout(vec2(bw, 22.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                let items = super::inspector::blend_items();
+                let title = if !any { Some(tr("Normal")) } else if blend.is_empty() { Some("—".to_string()) } else { None };
+                let r = picker_field(ui, "layers-blend", &items, &blend, title.as_deref(), &[], true);
+                if r.opened {
+                    app.begin_browse();
+                }
+                if let Some(v) = r.selected {
+                    if let Some(b) = BlendMode::from_id(&v) {
+                        app.update_selected(None, |n| n.blend = b);
+                    }
+                }
+                if r.closed {
+                    app.end_browse();
+                }
+            })
+            .response
+            .on_hover_text(tr("Blend mode of the selected layer"));
+            let ow = ui.available_width().min(w - bw - 6.0);
+            if let Some(v) = opacity_field(ui, ow, opacity) {
+                app.update_selected(Some("layers-bar-opacity".into()), |n| n.opacity = v);
+            }
+        });
+    });
+}
+
+/// Compact opacity bar: click or drag to set, double-click for 100%, scroll to nudge.
+fn opacity_field(ui: &mut Ui, w: f32, v: f64) -> Option<f64> {
+    let (rect, resp) = ui.allocate_exact_size(vec2(w, 22.0), Sense::click_and_drag());
+    let mut out = None;
+    let p = ui.painter();
+    p.rect_filled(rect, CornerRadius::same(6), if resp.hovered() || resp.dragged() { field_strong() } else { field() });
+    let fill = Rect::from_min_size(rect.min, vec2(rect.width() * v.clamp(0.0, 1.0) as f32, rect.height()));
+    p.rect_filled(fill, CornerRadius::same(6), with_alpha(ACCENT, if resp.dragged() { 0.38 } else { 0.24 }));
+    p.text(pos2(rect.left() + 8.0, rect.center().y), Align2::LEFT_CENTER, tr("Opacity"), label_font(), text_dim());
+    p.text(pos2(rect.right() - 8.0, rect.center().y), Align2::RIGHT_CENTER, format!("{}%", (v * 100.0).round() as i64), value_font_small(), text());
+    if resp.double_clicked() {
+        out = Some(1.0);
+    } else if resp.dragged() || resp.drag_started() || resp.clicked() {
+        if let Some(pp) = resp.interact_pointer_pos() {
+            let nv = (((pp.x - rect.left()) / rect.width()).clamp(0.0, 1.0) as f64 * 100.0).round() / 100.0;
+            if (nv - v).abs() > 1e-6 {
+                out = Some(nv);
+            }
+        }
+    }
+    if resp.hovered() {
+        let d = ui.input(|i| i.smooth_scroll_delta.y + i.smooth_scroll_delta.x);
+        if d.abs() > 0.5 {
+            ui.ctx().input_mut(|i| i.smooth_scroll_delta = egui::Vec2::ZERO);
+            out = Some(((v * 100.0 + d.signum() as f64).round() / 100.0).clamp(0.0, 1.0));
+        }
+    }
+    resp.on_hover_text(tr("Opacity · drag or click to set · double-click for 100%"));
+    out
+}
+
+/// Menu of a layer's mask slot: pick a mask of the image, invert, create or edit.
+fn layer_mask_menu(ui: &mut Ui, app: &mut AppState, lid: Uuid) {
+    ui.set_min_width(200.0);
+    let st = app.state();
+    let cur = app.layers().find(lid).and_then(|n| n.mask).filter(|r| st.mask(r.id).is_some());
+    if ui.add(egui::Button::selectable(cur.is_none(), tr("None (whole image)"))).clicked() {
+        app.set_layer_mask(lid, None);
+        ui.close();
+    }
+    if !st.masks.is_empty() {
+        ui.separator();
+        ui.label(egui::RichText::new(spaced_upper(&tr("Masks"))).font(section_font()).color(text_faint()));
+        for m in &st.masks {
+            let on = cur.map(|c| c.id == m.id).unwrap_or(false);
+            if ui.add(egui::Button::selectable(on, &m.name)).clicked() {
+                app.set_layer_mask(lid, Some(MaskRef { id: m.id, invert: cur.map(|c| c.invert).unwrap_or(false) }));
+                ui.close();
+            }
+        }
+    }
+    ui.separator();
+    if let Some(c) = cur {
+        if ui.add(egui::Button::selectable(c.invert, tr("Invert Mask"))).clicked() {
+            app.set_layer_mask(lid, Some(MaskRef { id: c.id, invert: !c.invert }));
+            ui.close();
+        }
+    }
+    if ui.button(tr("New Mask…")).clicked() {
+        app.set_selected(Some(lid));
+        app.mask_new_for = Some(lid);
+        app.set_tool(crate::app::Tool::Masks);
+        ui.close();
+    }
+    if ui.button(tr("Edit Masks…")).clicked() {
+        app.selected_mask = cur.map(|c| c.id).or(app.selected_mask);
+        app.set_tool(crate::app::Tool::Masks);
+        ui.close();
+    }
 }
 
 fn value_font_small() -> egui::FontId { egui::FontId::new(10.0, egui::FontFamily::Name("digits".into())) }
