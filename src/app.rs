@@ -1908,6 +1908,10 @@ impl AppState {
         if self.is_cropping && t != Tool::Crop {
             self.commit_crop();
         }
+        if t != Tool::Masks {
+            self.mask_draw = None;
+            self.mask_draw_into = None;
+        }
         self.tool = t;
         match t {
             Tool::Crop => {

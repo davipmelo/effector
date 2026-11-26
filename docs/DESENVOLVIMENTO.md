@@ -22,15 +22,32 @@
 - **Teste da interface:** variáveis `EFFECTOR_SHOT=<png>` e `EFFECTOR_SHOT_SCRIPT="effect:vhs,select:0,browser,..."`
   abrem o app, executam os passos, salvam um screenshot da janela e fecham. Use `EFFECTOR_SUPPORT_DIR=<pasta>` para não
   mexer nas configurações / sessão reais.
-- **Profundidade (0.8):** `src/depth.rs` roda o Depth Anything V2 Small (Apache-2.0) com candle **no CPU** (o Metal do
-  candle não tem layer-norm) numa thread dedicada (o modelo não é `Send`), ~0,9 s por foto em 518×518, só quando
-  `depth::layers_need_depth` diz que algum layer usa. Mapa normalizado 0..1 (1 = perto) da imagem inteira; `Ctx::depth()`
-  recorta e amplia para o tamanho do render com filtro bilateral guiado pela foto (`k_depthup`). `LayerNode.depth_mask`
-  e o parâmetro padrão `depthBias` (via `.depth_bias()`) viram máscara em `renderer::layer_mask` (`k_depthmask`, `k_blendm`).
-  Efeito que lê profundidade declara `.depth(|p| …)`. Pesos: `assets/models/depth_anything_v2_vits_f16.safetensors`
-  (fora do git) baixado por `packaging/fetch_model.sh` do release `depth-model-v1`; vai em `EFFECTOR.app/Contents/Resources/models`
-  e `{app}\models` no Windows. `effector --depth-view <img> <out.png>` testa.
-- **Extras do render:** `renderer::Extras` leva profundidade + data EXIF (`src/exif.rs`, DateTimeOriginal) para `Ctx`.
+- **Assunto por IA (0.8.3, substitui a profundidade da 0.8):** `src/subject.rs` roda o IS-Net general use (DIS,
+  Apache-2.0, ONNX do projeto rembg) com **tract** (Rust puro, CPU, igual no Mac e no Windows) numa thread dedicada,
+  ~2 s por foto em 1024×1024, só quando `subject::layers_need_subject` diz que algum layer ou máscara usa. Matte 0..1
+  (1 = assunto) da imagem inteira; `Ctx::subject()` recorta e amplia com filtro bilateral guiado pela foto (`k_matteup`).
+  O encanamento é o da antiga profundidade: `depthBias` "near"/"far" (chaves antigas) = assunto/fundo, o Background
+  Blur usa o matte como "distância" (foco em 1), o Fog põe névoa onde o matte é 0. `.subject(|p| …)` declara uso.
+  Pesos: `assets/models/subject_isnet.onnx` (fora do git, ~170 MB) baixado por `packaging/fetch_model.sh` (tenta o
+  release `subject-model-v1` deste repo e depois o release do rembg, com SHA-256); vai em
+  `EFFECTOR.app/Contents/Resources/models` e `{app}\models`. `effector --subject-view <img> <out.png>` testa.
+- **Máscaras (0.8.3):** `MaskShape` = Linear, Radial, Brush, Subject, Background (+ `Depth` antigo, migrado para
+  Subject/Background em `adopt_masks` via `Mask::migrate`). Posições em coordenadas da imagem inteira (0..1, sem
+  recorte), tamanhos em frações do lado maior; `Ctx.crop` / `Ctx.aspect` (de `Extras`) mapeiam para o render.
+  `renderer::part_texture` desenha cada parte (`k_maskgeom` para gradientes, `brush::raster` na CPU até 1280 px +
+  upload para o pincel, `k_subjectmask` para assunto/fundo). O renderer guarda em cache a saída do efeito **sem** a
+  máscara (`LayerNode::effect_hash`), então pintar ou arrastar um gradiente só refaz a mescla.
+  UI: `ui/tools.rs` (painel, `MASK_KINDS`, `begin_kind`), `ui/mask_canvas.rs` (desenhar, pintar, alfinetes e alças;
+  `Geo` converte tela ↔ imagem), `AppState::{mask_draw, mask_draw_into, selected_part, brush}`,
+  `AppState::mask_key` (teclas [ ] ⇧[ ⇧] ' ⌫ ⎋ antes dos atalhos globais). Atalhos: `MaskBrush` (K), `MaskLinear` (M),
+  `MaskRadial` (⇧M), `MaskSubject` (⇧S), `MaskBackground` (⇧G). Specs do `--render-test`: `mask=linear|radial|brush|
+  subject|background[/inv]`; passos do script de screenshot: `mask:<tipo>`, `draw:<brush|linear|radial>`.
+- **Layers (0.8.3):** mesclagem + opacidade do(s) layer(s) selecionado(s) numa barra no topo da lista
+  (`layers::layer_props_bar`) e o slot de máscara em cada linha (`layer_mask_menu`); a seção "Layer" saiu do inspector.
+- **Filtros de lente (0.8.3):** `lensfilters::diffusion` (difusão física em luz linear que conserva energia:
+  `k_diffsrc` + 3 blurs + `k_diffusion`, constantes por filtro em `diffuser`) e `lensfilters::ghost` (`k_ghostfx`,
+  cópias/rastro misturados em luz linear). Categoria de presets "Lens Filters".
+- **Extras do render:** `renderer::Extras` leva o matte do assunto, o recorte, a proporção da imagem + data EXIF (`src/exif.rs`, DateTimeOriginal) para `Ctx`.
 - **Atualizações (0.8):** `src/updater.rs` lê `releases/latest` do GitHub (repo público), baixa o asset da plataforma e instala
   (Windows: Inno Setup `/SILENT`, o `[Run] Check: WizardSilent` reabre o app; Mac: script que espera o app fechar, troca o
   `.app` pelo do DMG e reabre). Testes: `--check-update [--install]` com `EFFECTOR_FAKE_VERSION=0.6.0` e
@@ -38,9 +55,10 @@
 - **Looks e paletas (0.8):** looks extras em `effects/looks080.rs`; combinações de cores por efeito e grupos novos de
   degradês/paletas em `effects/palettes080.rs` (o inspector mostra o seletor "Paleta" na seção da primeira cor).
 - **Ferramentas de dev:** `--list-looks`, `--slider-audit`, `--missing-pt` (textos sem tradução), `look=<id>` e
-  `dm=from/to/feather[/inv]` nas specs do `--render-test`, passos `dm:` e `depth` no script de screenshot.
+  `mask=<tipo>` nas specs do `--render-test`, passos `mask:` e `draw:` no script de screenshot.
 - **CI:** `.github/workflows/ci.yml` compila e roda o lint no Windows e no Mac a cada push na `main`.
-- **Traduções 0.8:** `src/l10n_pt_080.rs` (sobrepõe `PT`); 0.8.1 em `src/l10n_pt_081.rs`; 0.8.2 em `src/l10n_pt_082.rs`.
+- **Traduções 0.8:** `src/l10n_pt_080.rs` (sobrepõe `PT`); 0.8.1 em `src/l10n_pt_081.rs`; 0.8.2 em `src/l10n_pt_082.rs`;
+  0.8.3 em `src/l10n_pt_083.rs`.
   Cuidado com chaves curtas ("Add", "Custom Text"…): uma tabela nova sobrepõe a tradução antiga em todo o app.
 - **Histograma (0.8.1):** `src/histogram.rs` mede a saída na thread de render (cópia de ≤640 px, só com o painel aberto);
   `ui/histogram.rs` desenha. **J** = `Action::ShowClipping` (cópia de exibição via `k_clipview`), ⇧⌘H abre/fecha.
@@ -51,7 +69,7 @@
   Fontes extras em `overlay::EXTRA` (OFL, `assets/fonts/OFL-*.txt`).
 - **Ferramentas (0.8.2):** `app::Tool` (Edit, Crop, Canvas, Masks) + `ui/tools.rs` (fileira de ícones, painéis de Crop,
   Canvas e Masks, linha "Máscara" do layer). `set_tool` aplica o recorte ao sair de Crop. Atalhos `ToolEdit` (E),
-  `ToolCanvas` (⇧B), `ToolMasks` (⇧W), `Crop` (R).
+  `ToolCanvas` (⇧B), `ToolMasks` (⇧W), `Crop` (R). (O painel de máscaras foi refeito na 0.8.3, ver abaixo.)
 - **Máscaras (0.8.2):** `DocumentState.masks: Vec<Mask>` (partes `MaskPart` com `MaskMode` add/subtract/intersect e
   `MaskShape::Depth`); o layer aponta com `LayerNode.mask: Option<MaskRef>`. Para renderizar use sempre
   `DocumentState::render_layers()` (preenche `resolved_mask`); `renderer::mask_texture` desenha a máscara

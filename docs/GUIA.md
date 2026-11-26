@@ -11,13 +11,15 @@
 ## Layers
 - **Adicionar Efeito** (ou **⇧⌘A**) abre o navegador de efeitos na **metade de baixo da sidebar**, no lugar dos presets (que voltam quando você fecha os efeitos), com miniaturas feitas a partir da sua imagem.
 - **Prévia ao vivo:** passe o mouse sobre um efeito ou preset (ou use ↑ ↓ ← →) para vê-lo aplicado na imagem antes de adicionar. **↩** adiciona, **⎋** fecha. Dá para desligar em Configurações.
-- **Seleção múltipla:** **⇧-clique** seleciona um intervalo, **⌘-clique** adiciona ou remove um layer, **⌥⌘A** seleciona todos. Com vários selecionados aparecem ações em massa (agrupar, duplicar, ocultar, excluir), e o inspector muda opacidade e mesclagem de todos de uma vez. Arrastar qualquer layer selecionado move todos.
+- **Seleção múltipla:** **⇧-clique** seleciona um intervalo, **⌘-clique** adiciona ou remove um layer, **⌥⌘A** seleciona todos. Com vários selecionados aparecem ações em massa (agrupar, duplicar, ocultar, excluir), e a barra de mesclagem e opacidade muda todos de uma vez. Arrastar qualquer layer selecionado move todos.
 - **⌘K** abre a paleta de comandos: digite o nome de qualquer efeito, preset ou comando.
 - O botão no topo do navegador alterna entre **grade** e **lista** (a lista é compacta: só miniatura pequena e nome; a descrição aparece ao passar o mouse). Um título discreto no topo mostra se o painel aberto é **Adicionar Efeito** ou **Presets**.
 - O layer **de cima** é aplicado **por último**, sobre tudo o que está abaixo.
 - Arraste para reordenar. Soltar no meio de um grupo coloca o layer **dentro** dele.
 - **⌘G** agrupa e **⇧⌘G** desagrupa. **⌘J** duplica (como no Photoshop) e **⌫** exclui. Cada grupo tem a própria opacidade e o próprio modo de mesclagem.
 - Olho = mostrar/ocultar (**H**). Lixeira (ao lado do olho) = excluir. **S** (ao passar o mouse) = solo: mostra só aquele layer.
+- **Mesclagem e opacidade** ficam no topo da lista de layers, como no Photoshop, e valem para o layer selecionado (ou todos os selecionados). Na opacidade: clique ou arraste para ajustar, role o mouse para ajuste fino e dê duplo clique para 100%.
+- **Ícone de máscara** em cada layer (aparece ao passar o mouse; fica amarelo quando o layer tem máscara): clique para escolher uma máscara da imagem, inverter, criar uma nova ou editar.
 - O botão de salvar (no topo dos layers) guarda **a pilha inteira como preset**: ordem, grupos, parâmetros, opacidade e mesclagem.
 - Duplo clique no nome renomeia. Clique direito abre mais opções, como "Salvar como Preset".
 
@@ -35,7 +37,7 @@
 - **LUT**: arraste arquivos `.cube` para o campo da LUT (ou direto para a imagem, que cria um layer de LUT). Toda LUT carregada fica salva na sua biblioteca e aparece no menu.
 
 ## Presets
-- Botão **Presets** (ou **P**): abre os presets na **metade de baixo da sidebar**, dividindo o espaço com os layers (arraste a divisória para mudar a proporção; duplo clique volta para a metade). O painel fica aberto depois de aplicar e só fecha no **✕** ou no **P**; o app lembra se estava aberto. As setas navegam nos presets enquanto o mouse está sobre o painel ou a busca está ativa. Clique num preset para adicioná-lo **por cima como grupo**. São 69 presets do app, separados em Cinema, Filme, Retrato & Luz, Y2K & Digital, Vídeo Retrô, Impressão & Gráfico, Pixel & Código, Sonho & Surreal e Rastreio & HUD. Cada um combina de 3 a 8 efeitos (alguns organizados em grupos, como "Grade" e "Lens"), com grão fino e discreto.
+- Botão **Presets** (ou **P**): abre os presets na **metade de baixo da sidebar**, dividindo o espaço com os layers (arraste a divisória para mudar a proporção; duplo clique volta para a metade). O painel fica aberto depois de aplicar e só fecha no **✕** ou no **P**; o app lembra se estava aberto. As setas navegam nos presets enquanto o mouse está sobre o painel ou a busca está ativa. Clique num preset para adicioná-lo **por cima como grupo**. São 100 presets do app, separados em DM's Specials, Cinema, Filme, Retrato & Luz, Y2K & Digital, Vídeo Retrô, Impressão & Gráfico, Pixel & Código, Filtros de Lente e Rastreio & HUD. Cada um combina de 3 a 8 efeitos (alguns organizados em grupos, como "Grade" e "Lens"), com grão fino e discreto.
 - O botão **+** salva a pilha atual como preset.
 - Menu ⋯: salvar a pilha atual, importar e exportar (`.effectorpreset`), mostrar ou ocultar os presets do app.
 
@@ -51,7 +53,6 @@
 
 ## Visualização
 - **]** ou o botão na barra alterna **Antes / Depois**.
-- **D** mostra o **mapa de profundidade** da foto.
 - **Histograma** no topo da sidebar da direita: RGB, Luminância, R, G, B ou Tudo. Clique no título (ou ⇧⌘H) para recolher.
 - **J** mostra o **recorte** na imagem: altas luzes estouradas em vermelho, sombras esmagadas em azul. Os triângulos do histograma também ligam e desligam.
 - Pinça ou **⌘ + rolagem** para zoom. Arraste ou role para mover a imagem: isso só funciona quando a imagem é maior que a área de visualização (no eixo em que ela passa da tela). Ajustada à janela, ela não sai do lugar.
@@ -68,11 +69,16 @@
 - **R** (como no Lightroom) ou o ícone de recorte na fileira de ferramentas. Escolha a proporção (Livre, 1:1, 4:5, 16:9…) no painel da direita e clique em **Concluir** (ou **↩**). **⎋** cancela. Trocar de ferramenta também aplica o recorte, como no Lightroom.
 
 ## Máscaras
-- As máscaras são da **imagem**, não de cada efeito: crie uma vez e use em quantos efeitos quiser. Ícone **Máscaras** (ou **⇧W**) → **Criar Máscara** → Assunto (perto), Fundo (longe) ou Distância média.
-- Cada máscara tem partes: a primeira é a base; os botões **Adicionar / Subtrair** acrescentam outras faixas de profundidade, que podem **Adicionar**, **Subtrair** ou fazer **Interseção**. Cada parte tem borda longe, borda perto, suavidade, inverter e olho.
-- **Efeitos que Usam Esta Máscara**: marque os efeitos que a máscara limita. No Editar, a linha **Máscara** do layer escolhe a máscara (ou "Nenhuma"), tem **Inverter Máscara** e atalhos para criar ou editar máscaras.
-- **Mostrar Sobreposição** (**O**) pinta de vermelho a área da máscara selecionada. Layers com máscara mostram um ícone na lista.
-- Projetos e presets antigos com Máscara de Profundidade abrem com uma máscara criada sozinha (camadas com a mesma faixa dividem a mesma máscara). Presets e layers copiados levam as máscaras junto para outras imagens.
+- As máscaras são da **imagem**, não de cada efeito: crie uma vez e use em quantos efeitos quiser. Ícone **Máscaras** (ou **⇧W**) → **Criar Nova Máscara**, ou direto pelos atalhos do Lightroom Classic:
+  - **Selecionar Assunto** (**⇧S**) e **Selecionar Fundo** (**⇧G**): a IA encontra o assunto principal da foto no próprio computador (cerca de 2 s na primeira vez em cada foto). Ajustes: **Suavidade da Borda** e **Expandir / Contrair**.
+  - **Pincel** (**K**): pinte na imagem. **[ ]** mudam o tamanho, **⇧[ ⇧]** a suavidade; segure **⌥** (Alt) para apagar, ou ligue **Apagar**. **Fluxo** controla quanto cada pincelada acumula. **⎋** ou **Concluído** para de pintar.
+  - **Gradiente Linear** (**M**): arraste na imagem de onde o efeito é total até onde ele some.
+  - **Gradiente Radial** (**⇧M**): arraste do centro para fora; segure **⇧** para um círculo. Ajustes: tamanho, arredondamento, suavidade e ângulo.
+- Gradientes mostram **alfinete e alças** na imagem: arraste o alfinete para mover, as alças para mudar tamanho, ângulo e largura da transição.
+- Cada máscara tem partes: a primeira é a base; **Adicionar / Subtrair** acrescentam outras partes de qualquer tipo, que podem **Adicionar**, **Subtrair** ou fazer **Interseção**. Cada parte tem inverter (**'**, como no Lightroom), olho e remover (**⌫** remove a parte selecionada).
+- **Efeitos que Usam Esta Máscara**: marque os efeitos que a máscara limita, ou use o ícone de máscara de cada layer.
+- **Mostrar Sobreposição** (**O**) pinta de vermelho a área da máscara selecionada.
+- Projetos e presets antigos com máscaras de profundidade abrem com máscaras de Assunto ou Fundo no lugar. Presets e layers copiados levam as máscaras junto para outras imagens.
 
 ## Salvar e exportar
 - **⌘S** salva o projeto `.effector` (imagem original + todos os layers editáveis).
@@ -106,7 +112,10 @@ Baseados no **Lightroom Classic** quando a função existe lá, e no **Photoshop
 | Antes / Depois dividido | Y |
 | Ferramentas: Editar / Recortar / Canvas & Bordas / Máscaras | E / R / ⇧B / ⇧W |
 | Sobreposição da máscara | O |
-| Mapa de profundidade | D |
+| Máscara: Pincel / Gradiente Linear / Gradiente Radial | K / M / ⇧M |
+| Máscara: Selecionar Assunto / Selecionar Fundo | ⇧S / ⇧G |
+| Pincel: tamanho / suavidade | [ ] / ⇧[ ⇧] |
+| Inverter / remover a parte da máscara | ' / ⌫ |
 | Mostrar recorte | J |
 | Mostrar / ocultar histograma | ⇧⌘H |
 | Agrupar / Desagrupar | ⌘G / ⇧⌘G |
@@ -189,3 +198,9 @@ Baseados no **Lightroom Classic** quando a função existe lá, e no **Photoshop
 - Aviso de **atualização** ao abrir o app.
 - Dithering, halftone e ASCII **sem padrões falsos** quando o zoom está abaixo de 100%.
 - Presets com **Moldura** vêm com ela **desligada** (olho fechado): ligue o layer para usar a borda.
+
+## Novos na 0.8.3
+- **Máscaras de verdade**: Pincel (**K**), Gradiente Linear (**M**), Gradiente Radial (**⇧M**), Selecionar Assunto (**⇧S**) e Selecionar Fundo (**⇧G**), desenhadas e ajustadas direto na imagem.
+- **Detecção de assunto por IA** no lugar do mapa de profundidade: Desfoque de Fundo (antigo Desfoque de Profundidade), Emulação de Lentes e Neblina usam o assunto, e a seção **Onde** dos efeitos virou **Aplicar Em: Em tudo / Fundo / Assunto**. Paralaxe & Relevo saiu.
+- **Mesclagem, opacidade e máscara** na lista de layers, como no Photoshop.
+- **Filtros de Lente** (categoria nova de presets, no lugar de Sonho & Surreal) com dois efeitos novos: **Filtro de Difusão** (Black Pro-Mist, Pro-Mist, Cinebloom, Glimmerglass, Pearlescent, Hollywood Black Magic, Black Satin, Soft Focus e Fog, em graduações 1/8 a 2) e **Filtro Fantasma** (cópias deslocadas e rastros de obturador lento, de um lado, dos dois, nos cantos ou em volta do centro).
