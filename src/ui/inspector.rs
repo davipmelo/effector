@@ -258,7 +258,7 @@ fn layer_inspector(ui: &mut Ui, app: &mut AppState, layer: &LayerNode) {
         });
     });
     egui::ScrollArea::vertical().id_salt(("insp", layer.id)).auto_shrink([false, false]).show(ui, |ui| {
-        // blend, opacity and mask live in the layers panel (0.8.3)
+        // blend, opacity and mask live in the layers panel (0.9.0)
         if let Some(effect) = effect {
             if !effect.looks.is_empty() {
                 look_row(ui, app, layer, effect);

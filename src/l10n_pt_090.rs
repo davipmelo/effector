@@ -1,5 +1,5 @@
-// Portuguese strings added in v0.8.3 (key = English text). Later entries override earlier tables.
-pub const PT_083: &[(&str, &str)] = &[
+// Portuguese strings added in v0.9.0 (key = English text). Later entries override earlier tables.
+pub const PT_090: &[(&str, &str)] = &[
     // layers panel
     ("Blend mode of the selected layer", "Modo de mesclagem do layer selecionado"),
     ("Opacity · drag or click to set · double-click for 100%", "Opacidade · arraste ou clique para ajustar · clique duplo para 100%"),

@@ -201,7 +201,7 @@ Baseados no **Lightroom Classic** quando a função existe lá, e no **Photoshop
 - Dithering, halftone e ASCII **sem padrões falsos** quando o zoom está abaixo de 100%.
 - Presets com **Moldura** vêm com ela **desligada** (olho fechado): ligue o layer para usar a borda.
 
-## Novos na 0.8.3
+## Novos na 0.9.0
 - **Máscaras de verdade**: Pincel (**K**), Gradiente Linear (**M**), Gradiente Radial (**⇧M**), Selecionar Assunto (**⇧S**) e Selecionar Fundo (**⇧G**), desenhadas e ajustadas direto na imagem.
 - **Detecção de assunto por IA** no lugar do mapa de profundidade: Desfoque de Fundo (antigo Desfoque de Profundidade), Emulação de Lentes e Neblina usam o assunto, e a seção **Onde** dos efeitos virou **Aplicar Em: Em tudo / Fundo / Assunto**. Paralaxe & Relevo saiu.
 - **Mesclagem, opacidade e máscara** na lista de layers, como no Photoshop (o botão Solo saiu).

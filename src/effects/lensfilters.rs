@@ -397,7 +397,7 @@ pub fn lens_blur() -> Effect {
     ])
 }
 
-// MARK: - Diffusion filters (0.8.3)
+// MARK: - Diffusion filters (0.9.0)
 
 /// Optical constants of each diffusion filter at grade 1: scatter share, highlight bias,
 /// weights and radii (reference px) of the tight / medium / wide halo, detail softening and glints.
@@ -502,7 +502,7 @@ pub fn diffusion() -> Effect {
     ])
 }
 
-// MARK: - Ghost filters (0.8.3)
+// MARK: - Ghost filters (0.9.0)
 
 pub fn ghost() -> Effect {
     Effect::new("ghost", "Ghost Filter", Category::Lens, |input, p, ctx| {

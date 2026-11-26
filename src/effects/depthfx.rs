@@ -1,4 +1,4 @@
-//! Effects that use the AI subject matte (0.8.3; the depth map of 0.8.0–0.8.2 is gone):
+//! Effects that use the AI subject matte (0.9.0; the depth map of 0.8.0–0.8.2 is gone):
 //! Background Blur (bokeh behind a sharp subject), Lens Emulation and Fog & Haze. Without the
 //! matte they fall back to sensible 2D versions. Parallax & Relief only worked with depth and is
 //! kept hidden for old projects.
@@ -210,7 +210,7 @@ pub fn fog() -> Effect {
 }
 
 pub fn relief() -> Effect {
-    // Removed in 0.8.3 with the depth map: kept hidden so old projects still open (renders unchanged).
+    // Removed in 0.9.0 with the depth map: kept hidden so old projects still open (renders unchanged).
     Effect::new("relief", "Parallax & Relief", Category::Distort, |input, _p, _ctx| input.clone())
     .symbol("cube.transparent")
     .summary("Experimental depth tricks: 3D parallax shift, an embossed relief of the scene, or near/far colour tint.")
