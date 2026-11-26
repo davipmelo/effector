@@ -208,7 +208,7 @@ pub fn all() -> &'static [Effect] {
             // Film & light
             film::film(), grain::grain(), light::glow(), light::bloom(), light::halation(), texture::light_leak(), depthfx::fog(),
             // Lens filters
-            depthfx::lens_emulation(), lensfilters::anamorphic(), lensfilters::star(), lensfilters::prism(), lensfilters::halo(),
+            depthfx::lens_emulation(), lensfilters::diffusion(), lensfilters::ghost(), lensfilters::anamorphic(), lensfilters::star(), lensfilters::prism(), lensfilters::halo(),
             lens::chromatic(), lens::vignette(),
             // Blur
             depthfx::depth_blur(), blur::blur(), blur::radial(), blur::motion(), lensfilters::lens_blur(),

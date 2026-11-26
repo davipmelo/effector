@@ -44,7 +44,7 @@ fn one() -> i64 { 1 }
 fn app() -> String { "EFFECTOR".into() }
 
 pub const CATEGORIES: [&str; 10] = [
-    "DM'S SPECIALS", "Cinema", "Film", "Portrait & Light", "Y2K & Digital", "Retro Video", "Print & Graphic", "Pixel & Code", "Dream & Surreal", "Tracking & HUD",
+    "DM'S SPECIALS", "Cinema", "Film", "Portrait & Light", "Y2K & Digital", "Retro Video", "Print & Graphic", "Pixel & Code", "Lens Filters", "Tracking & HUD",
 ];
 
 // MARK: - Factory DSL (mirrors FactoryPresets in the macOS app)

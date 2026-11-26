@@ -504,62 +504,74 @@ fx("basic", None, 1.0, BlendMode::Normal, vals!["exposure" => 0.5, "shadows" => 
 look("ascii", "color", None, 1.0, BlendMode::Normal, vals!["brightness" => 30.0]),
 fx("bloom", None, 0.5, BlendMode::Normal, vals!["threshold" => 55.0, "radius" => 12.0]),
 ]),
-make("Kaleido Bloom", "Dream & Surreal", vec![
-look("prism", "k6", None, 1.0, BlendMode::Normal, vals![]),
-fx("hsl", None, 1.0, BlendMode::Normal, vals!["orange_s" => 15.0, "magenta_s" => 25.0, "purple_s" => 20.0]),
-fx("bloom", None, 1.0, BlendMode::Normal, vals!["threshold" => 65.0, "intensity" => 90.0, "radius" => 40.0]),
-fx("vignette", None, 1.0, BlendMode::Normal, vals!["amount" => 40.0, "roundness" => 100.0]),
+make("Black Pro-Mist 1/8", "Lens Filters", vec![
+look("diffusion", "bpm8", None, 1.0, BlendMode::Normal, vals![]),
 ]),
-make("Mandala", "Dream & Surreal", vec![
-look("prism", "mandala", None, 1.0, BlendMode::Normal, vals![]),
-fx("gradientmap", None, 0.4, BlendMode::SoftLight, vals!["gradient" => swatches::gradient_named("Golden Hour")]),
-fx("vignette", None, 1.0, BlendMode::Normal, vals!["amount" => 50.0, "roundness" => 100.0]),
+make("Black Pro-Mist 1/4", "Lens Filters", vec![
+look("diffusion", "bpm4", None, 1.0, BlendMode::Normal, vals![]),
 ]),
-make("Glass Shards", "Dream & Surreal", vec![
-look("prism", "shards", None, 1.0, BlendMode::Normal, vals![]),
-fx("chromab", None, 1.0, BlendMode::Normal, vals!["amount" => 5.0]),
-fx("hsl", None, 1.0, BlendMode::Normal, vals!["blue_s" => 20.0, "aqua_s" => 20.0, "magenta_s" => 20.0]),
-fx("glow", None, 0.4, BlendMode::Normal, vals!["intensity" => 40.0, "radius" => 25.0, "threshold" => 70.0]),
-fx("vignette", None, 1.0, BlendMode::Normal, vals!["amount" => 30.0]),
+make("Black Pro-Mist 1/2", "Lens Filters", vec![
+look("diffusion", "bpm2", None, 1.0, BlendMode::Normal, vals![]),
 ]),
-make("Hyperspace", "Dream & Surreal", vec![
-look("edgewarp", "warp", None, 1.0, BlendMode::Normal, vals!["strength" => 160.0]),
-look("radialblur", "zoom", None, 1.0, BlendMode::Normal, vals!["amount" => 90.0, "protect" => 12.0]),
-fx("chromab", None, 1.0, BlendMode::Normal, vals!["amount" => 10.0]),
-fx("bloom", None, 0.7, BlendMode::Normal, vals!["threshold" => 82.0, "intensity" => 60.0, "radius" => 40.0]),
-fx("vignette", None, 1.0, BlendMode::Normal, vals!["amount" => 45.0]),
+make("Pro-Mist 1/2", "Lens Filters", vec![
+fx("diffusion", None, 1.0, BlendMode::Normal, vals!["filter" => "promist", "grade" => "1/2"]),
 ]),
-make("Vortex", "Dream & Surreal", vec![
-look("edgewarp", "vortex", None, 1.0, BlendMode::Normal, vals![]),
-look("radialblur", "spin", None, 1.0, BlendMode::Normal, vals!["protect" => 25.0]),
-fx("gradientmap", None, 0.4, BlendMode::SoftLight, vals!["gradient" => swatches::gradient_named("Dusk")]),
-fx("glow", None, 0.6, BlendMode::Normal, vals!["intensity" => 60.0, "radius" => 30.0]),
-fx("vignette", None, 1.0, BlendMode::Normal, vals!["amount" => 40.0]),
+make("Cinebloom 20%", "Lens Filters", vec![
+look("diffusion", "cb20", None, 1.0, BlendMode::Normal, vals![]),
 ]),
-make("Liquid Edges", "Dream & Surreal", vec![
-look("edgewarp", "dream", None, 1.0, BlendMode::Normal, vals![]),
-fx("hsl", None, 1.0, BlendMode::Normal, vals!["blue_s" => 20.0, "purple_s" => 20.0, "magenta_h" => -10.0]),
-look("blur", "edges", None, 1.0, BlendMode::Normal, vals!["radius" => 12.0]),
-fx("glow", None, 0.5, BlendMode::Normal, vals!["intensity" => 50.0, "radius" => 40.0]),
-fx("vignette", None, 1.0, BlendMode::Normal, vals!["amount" => 25.0]),
+make("Glimmerglass", "Lens Filters", vec![
+fx("diffusion", None, 1.0, BlendMode::Normal, vals!["filter" => "glimmer", "grade" => "1"]),
 ]),
-make("Vaporwave", "Dream & Surreal", vec![
-fx("gradientmap", None, 0.65, BlendMode::Color, vals!["gradient" => swatches::gradient_named("Vaporwave")]),
-fx("mirror", None, 1.0, BlendMode::Normal, vals!["mode" => "lr"]),
-look("vhs", "clean", None, 1.0, BlendMode::Normal, vals![]),
-fx("chromab", None, 1.0, BlendMode::Normal, vals!["amount" => 6.0]),
-fx("star", None, 1.0, BlendMode::Normal, vals!["points" => "4", "spectral" => true]),
+make("Pearlescent 1/2", "Lens Filters", vec![
+fx("diffusion", None, 1.0, BlendMode::Normal, vals!["filter" => "pearl", "grade" => "1/2"]),
 ]),
-make("Ghost Echo", "Dream & Surreal", vec![
-fx("bw", None, 1.0, BlendMode::Normal, vals!["contrast" => 20.0]),
-fx("trail", None, 1.0, BlendMode::Normal, vals!["distance" => 90.0, "copies" => 10.0, "blend" => "screen", "rgbShift" => 60.0]),
-fx("glow", None, 0.6, BlendMode::Normal, vals!["intensity" => 60.0]),
-fx("vignette", None, 1.0, BlendMode::Normal, vals!["amount" => 50.0]),
+make("Hollywood Black Magic", "Lens Filters", vec![
+look("diffusion", "hbm", None, 1.0, BlendMode::Normal, vals![]),
 ]),
-make("Mirror Ball", "Dream & Surreal", vec![
-look("fisheye", "ball", None, 1.0, BlendMode::Normal, vals![]),
-fx("star", None, 1.0, BlendMode::Normal, vals!["points" => "8", "spectral" => true, "length" => 12.0, "threshold" => 93.0, "intensity" => 70.0]),
-fx("bloom", None, 0.6, BlendMode::Normal, vals!["threshold" => 84.0, "intensity" => 60.0]),
+make("Black Satin", "Lens Filters", vec![
+fx("diffusion", None, 1.0, BlendMode::Normal, vals!["filter" => "satin", "grade" => "1/2"]),
+]),
+make("Classic Soft", "Lens Filters", vec![
+look("diffusion", "soft", None, 1.0, BlendMode::Normal, vals![]),
+]),
+make("Double Fog", "Lens Filters", vec![
+look("diffusion", "dfog", None, 1.0, BlendMode::Normal, vals!["grade" => "1"]),
+]),
+make("Ghost Glass", "Lens Filters", vec![
+look("ghost", "half", None, 1.0, BlendMode::Normal, vals![]),
+]),
+make("Double Ghost", "Lens Filters", vec![
+look("ghost", "double", None, 1.0, BlendMode::Normal, vals![]),
+]),
+make("Four Corner Ghost", "Lens Filters", vec![
+look("ghost", "spectre", None, 1.0, BlendMode::Normal, vals![]),
+]),
+make("Soft Echo", "Lens Filters", vec![
+look("ghost", "echo", None, 1.0, BlendMode::Normal, vals![]),
+]),
+make("Shutter Drag", "Lens Filters", vec![
+look("ghost", "phantom", None, 1.0, BlendMode::Normal, vals![]),
+]),
+make("Halo Trail", "Lens Filters", vec![
+look("ghost", "halo", None, 1.0, BlendMode::Normal, vals![]),
+]),
+make("Prism Edge", "Lens Filters", vec![
+look("ghost", "prism", None, 1.0, BlendMode::Normal, vals![]),
+]),
+make("Cross Screen", "Lens Filters", vec![
+look("star", "whisper", None, 1.0, BlendMode::Normal, vals![]),
+]),
+make("Streak Filter", "Lens Filters", vec![
+look("anamorphic", "clean", None, 1.0, BlendMode::Normal, vals!["intensity" => 35.0, "length" => 35.0, "glow" => 5.0]),
+]),
+make("Night Glamour", "Lens Filters", vec![
+look("diffusion", "bpm4", None, 1.0, BlendMode::Normal, vals![]),
+fx("star", None, 1.0, BlendMode::Normal, vals!["points" => "6", "intensity" => 30.0, "length" => 7.0, "selectivity" => 65.0, "core" => 10.0]),
+]),
+make("Dream Glass", "Lens Filters", vec![
+fx("ghost", None, 1.0, BlendMode::Normal, vals!["zone" => "around", "distance" => 30.0, "amount" => 30.0, "clear" => 30.0, "softness" => 3.0]),
+fx("star", None, 1.0, BlendMode::Normal, vals!["points" => "4", "intensity" => 35.0, "length" => 8.0, "selectivity" => 55.0]),
+fx("diffusion", None, 1.0, BlendMode::Normal, vals!["filter" => "blackpromist", "grade" => "1/8"]),
 ]),
 make("Thermal Cam", "Tracking & HUD", vec![
 fx("blur", None, 1.0, BlendMode::Normal, vals!["radius" => 3.0]),

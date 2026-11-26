@@ -396,3 +396,157 @@ pub fn lens_blur() -> Effect {
         look("dream", "Dreamy Bokeh", vals!["mode" => "full", "amount" => 30.0, "bokeh" => 80.0]),
     ])
 }
+
+// MARK: - Diffusion filters (0.8.3)
+
+/// Optical constants of each diffusion filter at grade 1: scatter share, highlight bias,
+/// weights and radii (reference px) of the tight / medium / wide halo, detail softening and glints.
+struct Diffuser {
+    k: f32,
+    hl: f32,
+    w: [f32; 3],
+    r: [f64; 3],
+    detail: f32,
+    glint: f32,
+}
+
+fn diffuser(kind: &str) -> Diffuser {
+    let d = |k, hl, w, r, detail, glint| Diffuser { k, hl, w, r, detail, glint };
+    match kind {
+        "promist" => d(0.42, 0.30, [0.30, 0.40, 0.30], [5.0, 22.0, 90.0], 0.05, 0.0),
+        "glimmer" => d(0.15, 0.60, [0.60, 0.30, 0.10], [3.0, 12.0, 50.0], 0.12, 1.0),
+        "cinebloom" => d(0.36, 0.65, [0.25, 0.45, 0.30], [6.0, 28.0, 110.0], 0.0, 0.0),
+        "pearl" => d(0.28, 0.50, [0.50, 0.35, 0.15], [3.0, 14.0, 60.0], 0.10, 0.0),
+        "hbm" => d(0.18, 0.50, [0.60, 0.30, 0.10], [4.0, 16.0, 60.0], 0.35, 0.0),
+        "satin" => d(0.09, 0.40, [0.70, 0.30, 0.00], [3.0, 12.0, 40.0], 0.45, 0.0),
+        "softfocus" => d(0.40, 0.00, [0.80, 0.20, 0.00], [6.0, 20.0, 40.0], 0.0, 0.0),
+        "fog" => d(0.55, 0.00, [0.10, 0.30, 0.60], [10.0, 60.0, 250.0], 0.0, 0.0),
+        // Black Pro-Mist
+        _ => d(0.35, 0.75, [0.45, 0.40, 0.15], [4.0, 18.0, 70.0], 0.0, 0.0),
+    }
+}
+
+pub fn diffusion() -> Effect {
+    Effect::new("diffusion", "Diffusion Filter", Category::Lens, |input, p, ctx| {
+        let kind = p.choice_or("filter", "blackpromist");
+        let d = diffuser(&kind);
+        let grade = match p.choice_or("grade", "1/4").as_str() { "1/8" => 0.3, "1/4" => 0.5, "1/2" => 0.72, "2" => 1.5, _ => 1.0 };
+        let k = (d.k * grade * p.fd("amount", 100.0) / 100.0).min(0.92);
+        if k <= 0.0005 {
+            return input.clone();
+        }
+        let size = p.num("size", 100.0) / 100.0;
+        // "Shadow Lift" scales the wide veil; the weights are renormalised so the light stays the same
+        let lift = p.fd("lift", 100.0) / 100.0;
+        let mut w = [d.w[0], d.w[1], d.w[2] * lift];
+        let sum = (w[0] + w[1] + w[2]).max(1e-4);
+        w.iter_mut().for_each(|x| *x /= sum);
+        let hl = (d.hl + p.f("highlights") / 100.0).clamp(0.0, 1.0);
+        let src = ctx.apply("k_diffsrc", &[input], &[hl]);
+        let mut g: Vec<T> = vec![];
+        for r in d.r {
+            let r = ctx.px(r * size).max(0.5);
+            let f = ((r / 6.0) as usize).max(1);
+            let small = ctx.resize(&src, (src.width() / f).max(1), (src.height() / f).max(1), true);
+            g.push(ctx.blur(&small, r / f as f64));
+        }
+        let detail = (d.detail * grade.min(1.2) * p.fd("amount", 100.0) / 100.0).min(0.9);
+        let soft = if detail > 0.001 {
+            let lin = ctx.apply("k_tolin", &[input], &[]);
+            ctx.blur(&lin, ctx.px(2.2 * size).max(0.5))
+        } else {
+            g[0].clone()
+        };
+        let mut out = ctx.apply("k_diffusion", &[input, &g[0], &g[1], &g[2], &soft], &[k, hl, w[0], w[1], w[2], detail]);
+        if d.glint > 0.0 && p.bool_or("glints", true) {
+            // Glimmerglass: tiny four-point glints on the brightest specks
+            let mut sp = Params::default();
+            for (key, v) in vals!["points" => "4", "intensity" => 30.0 * grade as f64, "length" => 3.0, "threshold" => 90.0,
+                                  "selectivity" => 60.0, "core" => 10.0, "thickness" => 0.3, "angle" => 45.0] {
+                sp.set(&key, v);
+            }
+            out = (star().apply)(&out, &sp, ctx);
+        }
+        out
+    })
+    .symbol("camera.filters")
+    .summary("Real diffusion glass — Black Pro-Mist, Pro-Mist, Glimmerglass, Cinebloom, Pearlescent, Hollywood Black Magic, Black Satin, Soft Focus and Fog. Simulated in linear light: light is only spread around, never added.")
+    .params(vec![
+        ParamDef::choice("filter", "Filter", &[
+            ("blackpromist", "Black Pro-Mist"), ("promist", "Pro-Mist (White)"), ("cinebloom", "Cinebloom"), ("glimmer", "Glimmerglass"),
+            ("pearl", "Pearlescent"), ("hbm", "Hollywood Black Magic"), ("satin", "Black Satin"), ("softfocus", "Soft Focus"), ("fog", "Fog"),
+        ], "blackpromist").sec("Filter"),
+        ParamDef::segmented("grade", "Strength", &[("1/8", "1/8"), ("1/4", "1/4"), ("1/2", "1/2"), ("1", "1"), ("2", "2")], "1/4").sec("Filter"),
+        s("amount", "Fine Tune", 0.0, 200.0, 100.0).step(1.0).unit("%").sec("Filter"),
+        s("size", "Halo Size", 20.0, 300.0, 100.0).step(1.0).unit("%").curve(1.4).sec("Filter"),
+        s("highlights", "Highlights Only", -100.0, 100.0, 0.0).step(1.0).unit("%").sec("Filter"),
+        s("lift", "Shadow Veil", 0.0, 200.0, 100.0).step(1.0).unit("%").sec("Filter"),
+        ParamDef::toggle("glints", "Glints", true).sec("Filter").vis(when("filter", "glimmer")),
+    ])
+    .looks(vec![
+        look_g("bpm8", "Black Pro-Mist 1/8", "Black Pro-Mist", vals!["filter" => "blackpromist", "grade" => "1/8"]),
+        look_g("bpm4", "Black Pro-Mist 1/4", "Black Pro-Mist", vals!["filter" => "blackpromist", "grade" => "1/4"]),
+        look_g("bpm2", "Black Pro-Mist 1/2", "Black Pro-Mist", vals!["filter" => "blackpromist", "grade" => "1/2"]),
+        look_g("bpm1", "Black Pro-Mist 1", "Black Pro-Mist", vals!["filter" => "blackpromist", "grade" => "1"]),
+        look_g("pm4", "Pro-Mist 1/4", "Pro-Mist", vals!["filter" => "promist", "grade" => "1/4"]),
+        look_g("pm1", "Pro-Mist 1", "Pro-Mist", vals!["filter" => "promist", "grade" => "1"]),
+        look_g("cb10", "Cinebloom 10%", "Cinebloom", vals!["filter" => "cinebloom", "grade" => "1/4"]),
+        look_g("cb20", "Cinebloom 20%", "Cinebloom", vals!["filter" => "cinebloom", "grade" => "1/2"]),
+        look_g("glim", "Glimmerglass 1/2", "Glimmerglass", vals!["filter" => "glimmer", "grade" => "1/2"]),
+        look_g("pearl", "Pearlescent 1/4", "Pearlescent", vals!["filter" => "pearl", "grade" => "1/4"]),
+        look_g("hbm", "Hollywood Black Magic 1/2", "Skin", vals!["filter" => "hbm", "grade" => "1/2"]),
+        look_g("satin", "Black Satin 1/4", "Skin", vals!["filter" => "satin", "grade" => "1/4"]),
+        look_g("soft", "Classic Soft 2", "Soft", vals!["filter" => "softfocus", "grade" => "1"]),
+        look_g("fog", "Fog 1", "Fog", vals!["filter" => "fog", "grade" => "1"]),
+        look_g("dfog", "Double Fog 2", "Fog", vals!["filter" => "fog", "grade" => "2", "lift" => 140.0]),
+    ])
+}
+
+// MARK: - Ghost filters (0.8.3)
+
+pub fn ghost() -> Effect {
+    Effect::new("ghost", "Ghost Filter", Category::Lens, |input, p, ctx| {
+        let zone = match p.choice_or("zone", "half").as_str() { "both" => 1.0, "quad" => 2.0, "around" => 3.0, "full" => 4.0, _ => 0.0 };
+        let amt = p.fd("amount", 35.0) / 100.0;
+        if amt <= 0.001 {
+            return input.clone();
+        }
+        let src = {
+            let sf = ctx.px(p.num("softness", 1.5));
+            if sf > 0.3 { ctx.blur(input, sf) } else { input.clone() }
+        };
+        // the copies come from a slightly softened image (the prism is out of focus); the direct image stays sharp
+        ctx.apply("k_ghostfx", &[input, &src], &[
+            zone, p.f("angle"), ctx.px(p.num("distance", 40.0)) as f32, p.fd("copies", 1.0), p.fd("fade", 40.0) / 100.0,
+            if p.choice_or("style", "copies") == "smear" { 1.0 } else { 0.0 }, p.fd("clear", 25.0) / 100.0, p.fd("feather", 40.0) / 100.0,
+            amt, p.fd("cx", 50.0) / 100.0, p.fd("cy", 50.0) / 100.0, p.f("fringe") / 100.0,
+        ])
+    })
+    .symbol("person.2.fill")
+    .summary("In-camera ghost glass: a faint displaced copy or a shutter-drag smear on one side, both sides, the corners or around a clear centre. Mixed in linear light, so brightness and colour stay the same.")
+    .params(vec![
+        ParamDef::choice("zone", "Glass", &[("half", "One Side"), ("both", "Both Sides"), ("quad", "Four Corners"), ("around", "Around the Centre"), ("full", "Whole Frame")], "half").sec("Ghost"),
+        ParamDef::segmented("style", "Style", &[("copies", "Copies"), ("smear", "Smear")], "copies").sec("Ghost"),
+        s("amount", "Amount", 0.0, 100.0, 35.0).step(1.0).unit("%").sec("Ghost"),
+        s("distance", "Distance", 0.0, 300.0, 40.0).step(1.0).curve(1.6).sec("Ghost"),
+        s("angle", "Direction", -180.0, 180.0, 0.0).step(1.0).unit("°").sec("Ghost"),
+        s("copies", "Copies", 1.0, 8.0, 1.0).step(1.0).sec("Ghost").vis(when("style", "copies")),
+        s("fade", "Fade", 0.0, 95.0, 40.0).step(1.0).unit("%").sec("Ghost"),
+        s("clear", "Clear Centre", 0.0, 100.0, 25.0).step(1.0).unit("%").sec("Glass").vis(when_not("zone", "full")),
+        s("feather", "Feather", 0.0, 100.0, 40.0).step(1.0).unit("%").sec("Glass").vis(when_not("zone", "full")),
+        s("cx", "Center X", 0.0, 100.0, 50.0).step(1.0).unit("%").sec("Glass").vis(when_not("zone", "full")),
+        s("cy", "Center Y", 0.0, 100.0, 50.0).step(1.0).unit("%").sec("Glass").vis(when_not("zone", "full")),
+        s("softness", "Ghost Softness", 0.0, 20.0, 1.5).step(0.1).curve(1.5).sec("Glass"),
+        s("fringe", "Rainbow Fringe", 0.0, 100.0, 0.0).step(1.0).unit("%").sec("Glass"),
+    ])
+    .looks(vec![
+        look_g("half", "Half Ghost", "Ghost", vals![]),
+        look_g("double", "Double Ghost", "Ghost", vals!["zone" => "both", "distance" => 50.0, "clear" => 18.0]),
+        look_g("spectre", "Four Corners", "Ghost", vals!["zone" => "quad", "distance" => 45.0, "clear" => 30.0]),
+        look_g("echo", "Soft Echo", "Ghost", vals!["zone" => "full", "copies" => 2.0, "distance" => 30.0, "amount" => 25.0, "fade" => 50.0]),
+        look_g("phantom", "Shutter Drag", "Trail", vals!["zone" => "both", "style" => "smear", "distance" => 90.0, "amount" => 45.0, "fade" => 60.0, "clear" => 15.0]),
+        look_g("halo", "Halo Trail", "Trail", vals!["zone" => "around", "style" => "smear", "distance" => 60.0, "amount" => 40.0, "clear" => 35.0]),
+        look_g("swipe", "Side Swipe", "Trail", vals!["zone" => "half", "style" => "smear", "distance" => 140.0, "amount" => 50.0, "fade" => 70.0, "clear" => 0.0]),
+        look_g("prism", "Prism Edge", "Ghost", vals!["zone" => "half", "distance" => 35.0, "fringe" => 70.0, "amount" => 40.0]),
+    ])
+}
