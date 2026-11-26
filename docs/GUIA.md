@@ -5,7 +5,7 @@
 - **← / →** trocam de imagem. **F6** mostra ou esconde a filmstrip. **⌘W** fecha a imagem atual. A rodinha do mouse (sem Shift) rola a filmstrip.
 - **⌫ (Delete)**: com fotos selecionadas na filmstrip (último clique nela), fecha essas fotos; pergunta antes se tiverem alterações. Fora da filmstrip, exclui os layers selecionados.
 - Na filmstrip: clique abre; **⌘-clique** ou **⇧-clique** seleciona várias. O botão **⟳** (ou **⇧⌘S**, como no Lightroom) **sincroniza** os ajustes da imagem ativa nas selecionadas (layers — substituindo ou por cima —, recorte e canvas). Clique direito: copiar/colar ajustes, limpar, mostrar no Finder, fechar. **⇧⌘C / ⇧⌘V** copiam e colam os ajustes, **⇧⌘R** redefine, **⌘A** (depois de clicar na filmstrip) seleciona todas.
-- **Exportar** com várias imagens: escolha "Esta imagem", "Selecionadas" ou "Todas"; cada uma sai com os próprios efeitos numa pasta, com sufixo no nome.
+- **Exportar** com várias imagens: escolha "Esta imagem", "Selecionadas" ou "Todas"; cada uma sai com os próprios efeitos, com o nome montado pelo modelo de nomes do export.
 - Formatos aceitos: JPG, PNG, HEIC, TIFF, RAW (CR3, ARW, NEF, DNG…) e projetos `.effector`.
 
 ## Layers
@@ -13,7 +13,7 @@
 - **Prévia ao vivo:** passe o mouse sobre um efeito ou preset (ou use ↑ ↓ ← →) para vê-lo aplicado na imagem antes de adicionar. **↩** adiciona, **⎋** fecha. Dá para desligar em Configurações.
 - **Seleção múltipla:** **⇧-clique** seleciona um intervalo, **⌘-clique** adiciona ou remove um layer, **⌥⌘A** seleciona todos. Com vários selecionados aparecem ações em massa (agrupar, duplicar, ocultar, excluir), e o inspector muda opacidade e mesclagem de todos de uma vez. Arrastar qualquer layer selecionado move todos.
 - **⌘K** abre a paleta de comandos: digite o nome de qualquer efeito, preset ou comando.
-- O botão no topo do navegador alterna entre **grade** e **lista** (a lista mostra uma descrição de cada efeito).
+- O botão no topo do navegador alterna entre **grade** e **lista** (a lista é compacta: só miniatura pequena e nome; a descrição aparece ao passar o mouse). Um título discreto no topo mostra se o painel aberto é **Adicionar Efeito** ou **Presets**.
 - O layer **de cima** é aplicado **por último**, sobre tudo o que está abaixo.
 - Arraste para reordenar. Soltar no meio de um grupo coloca o layer **dentro** dele.
 - **⌘G** agrupa e **⇧⌘G** desagrupa. **⌘J** duplica (como no Photoshop) e **⌫** exclui. Cada grupo tem a própria opacidade e o próprio modo de mesclagem.
@@ -44,7 +44,7 @@
 - **F** abre a imagem em **tela cheia**, sem painéis. **F** ou **⎋** volta.
 - **Y** liga a comparação **Antes / Depois dividida** (como no Lightroom): arraste a divisória para comparar.
 - **Tab** esconde as barras laterais; **⇧Tab** esconde todos os painéis.
-- **Clique direito fora da imagem** escolhe a cor de fundo da área central: branco, quatro cinzas ou preto.
+- **Clique direito fora da imagem** escolhe a cor de fundo da área central: branco, quatro cinzas ou preto (a linha inteira de cada opção é clicável).
 - As duas barras laterais são **redimensionáveis**: arraste a divisória. Duplo clique na divisória volta à largura padrão.
 - Passe o mouse sobre qualquer botão para ver o nome e o atalho.
 - O app **reabre a última imagem com todos os layers** ao ser aberto de novo (dá para desligar em Configurações). Configurações, atalhos, favoritos, presets, paletas, degradês e LUTs são sempre salvos.
@@ -54,24 +54,40 @@
 - **D** mostra o **mapa de profundidade** da foto.
 - **Histograma** no topo da sidebar da direita: RGB, Luminância, R, G, B ou Tudo. Clique no título (ou ⇧⌘H) para recolher.
 - **J** mostra o **recorte** na imagem: altas luzes estouradas em vermelho, sombras esmagadas em azul. Os triângulos do histograma também ligam e desligam.
-- Pinça ou **⌘ + rolagem** para zoom. Arraste ou role para mover a imagem.
+- Pinça ou **⌘ + rolagem** para zoom. Arraste ou role para mover a imagem: isso só funciona quando a imagem é maior que a área de visualização (no eixo em que ela passa da tela). Ajustada à janela, ela não sai do lugar.
 - Duplo clique na imagem ajusta à janela.
 - **Z** alterna entre ajustar à janela e 100% (como no Lightroom); **⌘0** ajusta e **⌘1** mostra em 100%.
 
+## Ferramentas (fileira de ícones da direita)
+- Embaixo do histograma há uma fileira de ícones, como no Lightroom Classic: **Editar** (**E**: os controles do layer selecionado), **Recorte** (**R**), **Canvas & Bordas** (**⇧B**) e **Máscaras** (**⇧W**). Apertar o atalho de novo volta para Editar. Um pontinho amarelo marca as ferramentas que estão mudando a imagem (recorte aplicado, canvas ligado, máscaras criadas).
+
 ## Canvas & Bordas (Instagram)
-- Botão **Canvas** na barra de cima (ou no painel direito sem layer selecionado): encaixa a imagem numa proporção — 4:5, 1:1, 9:16, 3:4, 1.91:1, 16:9, impressão, A4 ou personalizada — com borda mínima, fundo de **cor**, **degradê** ou a **própria foto desfocada**, posição, cantos arredondados e sombra. O export sai no tamanho do canvas.
+- Ícone **Canvas & Bordas** na fileira de ferramentas (ou **⇧B**): encaixa a imagem numa proporção — 4:5, 1:1, 9:16, 3:4, 1.91:1, 16:9, impressão, A4 ou personalizada — com borda mínima, fundo de **cor**, **degradê** ou a **própria foto desfocada**, posição, cantos arredondados e sombra. O export sai no tamanho do canvas.
 
 ## Recorte
-- **R** (como no Lightroom) ou o botão ✂︎ abre o recorte. Escolha a proporção (Livre, 1:1, 4:5, 16:9…) e clique em **Aplicar**.
+- **R** (como no Lightroom) ou o ícone de recorte na fileira de ferramentas. Escolha a proporção (Livre, 1:1, 4:5, 16:9…) no painel da direita e clique em **Concluir** (ou **↩**). **⎋** cancela. Trocar de ferramenta também aplica o recorte, como no Lightroom.
+
+## Máscaras
+- As máscaras são da **imagem**, não de cada efeito: crie uma vez e use em quantos efeitos quiser. Ícone **Máscaras** (ou **⇧W**) → **Criar Máscara** → Assunto (perto), Fundo (longe) ou Distância média.
+- Cada máscara tem partes: a primeira é a base; **Somar / Subtrair** acrescentam outras faixas de profundidade, que podem **Adicionar**, **Subtrair** ou fazer **Interseção**. Cada parte tem borda longe, borda perto, suavidade, inverter e olho.
+- **Efeitos que Usam Esta Máscara**: marque os efeitos que a máscara limita. No Editar, a linha **Máscara** do layer escolhe a máscara (ou "Nenhuma"), tem **Inverter Máscara** e atalhos para criar ou editar máscaras.
+- **Mostrar Sobreposição** (**O**) pinta de vermelho a área da máscara selecionada. Layers com máscara mostram um ícone na lista.
+- Projetos e presets antigos com Máscara de Profundidade abrem com uma máscara criada sozinha (camadas com a mesma faixa dividem a mesma máscara). Presets e layers copiados levam as máscaras junto para outras imagens.
 
 ## Salvar e exportar
 - **⌘S** salva o projeto `.effector` (imagem original + todos os layers editáveis).
-- **⇧⌘E** exporta em PNG ou JPG, em 1× ou 2×. PNG mantém a transparência.
+- **⇧⌘E** abre o **Export**, no estilo do Lightroom:
+  - **Local**: pasta específica, mesma pasta do original ou escolher na hora; **subpasta** opcional; o que fazer com **arquivos que já existem** (perguntar, nome novo, sobrescrever ou pular).
+  - **Nome dos arquivos**: modelos prontos no menu ou um modelo montado com **blocos** (nome do arquivo, texto livre, sequência, data da exportação, data da foto, dimensões, separadores e texto). Clique num bloco para trocar o formato, mover ou remover. O **Exemplo** mostra o nome final.
+  - **Arquivo**: JPG (qualidade e **limitar tamanho do arquivo**) ou PNG (mantém a transparência).
+  - **Tamanho**: redimensionar para caber em largura e altura, dimensões, lado maior, lado menor, megapixels ou porcentagem, em pixels, polegadas ou centímetros, com **Não Ampliar**.
+  - **Depois de exportar**: não fazer nada ou mostrar no Explorer / Finder.
+  - **Presets de Exportação** na lista da esquerda: **+** salva as configurações atuais; clique direito atualiza, renomeia ou apaga. A lista começa vazia.
 - **⌥⇧⌘C** copia o resultado para colar em outro app.
 
 ## Configurações (⌘, ou a engrenagem na barra)
-- Idioma (English / Português / Sistema), tema (Escuro / Claro / Sistema), atalhos personalizáveis e padrões de exportação.
-- **Atualizações**: **Verificar Atualizações** procura uma versão nova no GitHub, baixa e instala (o app fecha, atualiza e abre de novo). Também verifica sozinho uma vez por dia (dá para desligar).
+- Idioma (English / Português / Sistema), tema (Escuro / Claro / Sistema) e atalhos personalizáveis. As configurações do export ficam na própria janela de export.
+- **Atualizações**: **Verificar Atualizações** procura uma versão nova no GitHub, baixa e instala (o app fecha, atualiza e abre de novo). O app também verifica **toda vez que abre** e, se houver versão nova, mostra um aviso com as novidades e os botões **Baixar e Instalar**, **Depois** e **Pular Esta Versão** (dá para desligar a verificação automática).
 
 ## Todos os atalhos (padrão, personalizáveis)
 Baseados no **Lightroom Classic** quando a função existe lá, e no **Photoshop** para layers. No Windows, ⌘ = Ctrl e ⌥ = Alt.
@@ -88,7 +104,8 @@ Baseados no **Lightroom Classic** quando a função existe lá, e no **Photoshop
 | Adicionar efeito | ⇧⌘A |
 | Antes / Depois | ] |
 | Antes / Depois dividido | Y |
-| Recortar | R |
+| Ferramentas: Editar / Recortar / Canvas & Bordas / Máscaras | E / R / ⇧B / ⇧W |
+| Sobreposição da máscara | O |
 | Mapa de profundidade | D |
 | Mostrar recorte | J |
 | Mostrar / ocultar histograma | ⇧⌘H |
@@ -162,3 +179,13 @@ Baseados no **Lightroom Classic** quando a função existe lá, e no **Photoshop
 - **Color Grading** ganhou o modo **Split Tone** (o antigo efeito Split Tone, que saiu do menu). Projetos antigos são convertidos sozinhos.
 - **Fonte** em todo efeito com texto (Blob Tracker, VHS, Camcorder, Digicam, Moldura, ASCII), com 10 fontes novas no estilo web dos anos 2000: VT323, Silkscreen, Press Start 2P, DotGothic16, Share Tech Mono, Space Mono, IBM Plex Mono, Major Mono Display, Courier Prime e Cutive Mono.
 - O Blob Tracker exporta exatamente as caixas do preview.
+
+## Novos na 0.8.2
+- **Fileira de ferramentas** na direita (Editar, Recorte, Canvas & Bordas, Máscaras) e **máscaras como objetos da imagem**, usadas por vários efeitos.
+- **Detalhe** (antigo Nitidez): seção **Presença** com **Textura**, **Claridade** e **Remover Névoa**, além da nitidez.
+- **Ajustes Básicos** na ordem do Lightroom: Balanço de Branco (temperatura, matiz), Tom (exposição, contraste, altas luzes, sombras, brancos, pretos) e Cor (vibração, saturação).
+- **HSL**: botão **Por Cor / Por Ajuste**; Por Ajuste mostra uma seção de Matiz, uma de Saturação e uma de Luminância com todas as cores.
+- **Export** novo, com presets de exportação.
+- Aviso de **atualização** ao abrir o app.
+- Dithering, halftone e ASCII **sem padrões falsos** quando o zoom está abaixo de 100%.
+- Presets com **Moldura** vêm com ela **desligada** (olho fechado): ligue o layer para usar a borda.

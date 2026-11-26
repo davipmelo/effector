@@ -38,6 +38,17 @@ fn thumb(ui: &Ui, app: &AppState, rect: Rect, tex: Option<&egui::TextureHandle>,
     );
 }
 
+/// Compact list rows (name only; the description shows on hover).
+const LIST_ROW_H: f32 = 30.0;
+const LIST_THUMB: egui::Vec2 = egui::Vec2 { x: 40.0, y: 24.0 };
+
+/// Small, quiet title over a browser panel, so it is clear which one is open.
+fn panel_title(ui: &mut Ui, title: &str) {
+    egui::Frame::new().inner_margin(egui::Margin { left: 12, right: 12, top: 9, bottom: 0 }).show(ui, |ui| {
+        ui.label(egui::RichText::new(spaced_upper(&tr(title))).font(semibold(9.5)).extra_letter_spacing(0.8).color(text_faint()));
+    });
+}
+
 fn ordered_effects(query: &str) -> Vec<&'static Effect> {
     let q = query.trim().to_lowercase();
     let mut all: Vec<&'static Effect> = vec![];
@@ -73,7 +84,8 @@ pub fn effect_browser(ui: &mut Ui, app: &mut AppState) {
     let mut list_mode = settings::get().browser_list;
     let mut add: Option<&'static str> = None;
     let mouse = ui.ctx().pointer_hover_pos();
-    egui::Frame::new().inner_margin(egui::Margin::symmetric(10, 8)).show(ui, |ui| {
+    panel_title(ui, "Add Effect");
+    egui::Frame::new().inner_margin(egui::Margin { left: 10, right: 10, top: 4, bottom: 8 }).show(ui, |ui| {
         ui.horizontal(|ui| {
             // exactly what the toggle (62) and close button (26) leave: a row even a pixel wider than
             // the sidebar makes egui widen the panel every frame (the sidebar jumped to its max width)
@@ -138,28 +150,28 @@ pub fn effect_browser(ui: &mut Ui, app: &mut AppState) {
                 ui.label(egui::RichText::new(spaced_upper(&tr(cat.label()))).font(section_font()).color(text_dim()));
                 ui.add_space(2.0);
                 if list_mode {
+                    ui.spacing_mut().item_spacing.y = 1.0;
                     for e in items {
                         let hl = mem.highlight.as_deref() == Some(e.id);
                         let w = ui.available_width();
-                        let (r, resp) = ui.allocate_exact_size(vec2(w, 56.0), Sense::click());
+                        let (r, resp) = ui.allocate_exact_size(vec2(w, LIST_ROW_H), Sense::click());
                         if hl {
-                            ui.painter().rect_filled(r, CornerRadius::same(8), row_selected());
+                            ui.painter().rect_filled(r, CornerRadius::same(6), row_selected());
                         } else if resp.hovered() {
-                            ui.painter().rect_filled(r, CornerRadius::same(8), row_hover());
+                            ui.painter().rect_filled(r, CornerRadius::same(6), row_hover());
                         }
-                        let tr_ = Rect::from_min_size(r.min + vec2(6.0, 7.0), vec2(64.0, 42.0));
-                        thumb(ui, app, tr_, app.effect_thumbs.get(e.id), e.symbol, hl || resp.hovered(), 6);
-                        let tx = tr_.right() + 10.0;
-                        let g = ui.painter().layout_job(rich_job(&format!("{}  {}", icon_text(e.symbol), tr(e.name)), medium(12.5), text(), Some(r.right() - tx - 6.0)));
-                        ui.painter().galley(pos2(tx, r.top() + 16.0 - g.size().y / 2.0), g, text());
-                        if !e.summary.is_empty() {
-                            let g = ui.painter().layout(tr(e.summary), regular(11.0), text_dim(), r.right() - tx - 6.0);
-                            ui.painter().with_clip_rect(r).galley(pos2(tx, r.top() + 26.0), g, text_dim());
-                        }
+                        let tr_ = Rect::from_min_size(pos2(r.left() + 4.0, r.center().y - LIST_THUMB.y / 2.0), LIST_THUMB);
+                        thumb(ui, app, tr_, app.effect_thumbs.get(e.id), e.symbol, hl || resp.hovered(), 4);
+                        let tx = tr_.right() + 9.0;
+                        let mut job = rich_job(&format!("{}  {}", icon_text(e.symbol), tr(e.name)), regular(12.0), text(), None);
+                        job.wrap = egui::text::TextWrapping::truncate_at_width(r.right() - tx - 6.0);
+                        let g = ui.painter().layout_job(job);
+                        ui.painter().galley(pos2(tx, r.center().y - g.size().y / 2.0), g, text());
                         if hl && scroll_to_highlight {
                             ui.scroll_to_rect(r, None);
                         }
                         hover_logic(ui, app, &mut mem, &resp, e.id, mouse);
+                        let resp = if e.summary.is_empty() { resp } else { resp.on_hover_text(tr(e.summary)) };
                         if resp.clicked() {
                             add = Some(e.id);
                         }
@@ -265,7 +277,8 @@ pub fn presets_panel(ui: &mut Ui, app: &mut AppState) {
     let panel_rect = ui.available_rect_before_wrap();
     let mouse = ui.ctx().pointer_hover_pos();
     let hovering = mouse.map(|m| panel_rect.contains(m)).unwrap_or(false);
-    egui::Frame::new().inner_margin(egui::Margin::symmetric(10, 8)).show(ui, |ui| {
+    panel_title(ui, "Presets");
+    egui::Frame::new().inner_margin(egui::Margin { left: 10, right: 10, top: 4, bottom: 8 }).show(ui, |ui| {
         ui.horizontal(|ui| {
             let sp = ui.spacing().item_spacing.x;
             let avail = (ui.available_width() - 62.0 - 26.0 - 26.0 - 3.0 * sp).floor().max(40.0);
@@ -369,26 +382,28 @@ pub fn presets_panel(ui: &mut Ui, app: &mut AppState) {
             });
             egui::Frame::new().inner_margin(egui::Margin { left: 12, right: 12, top: 0, bottom: 10 }).show(ui, |ui| {
                 if list_mode {
+                    ui.spacing_mut().item_spacing.y = 1.0;
                     for p in items {
                         let hl = mem.highlight == Some(p.id);
                         let w = ui.available_width();
-                        let (r, resp) = ui.allocate_exact_size(vec2(w, 56.0), Sense::click());
+                        let (r, resp) = ui.allocate_exact_size(vec2(w, LIST_ROW_H), Sense::click());
                         if hl {
-                            ui.painter().rect_filled(r, CornerRadius::same(8), row_selected());
+                            ui.painter().rect_filled(r, CornerRadius::same(6), row_selected());
                         } else if resp.hovered() {
-                            ui.painter().rect_filled(r, CornerRadius::same(8), row_hover());
+                            ui.painter().rect_filled(r, CornerRadius::same(6), row_hover());
                         }
-                        let tr_ = Rect::from_min_size(r.min + vec2(6.0, 7.0), vec2(64.0, 42.0));
-                        preset_thumb(ui, app, tr_, p, hl || resp.hovered());
-                        let tx = tr_.right() + 10.0;
-                        ui.painter().text(pos2(tx, r.top() + 16.0), Align2::LEFT_CENTER, p.display_name(), medium(12.5), text());
-                        let fx: Vec<String> = p.layers.all_effect_ids().iter().filter_map(|i| effects::effect(i).map(|e| tr(e.name))).collect();
-                        let g = ui.painter().layout(fx.join(" · "), regular(11.0), text_dim(), r.right() - tx - 6.0);
-                        ui.painter().with_clip_rect(r).galley(pos2(tx, r.top() + 26.0), g, text_dim());
+                        let tr_ = Rect::from_min_size(pos2(r.left() + 4.0, r.center().y - LIST_THUMB.y / 2.0), LIST_THUMB);
+                        thumb(ui, app, tr_, app.preset_thumbs.get(&p.id), "wand.and.stars", hl || resp.hovered(), 4);
+                        let tx = tr_.right() + 9.0;
+                        let mut job = egui::text::LayoutJob::simple_singleline(p.display_name(), regular(12.0), text());
+                        job.wrap = egui::text::TextWrapping::truncate_at_width(r.right() - tx - 6.0);
+                        let g = ui.painter().layout_job(job);
+                        ui.painter().galley(pos2(tx, r.center().y - g.size().y / 2.0), g, text());
                         if hl && scroll_to {
                             ui.scroll_to_rect(r, None);
                         }
-                        let resp = preset_hover(ui, app, &mut mem, resp, p, mouse);
+                        let fx: Vec<String> = p.layers.all_effect_ids().iter().filter_map(|i| effects::effect(i).map(|e| tr(e.name))).collect();
+                        let resp = preset_hover(ui, app, &mut mem, resp, p, mouse).on_hover_text(fx.join(" · "));
                         if resp.clicked() {
                             apply = Some(p.clone());
                         }

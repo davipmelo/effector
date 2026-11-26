@@ -80,6 +80,18 @@ pub enum DropPosition {
     Inside,
 }
 
+/// Tools of the right sidebar (the icon row under the histogram), Lightroom-style.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum Tool {
+    /// The selected layer's settings (or the image info).
+    #[default]
+    Edit,
+    Crop,
+    /// Canvas & Borders.
+    Canvas,
+    Masks,
+}
+
 #[derive(Clone, Copy, Default)]
 pub struct SyncOptions {
     pub layers: bool,
@@ -171,6 +183,10 @@ pub struct AppState {
     /// The update installer was started: quit now (the UI closes the window).
     pub quit_for_update: bool,
     update_announced: bool,
+    /// The launch check is running: when it finds a new version, the update pop-up opens.
+    pub update_check_auto: bool,
+    /// The "update available" pop-up is open.
+    pub show_update_popup: bool,
     /// Eyedropper armed: the next click on the image sets this layer slider to the depth there.
     pub depth_pick: Option<(Uuid, String)>,
     depth_gen: u64,
@@ -184,6 +200,8 @@ pub struct AppState {
     pub display: Option<T>,
     pub display_original: Option<T>,
     pub crop_view: Option<T>,
+    /// Red overlay of the selected mask (Masks tool).
+    pub mask_view: Option<T>,
     pub display_gen: u64,
     pub is_rendering: bool,
     pub is_cropping: bool,
@@ -194,9 +212,14 @@ pub struct AppState {
     pub show_command_palette: bool,
     pub show_export: bool,
     pub show_settings: bool,
-    pub show_canvas_popover: bool,
+    /// Active tool of the right sidebar.
+    pub tool: Tool,
+    /// Mask selected in the Masks tool.
+    pub selected_mask: Option<Uuid>,
     pub is_exporting: bool,
     pub export_progress: Option<String>,
+    /// Files done / total of the running export.
+    pub export_counter: Option<(Arc<std::sync::atomic::AtomicUsize>, usize)>,
     pub effect_thumbs: HashMap<String, egui::TextureHandle>,
     pub preset_thumbs: HashMap<Uuid, egui::TextureHandle>,
     pub toast: Option<(String, Instant)>,
@@ -258,6 +281,8 @@ impl AppState {
             depth_pick: None,
             quit_for_update: false,
             update_announced: false,
+            update_check_auto: false,
+            show_update_popup: false,
             depth_gen: 0,
             depth_missing_warned: false,
             hide_all_panels: false,
@@ -269,6 +294,7 @@ impl AppState {
             display: None,
             display_original: None,
             crop_view: None,
+            mask_view: None,
             display_gen: 0,
             is_rendering: false,
             is_cropping: false,
@@ -279,9 +305,11 @@ impl AppState {
             show_command_palette: false,
             show_export: false,
             show_settings: false,
-            show_canvas_popover: false,
+            tool: Tool::Edit,
+            selected_mask: None,
             is_exporting: false,
             export_progress: None,
+            export_counter: None,
             effect_thumbs: HashMap::new(),
             preset_thumbs: HashMap::new(),
             toast: None,
@@ -499,7 +527,7 @@ impl AppState {
             t.undo.push(t.state.clone());
             t.redo.clear();
             if opt.layers {
-                let copy: Vec<LayerNode> = st.layers.iter().map(|l| l.reidentified()).collect();
+                let copy: Vec<LayerNode> = st.portable(&st.layers).iter().map(|l| l.reidentified()).collect();
                 t.state.layers = if opt.add_on_top {
                     let mut c = copy;
                     c.extend(t.state.layers.drain(..));
@@ -514,6 +542,7 @@ impl AppState {
             if opt.canvas {
                 t.state.canvas = st.canvas.clone();
             }
+            t.state.adopt_masks();
             t.is_dirty = true;
             touched.push(t.id);
             n += 1;
@@ -543,15 +572,16 @@ impl AppState {
         for t in self.docs.iter_mut().filter(|d| ids.contains(&d.id) && Some(d.id) != active) {
             t.undo.push(t.state.clone());
             t.redo.clear();
-            t.state.layers = c.layers.iter().map(|l| l.reidentified()).collect();
+            t.state.layers = c.portable(&c.layers).iter().map(|l| l.reidentified()).collect();
             t.state.crop = c.crop;
             t.state.canvas = c.canvas.clone();
+            t.state.adopt_masks();
             t.is_dirty = true;
             touched.push(t.id);
         }
         if active.map(|a| ids.contains(&a)).unwrap_or(false) {
             self.edit(None, |s| {
-                s.layers = c.layers.iter().map(|l| l.reidentified()).collect();
+                s.layers = c.portable(&c.layers).iter().map(|l| l.reidentified()).collect();
                 s.crop = c.crop;
                 s.canvas = c.canvas.clone();
             });
@@ -762,6 +792,8 @@ impl AppState {
         let d = &mut self.docs[i];
         let mut s = d.state.clone();
         body(&mut s);
+        // layers that arrive carrying a mask (presets, pasted layers, old depth masks) get a document mask
+        s.adopt_masks();
         if s == d.state {
             return;
         }
@@ -1178,7 +1210,9 @@ impl AppState {
 
     /// Adds layers as a user preset with a thumbnail rendered from the current image.
     pub fn add_preset(&mut self, name: &str, layers: &[LayerNode]) {
-        let thumb = self.render_thumbnail_blocking(layers, 240.0).and_then(|(px, w, h)| {
+        // masks travel inside the preset, so it works on other images too
+        let layers = &self.state().portable(layers);
+        let thumb = self.render_thumbnail_blocking(&resolve_masks(layers, &[]), 240.0).and_then(|(px, w, h)| {
             let rgb: Vec<u8> = px.chunks(4).flat_map(|p| [p[0], p[1], p[2]]).collect();
             let mut out = vec![];
             jpeg_encoder::Encoder::new(&mut out, 80).encode(&rgb, w as u16, h as u16, jpeg_encoder::ColorType::Rgb).ok()?;
@@ -1277,7 +1311,7 @@ impl AppState {
         self.render_started = Instant::now();
         self.is_rendering = true;
         let st = self.state();
-        let mut layers = st.layers.clone();
+        let mut layers = st.render_layers();
         if let Some(solo) = self.solo_id {
             if let Some(n) = layers.find(solo).cloned() {
                 let mut n = n;
@@ -1288,7 +1322,7 @@ impl AppState {
             }
         }
         if let Some(pv) = &self.preview_layers {
-            let mut l = pv.clone();
+            let mut l = resolve_masks(pv, &st.masks);
             l.extend(layers);
             layers = l;
         }
@@ -1305,15 +1339,17 @@ impl AppState {
             show_depth: self.show_depth,
             show_clipping: self.show_clipping,
             want_histogram: settings::get().histogram_open,
+            mask_overlay: self.mask_overlay(),
         });
     }
 
     /// Starts the depth map of the active image when something needs it; re-renders when it lands.
     fn tick_depth(&mut self, ctx: &egui::Context) {
         let Some(src) = self.source() else { return };
-        let mut needs = self.show_depth || self.depth_pick.is_some() || crate::depth::layers_need_depth(self.layers());
+        let st = self.state();
+        let mut needs = self.show_depth || self.depth_pick.is_some() || self.mask_overlay().is_some() || crate::depth::layers_need_depth(&st.render_layers());
         if let Some(pv) = &self.preview_layers {
-            needs |= crate::depth::layers_need_depth(pv);
+            needs |= crate::depth::layers_need_depth(&resolve_masks(pv, &st.masks));
         }
         if needs && crate::depth::get(src.id).is_none() {
             if !crate::depth::model_available() {
@@ -1427,6 +1463,7 @@ impl AppState {
                 if r.crop_view.is_some() {
                     self.crop_view = r.crop_view;
                 }
+                self.mask_view = r.mask_view;
                 self.display_gen += 1;
             }
             self.is_rendering = self.render_pending;
@@ -1494,11 +1531,15 @@ impl AppState {
                 ctx.request_repaint_after(Duration::from_millis(200));
             }
         }
+        if let Some((c, total)) = &self.export_counter {
+            self.export_progress = Some(format!("{} / {total}", c.load(std::sync::atomic::Ordering::Relaxed).min(*total)));
+        }
         if let Some(rx) = &self.export_rx {
             if let Ok(r) = rx.try_recv() {
                 self.export_rx = None;
                 self.is_exporting = false;
                 self.export_progress = None;
+                self.export_counter = None;
                 self.show_export = false;
                 match r {
                     Ok(msg) => self.flash(&msg),
@@ -1523,10 +1564,16 @@ impl AppState {
             }
         }
         self.tick_depth(ctx);
-        if !self.update_announced {
-            if let crate::updater::State::Available { version, .. } = crate::updater::current() {
-                self.update_announced = true;
-                self.flash(&trf("EFFECTOR %@ is available — Settings › Updates", &[&version]));
+        if self.update_check_auto && !self.update_announced {
+            match crate::updater::current() {
+                crate::updater::State::Available { version, .. } => {
+                    self.update_announced = true;
+                    if settings::get().skipped_version != version {
+                        self.show_update_popup = true;
+                    }
+                }
+                crate::updater::State::UpToDate | crate::updater::State::Failed(_) => self.update_announced = true,
+                _ => {}
             }
         }
         self.kick_render();
@@ -1574,6 +1621,7 @@ impl AppState {
         if nodes.is_empty() {
             return;
         }
+        let nodes = self.state().portable(&nodes);
         if let (Ok(json), Ok(mut cb)) = (serde_json::to_string(&nodes), arboard::Clipboard::new()) {
             let _ = cb.set_text(format!("{LAYERS_CLIP_PREFIX}{json}"));
             self.flash(&trf("%d layers copied", &[&nodes.len()]));
@@ -1653,94 +1701,40 @@ impl AppState {
 
     // MARK: - Export
 
-    pub fn export_size(&self, scale: usize) -> (usize, usize) {
-        let (w, h) = self.output_size();
-        (w * scale, h * scale)
-    }
-
-    fn base_name(&self) -> String {
-        self.project_path()
-            .and_then(|p| p.file_stem().map(|s| s.to_string_lossy().to_string()))
-            .or_else(|| self.doc().map(|d| Path::new(&d.file_name).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default()))
-            .unwrap_or_else(|| "image".into())
-    }
-
-    pub fn export(&mut self, format: Format, quality: f64, scale: usize) {
-        let Some(src) = self.source() else { return };
-        let name = format!("{}{}.{}", self.base_name(), if scale > 1 { format!("@{scale}x") } else { String::new() }, format.ext());
-        let Some(path) = rfd::FileDialog::new()
-            .set_file_name(&name)
-            .add_filter(if format == Format::Png { "PNG" } else { "JPEG" }, &[format.ext()])
-            .save_file()
-        else {
-            return;
-        };
-        self.is_exporting = true;
-        let st = self.state();
-        let keep_alpha = src.has_alpha;
-        let (tx, rx) = std::sync::mpsc::channel();
-        self.export_rx = Some(rx);
-        let repaint = self.ctx.clone();
-        std::thread::spawn(move || {
-            let tex = src.make_texture(&st.crop, scale as f64);
-            let extras = crate::renderer::Extras::for_render(&src, &st.crop, &st.layers, true);
-            let out = crate::renderer::Renderer::new(false).render(&st.layers, &tex, crate::worker::content_key(src.id, &st.crop), true, st.active_canvas(), extras);
-            let r = imageio::write(&out, &path, format, quality, keep_alpha)
-                .map(|_| trf("Exported %@", &[&path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default()]));
-            let _ = tx.send(r);
-            repaint.request_repaint();
-        });
-    }
-
-    /// Exports several images (each with its own effects) into a folder.
-    pub fn export_batch(&mut self, ids: &HashSet<Uuid>, format: Format, quality: f64, scale: usize, suffix: &str) {
-        let Some(dir) = rfd::FileDialog::new().set_title(trf("Choose a folder for %d images", &[&ids.len()])).pick_folder() else { return };
-        let jobs: Vec<(Arc<Vec<u8>>, String, Option<Arc<SourceImage>>, DocumentState)> = self
-            .docs
+    /// The images to export (in filmstrip order), with what the export needs from each.
+    pub fn export_jobs(&self, ids: &HashSet<Uuid>) -> Vec<crate::export::Job> {
+        self.docs
             .iter()
             .filter(|d| ids.contains(&d.id))
-            .map(|d| (d.data.clone(), d.file_name.clone(), d.source.clone(), d.state.clone()))
-            .collect();
+            .map(|d| crate::export::Job {
+                name: d.file_name.clone(),
+                data: d.data.clone(),
+                source: d.source.clone(),
+                state: d.state.clone(),
+                file_path: d.file_path.clone(),
+                project_path: d.project_path.clone(),
+                full_size: d.source.as_ref().map(|s| crate::export::full_size(s, &d.state)).unwrap_or((0, 0)),
+                taken: crate::exif::date_taken(&d.data),
+            })
+            .collect()
+    }
+
+    /// Exports in the background; the dialog closes and a message shows when it is done.
+    pub fn start_export(&mut self, s: crate::export::ExportSettings, jobs: Vec<crate::export::Job>, planned: Vec<crate::export::Planned>, existing: crate::export::Existing) {
+        if planned.is_empty() {
+            return;
+        }
         self.is_exporting = true;
-        self.export_progress = Some(format!("0 / {}", jobs.len()));
+        let total = planned.len();
+        let progress = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        self.export_counter = Some((progress.clone(), total));
+        self.export_progress = Some(format!("0 / {total}"));
         let (tx, rx) = std::sync::mpsc::channel();
         self.export_rx = Some(rx);
         let repaint = self.ctx.clone();
-        let suffix = suffix.to_string();
-        let progress = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         std::thread::spawn(move || {
-            let n = jobs.len();
-            let mut failed: Vec<String> = vec![];
-            for (data, name, src, st) in jobs {
-                let src = match src {
-                    Some(s) => s,
-                    None => match SourceImage::load_data(data, &name) {
-                        Ok(s) => Arc::new(s),
-                        Err(_) => {
-                            failed.push(name);
-                            continue;
-                        }
-                    },
-                };
-                let tex = src.make_texture(&st.crop, scale as f64);
-                let extras = crate::renderer::Extras::for_render(&src, &st.crop, &st.layers, true);
-                let out = crate::renderer::Renderer::new(false).render(&st.layers, &tex, crate::worker::content_key(src.id, &st.crop), true, st.active_canvas(), extras);
-                let stem = Path::new(&name).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
-                let base = format!("{stem}{suffix}{}", if scale > 1 { format!("@{scale}x") } else { String::new() });
-                let mut path = dir.join(format!("{base}.{}", format.ext()));
-                let mut k = 2;
-                while path.exists() {
-                    path = dir.join(format!("{base}-{k}.{}", format.ext()));
-                    k += 1;
-                }
-                if imageio::write(&out, &path, format, quality, src.has_alpha && st.active_canvas().is_none()).is_err() {
-                    failed.push(name);
-                }
-                progress.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                repaint.request_repaint();
-            }
-            let _ = open::that(&dir);
-            let _ = tx.send(if failed.is_empty() { Ok(trf("Exported %d images", &[&n])) } else { Err(failed.join("\n")) });
+            let r = crate::export::run(&s, jobs, planned, existing, progress);
+            let _ = tx.send(r);
             repaint.request_repaint();
         });
     }
@@ -1754,8 +1748,9 @@ impl AppState {
         let repaint = self.ctx.clone();
         std::thread::spawn(move || {
             let tex = src.make_texture(&st.crop, 1.0);
-            let extras = crate::renderer::Extras::for_render(&src, &st.crop, &st.layers, true);
-            let out = crate::renderer::Renderer::new(false).render(&st.layers, &tex, crate::worker::content_key(src.id, &st.crop), true, st.active_canvas(), extras);
+            let layers = st.render_layers();
+            let extras = crate::renderer::Extras::for_render(&src, &st.crop, &layers, true);
+            let out = crate::renderer::Renderer::new(false).render(&layers, &tex, crate::worker::content_key(src.id, &st.crop), true, st.active_canvas(), extras);
             let px = imageio::read_rgba8(&out);
             let _ = tx.send(Some((px, out.width(), out.height())));
             repaint.request_repaint();
@@ -1794,7 +1789,7 @@ impl AppState {
         let manifest = ProjectManifest { version: 1, app: "EFFECTOR".into(), original_file_name: d.file_name.clone(), state: d.state.clone() };
         let json = serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?;
         let ext = Path::new(&d.file_name).extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_else(|| "png".into());
-        let thumb = self.render_thumbnail_blocking(&d.state.layers, 512.0).and_then(|(px, w, h)| imageio::encode(&px, w, h, Format::Png, 1.0, true).ok());
+        let thumb = self.render_thumbnail_blocking(&d.state.render_layers(), 512.0).and_then(|(px, w, h)| imageio::encode(&px, w, h, Format::Png, 1.0, true).ok());
         crate::project::write(path, &json, &format!("original.{ext}"), &d.data, thumb.as_deref())
     }
 
@@ -1814,6 +1809,7 @@ impl AppState {
         }
         self.crop_draft = self.state().crop;
         self.is_cropping = true;
+        self.tool = Tool::Crop;
         self.show_original = false;
         self.request_render();
     }
@@ -1821,12 +1817,128 @@ impl AppState {
     pub fn commit_crop(&mut self) {
         let c = self.crop_draft;
         self.is_cropping = false;
+        if self.tool == Tool::Crop {
+            self.tool = Tool::Edit;
+        }
         self.edit(None, |s| s.crop = c);
         self.set_zoom(None);
         self.regenerate_thumbnails();
     }
 
-    pub fn cancel_crop(&mut self) { self.is_cropping = false; }
+    pub fn cancel_crop(&mut self) {
+        self.is_cropping = false;
+        if self.tool == Tool::Crop {
+            self.tool = Tool::Edit;
+        }
+        self.request_render();
+    }
+
+    // MARK: - Tools (right sidebar)
+
+    /// Switches the right sidebar tool. Leaving Crop applies the crop (like Lightroom).
+    pub fn set_tool(&mut self, t: Tool) {
+        if t == self.tool && !(t == Tool::Crop && !self.is_cropping) {
+            return;
+        }
+        if self.is_cropping && t != Tool::Crop {
+            self.commit_crop();
+        }
+        self.tool = t;
+        match t {
+            Tool::Crop => {
+                if !self.is_cropping {
+                    self.begin_crop();
+                }
+            }
+            Tool::Masks => {
+                let st = self.state();
+                if self.selected_mask.map(|id| st.mask(id).is_none()).unwrap_or(true) {
+                    // the mask of the selected layer, else the first one
+                    let from_layer = self.selected_layer().and_then(|l| l.mask).map(|r| r.id).filter(|id| st.mask(*id).is_some());
+                    self.selected_mask = from_layer.or(st.masks.first().map(|m| m.id));
+                }
+            }
+            _ => {}
+        }
+        self.request_render();
+    }
+
+    /// Same tool again goes back to Edit (shortcuts toggle, like Lightroom).
+    pub fn toggle_tool(&mut self, t: Tool) {
+        if !self.has_image() {
+            return;
+        }
+        self.set_tool(if self.tool == t { Tool::Edit } else { t });
+    }
+
+    // MARK: - Masks
+
+    /// What the Masks tool shows as a red overlay (the selected mask), if anything.
+    pub fn mask_overlay(&self) -> Option<Mask> {
+        if self.tool != Tool::Masks || !settings::get().mask_overlay {
+            return None;
+        }
+        let id = self.selected_mask?;
+        self.state().mask(id).cloned().filter(|m| m.is_active())
+    }
+
+    /// Creates a mask with one part; when `apply_to` is given, that layer uses it.
+    pub fn create_mask(&mut self, shape: MaskShape, apply_to: Option<Uuid>) -> Uuid {
+        let name = self.state().new_mask_name(&tr("Mask"));
+        let m = Mask { id: Uuid::new_v4(), name, parts: vec![MaskPart::new(shape, MaskMode::Add)] };
+        let id = m.id;
+        self.edit(None, |s| {
+            s.masks.push(m);
+            if let Some(l) = apply_to {
+                s.layers.update(l, &mut |n| n.mask = Some(MaskRef { id, invert: false }));
+            }
+        });
+        self.selected_mask = Some(id);
+        id
+    }
+
+    pub fn update_mask(&mut self, id: Uuid, coalesce: Option<String>, body: impl FnOnce(&mut Mask)) {
+        self.edit(coalesce, |s| {
+            if let Some(m) = s.masks.iter_mut().find(|m| m.id == id) {
+                body(m);
+            }
+        });
+    }
+
+    /// Deletes a mask; the layers that used it go back to the whole image.
+    pub fn delete_mask(&mut self, id: Uuid) {
+        self.edit(None, |s| {
+            s.masks.retain(|m| m.id != id);
+            fn clear(nodes: &mut [LayerNode], id: Uuid) {
+                for n in nodes.iter_mut() {
+                    if n.mask.map(|r| r.id == id).unwrap_or(false) {
+                        n.mask = None;
+                    }
+                    clear(&mut n.children, id);
+                }
+            }
+            clear(&mut s.layers, id);
+        });
+        if self.selected_mask == Some(id) {
+            self.selected_mask = self.state().masks.first().map(|m| m.id);
+        }
+    }
+
+    pub fn duplicate_mask(&mut self, id: Uuid) {
+        let Some(mut m) = self.state().mask(id).cloned() else { return };
+        let copy_word = tr("copy");
+        m.id = Uuid::new_v4();
+        m.name = format!("{} {}", m.name, copy_word);
+        for p in m.parts.iter_mut() {
+            p.id = Uuid::new_v4();
+        }
+        let nid = m.id;
+        self.edit(None, |s| s.masks.push(m));
+        self.selected_mask = Some(nid);
+    }
+
+    /// Links a layer to a mask (None = whole image).
+    pub fn set_layer_mask(&mut self, layer: Uuid, mask: Option<MaskRef>) { self.update_layer(layer, None, |n| n.mask = mask); }
     pub fn reset_crop(&mut self) { self.crop_draft = CropRect::default(); }
 
     // MARK: - Messages
@@ -1873,13 +1985,10 @@ impl AppState {
                     }
                 }
             }
-            Action::Crop => {
-                if self.is_cropping {
-                    self.commit_crop()
-                } else {
-                    self.begin_crop()
-                }
-            }
+            Action::Crop => self.toggle_tool(Tool::Crop),
+            Action::ToolEdit => self.set_tool(Tool::Edit),
+            Action::ToolCanvas => self.toggle_tool(Tool::Canvas),
+            Action::ToolMasks => self.toggle_tool(Tool::Masks),
             Action::Group => self.group_selected(),
             Action::Ungroup => self.ungroup_selected(),
             Action::Duplicate => self.duplicate_selected(),

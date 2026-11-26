@@ -144,11 +144,13 @@ pub fn get_blocking(src: &SourceImage) -> Option<Arc<DepthMap>> {
 
 // MARK: - Which layers use depth
 
-/// Does this stack need a depth map to render?
+/// Does this stack need a depth map to render? (Pass resolved layers: `DocumentState::render_layers`.)
 pub fn layers_need_depth(layers: &[LayerNode]) -> bool {
     layers.iter().any(|n| {
         n.enabled
             && (n.depth_mask.as_ref().map(|m| m.enabled).unwrap_or(false)
+                || n.resolved_mask.as_ref().map(|r| r.mask.needs_depth()).unwrap_or(false)
+                || n.embedded_mask.as_ref().map(|m| m.needs_depth()).unwrap_or(false)
                 || (n.is_group && layers_need_depth(&n.children))
                 || (!n.is_group && crate::effects::effect(&n.effect_id).map(|e| (e.uses_depth)(&n.params)).unwrap_or(false)))
     })

@@ -52,6 +52,12 @@ pub const CATEGORIES: [&str; 10] = [
 fn make(name: &str, category: &str, layers_bottom_first: Vec<LayerNode>) -> Preset {
     let mut layers = layers_bottom_first;
     layers.reverse();
+    // borders come with the preset but start hidden (eye off): turn the Frame layer on to use them
+    for l in layers.iter_mut() {
+        if l.effect_id == "frame" {
+            l.enabled = false;
+        }
+    }
     Preset { id: Uuid::new_v4(), name: name.into(), layers, is_factory: true, thumbnail: None, category: Some(category.into()) }
 }
 

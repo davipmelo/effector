@@ -37,7 +37,7 @@ wgpu = { version = "30.0.2", features = ["glsl", "naga-ir"] }
 zip = "9.8.2"
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.62.2", features = ["Win32_Graphics_Imaging", "Win32_System_Com", "Win32_Foundation"] }
+windows = { version = "0.62.2", features = ["Win32_Graphics_Imaging", "Win32_System_Com", "Win32_Foundation", "Win32_System_SystemInformation"] }
 
 [profile.release]
 opt-level = 3

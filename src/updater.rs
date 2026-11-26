@@ -29,6 +29,11 @@ fn state() -> &'static Mutex<State> {
 pub fn current() -> State { state().lock().unwrap_or_else(|e| e.into_inner()).clone() }
 fn set(s: State) { *state().lock().unwrap_or_else(|e| e.into_inner()) = s; }
 
+/// Dev/test (`update` screenshot step): pretends a release is available.
+pub fn debug_set_available(version: &str, notes: &str) {
+    set(State::Available { version: version.into(), notes: notes.into(), url: String::new(), size: 48_000_000, page: String::new() });
+}
+
 /// "0.10.2" → (0, 10, 2)
 pub fn parse_version(v: &str) -> (u64, u64, u64) {
     let mut it = v.trim().trim_start_matches('v').split(|c: char| c == '.' || c == '-').map(|x| x.parse::<u64>().unwrap_or(0));

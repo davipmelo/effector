@@ -27,6 +27,8 @@ pub struct RenderRequest {
     pub show_clipping: bool,
     /// Measure the histogram of the result (only while the histogram panel is open).
     pub want_histogram: bool,
+    /// Masks tool: also render this mask as a red overlay (`RenderResult::mask_view`).
+    pub mask_overlay: Option<Mask>,
 }
 
 pub struct RenderResult {
@@ -38,6 +40,8 @@ pub struct RenderResult {
     pub display_original: T,
     pub crop_view: Option<T>,
     pub histogram: Option<Arc<crate::histogram::Histogram>>,
+    /// Red overlay of the selected mask over the photo (cropped image, without the canvas borders).
+    pub mask_view: Option<T>,
 }
 
 /// What the render thread answers: a finished render, or the generation that failed (the
@@ -103,6 +107,19 @@ impl RenderWorker {
                                 dc.flush();
                             }
                         }
+                        let mut mask_view = None;
+                        if let Some(m) = &req.mask_overlay {
+                            if let Some(map) = crate::depth::get(req.source.id) {
+                                let mut dc = Ctx::new(1.0, src_tex.clone(), false);
+                                dc.depth_src = Some(crate::depth::DepthSrc { map, crop: req.crop });
+                                if let Some(d) = dc.depth() {
+                                    if let Some(t) = crate::renderer::mask_texture(m, false, &d, &mut dc) {
+                                        mask_view = Some(dc.apply("k_maskview", &[&t], &[0.55]));
+                                    }
+                                }
+                                dc.flush();
+                            }
+                        }
                         let display_original = to_display(&mut ctx, &src_tex);
                         let crop_view = if req.want_crop_view {
                             match &crop_cache {
@@ -120,7 +137,7 @@ impl RenderWorker {
                         };
                         ctx.flush();
                         crate::gpu::gpu().trim_pool(512 << 20);
-                        RenderResult { generation: req.generation, output: out, original: src_tex, display, display_original, crop_view, histogram }
+                        RenderResult { generation: req.generation, output: out, original: src_tex, display, display_original, crop_view, histogram, mask_view }
                     }));
                     match res {
                         Ok(r) => {
@@ -233,6 +250,7 @@ impl ThumbWorker {
                             let tex = source.make_texture(&crop, s);
                             let mut r = Renderer::new(false);
                             for (id, layers) in presets {
+                                let layers = resolve_masks(&layers, &[]);
                                 let extras = crate::renderer::Extras::for_render(&source, &crop, &layers, false);
                                 let out = r.render(&layers, &tex, 0, false, None, extras);
                                 let px = imageio::read_rgba8(&out);
@@ -248,7 +266,7 @@ impl ThumbWorker {
                                     Err(_) => return,
                                 },
                             };
-                            let (px, w, h) = render_small(&src, &state.crop, &state.layers, 180.0, state.active_canvas());
+                            let (px, w, h) = render_small(&src, &state.crop, &state.render_layers(), 180.0, state.active_canvas());
                             let _ = res_tx.send(ThumbResult::Strip { doc, rgba: px, w, h });
                             repaint.request_repaint();
                         }

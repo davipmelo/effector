@@ -45,18 +45,39 @@ pub fn vignette() -> Effect {
     ])
 }
 
+/// "Detail" (id `sharpen`, kept for older projects): Texture, Clarity and Dehaze, then sharpening.
 pub fn sharpen() -> Effect {
-    Effect::new("sharpen", "Sharpen", Category::Adjust, |input, p, ctx| {
-        let b = ctx.blur(input, ctx.px(p.num("radius", 1.5)).max(0.35));
-        ctx.apply("k_unsharp", &[input, &b], &[p.fd("amount", 80.0) / 100.0, p.fd("threshold", 2.0) / 100.0, if p.bool_or("luma", true) { 1.0 } else { 0.0 }])
+    Effect::new("sharpen", "Detail", Category::Adjust, |input, p, ctx| {
+        let (tx, cl, dh) = (p.f("texture") / 100.0, p.f("clarity") / 100.0, p.f("dehaze") / 100.0);
+        let mut cur = input.clone();
+        if tx.abs() + cl.abs() + dh.abs() > 0.001 {
+            let fine = if tx.abs() > 0.001 { ctx.blur(input, ctx.px(2.5).max(0.8)) } else { input.clone() };
+            let large = if cl.abs() > 0.001 { ctx.blur(input, ctx.px(30.0).max(4.0)) } else { input.clone() };
+            let haze = if dh > 0.001 {
+                let m = ctx.apply("k_minch", &[input], &[]);
+                ctx.blur(&m, ctx.px(12.0).max(2.0))
+            } else {
+                input.clone()
+            };
+            cur = ctx.apply("k_presence", &[input, &fine, &large, &haze], &[tx, cl, dh]);
+        }
+        let amount = p.fd("amount", 80.0) / 100.0;
+        if amount <= 0.001 {
+            return cur;
+        }
+        let b = ctx.blur(&cur, ctx.px(p.num("radius", 1.5)).max(0.35));
+        ctx.apply("k_unsharp", &[&cur, &b], &[amount, p.fd("threshold", 2.0) / 100.0, if p.bool_or("luma", true) { 1.0 } else { 0.0 }])
     })
     .symbol("triangle")
-    .summary("Unsharp mask. Push it for the crunchy over-sharpened digicam look.")
+    .summary("Texture, clarity, dehaze and sharpening. Push the sharpening for the crunchy over-sharpened digicam look.")
     .params(vec![
-        s("amount", "Amount", 0.0, 500.0, 80.0).step(1.0).unit("%").curve(1.5),
-        s("radius", "Radius", 0.3, 20.0, 1.5).step(0.05).curve(2.0),
-        s("threshold", "Threshold", 0.0, 50.0, 2.0).step(0.5).unit("%"),
-        ParamDef::toggle("luma", "Luminance Only", true),
+        s("texture", "Texture", -100.0, 100.0, 0.0).step(1.0).sec("Presence"),
+        s("clarity", "Clarity", -100.0, 100.0, 0.0).step(1.0).sec("Presence"),
+        s("dehaze", "Dehaze", -100.0, 100.0, 0.0).step(1.0).sec("Presence"),
+        s("amount", "Amount", 0.0, 500.0, 80.0).step(1.0).unit("%").curve(1.5).sec("Sharpening"),
+        s("radius", "Radius", 0.3, 20.0, 1.5).step(0.05).curve(2.0).sec("Sharpening"),
+        s("threshold", "Threshold", 0.0, 50.0, 2.0).step(0.5).unit("%").sec("Sharpening"),
+        ParamDef::toggle("luma", "Luminance Only", true).sec("Sharpening"),
     ])
 }
 

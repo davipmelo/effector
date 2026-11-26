@@ -166,11 +166,11 @@ pub enum Action {
     PrevImage, NextImage, Filmstrip, SyncSettings, CloseImage,
     ZoomIn, ZoomOut, ZoomFit, Zoom100, Present, Compare, Randomize, CopyLayers, PasteLayers, ShowLayers, ShowPresets,
     CopySettings, PasteSettings, ResetSettings, TogglePanels, ToggleAllPanels, SelectAll, Deselect, ShowDepth,
-    ShowClipping, ToggleHistogram,
+    ShowClipping, ToggleHistogram, ToolEdit, ToolCanvas, ToolMasks,
 }
 
 impl Action {
-    pub const ALL: [Action; 45] = [
+    pub const ALL: [Action; 48] = [
         Action::Open, Action::Save, Action::SaveAs, Action::Export, Action::CopyResult, Action::Paste, Action::Undo, Action::Redo,
         Action::CommandPalette, Action::AddEffect, Action::BeforeAfter, Action::Crop, Action::Group, Action::Ungroup, Action::Duplicate,
         Action::Delete, Action::ToggleVisibility, Action::MoveUp, Action::MoveDown, Action::PrevImage, Action::NextImage,
@@ -178,6 +178,7 @@ impl Action {
         Action::Present, Action::Compare, Action::Randomize, Action::CopyLayers, Action::PasteLayers, Action::ShowLayers,
         Action::ShowPresets, Action::CopySettings, Action::PasteSettings, Action::ResetSettings, Action::TogglePanels,
         Action::ToggleAllPanels, Action::SelectAll, Action::Deselect, Action::ShowDepth, Action::ShowClipping, Action::ToggleHistogram,
+        Action::ToolEdit, Action::ToolCanvas, Action::ToolMasks,
     ];
 
     /// Stable id (same raw values as the macOS app).
@@ -194,7 +195,8 @@ impl Action {
             ShowLayers => "showLayers", ShowPresets => "showPresets", CopySettings => "copySettings",
             PasteSettings => "pasteSettings", ResetSettings => "resetSettings", TogglePanels => "togglePanels",
             ToggleAllPanels => "toggleAllPanels", SelectAll => "selectAll", Deselect => "deselect", ShowDepth => "showDepth",
-            ShowClipping => "showClipping", ToggleHistogram => "toggleHistogram",
+            ShowClipping => "showClipping", ToggleHistogram => "toggleHistogram", ToolEdit => "toolEdit",
+            ToolCanvas => "toolCanvas", ToolMasks => "toolMasks",
         }
     }
 
@@ -246,6 +248,9 @@ impl Action {
             ShowDepth => "View Depth Map",
             ShowClipping => "Show Clipping",
             ToggleHistogram => "Show / Hide Histogram",
+            ToolEdit => "Edit Tool",
+            ToolCanvas => "Canvas & Borders",
+            ToolMasks => "Masks",
         }
     }
 
@@ -299,6 +304,9 @@ impl Action {
             ShowDepth => k("d", false, false, false),
             ShowClipping => k("j", false, false, false),
             ToggleHistogram => k("h", true, true, false),
+            ToolEdit => k("e", false, false, false),
+            ToolCanvas => k("b", false, true, false),
+            ToolMasks => k("w", false, true, false),
         }
     }
 

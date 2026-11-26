@@ -72,14 +72,14 @@ pub fn basic() -> Effect {
     .symbol("slider.horizontal.3")
     .summary("Exposure, contrast, highlights, shadows, white balance and saturation.")
     .params(vec![
+        s("temperature", "Temperature", -100.0, 100.0, 0.0).step(1.0).sec("White Balance").track(vec![hex("#3A7BFF"), hex("#9A9A9A"), hex("#FFB020")]),
+        s("tint", "Tint", -100.0, 100.0, 0.0).step(1.0).sec("White Balance").track(vec![hex("#2FBF5A"), hex("#9A9A9A"), hex("#E040C0")]),
         s("exposure", "Exposure", -4.0, 4.0, 0.0).step(0.01).unit(" EV").sec("Tone"),
         s("contrast", "Contrast", -100.0, 100.0, 0.0).step(1.0).sec("Tone"),
         s("highlights", "Highlights", -100.0, 100.0, 0.0).step(1.0).sec("Tone"),
         s("shadows", "Shadows", -100.0, 100.0, 0.0).step(1.0).sec("Tone"),
         s("whites", "Whites", -100.0, 100.0, 0.0).step(1.0).sec("Tone"),
         s("blacks", "Blacks", -100.0, 100.0, 0.0).step(1.0).sec("Tone"),
-        s("temperature", "Temperature", -100.0, 100.0, 0.0).step(1.0).sec("Color").track(vec![hex("#3A7BFF"), hex("#9A9A9A"), hex("#FFB020")]),
-        s("tint", "Tint", -100.0, 100.0, 0.0).step(1.0).sec("Color").track(vec![hex("#2FBF5A"), hex("#9A9A9A"), hex("#E040C0")]),
         s("vibrance", "Vibrance", -100.0, 100.0, 0.0).step(1.0).sec("Color"),
         s("saturation", "Saturation", -100.0, 100.0, 0.0).step(1.0).sec("Color"),
     ])

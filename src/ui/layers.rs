@@ -316,6 +316,14 @@ fn layer_row(ui: &mut Ui, app: &mut AppState, node: &LayerNode, depth: usize, di
         right -= g.size().x + 6.0;
         ui.painter().galley(pos2(right, cy - g.size().y / 2.0), g, text_faint());
     }
+    // limited by a mask (Masks tool)
+    if let Some(m) = node.mask.and_then(|r| app.state().mask(r.id).map(|m| (m.name.clone(), r.invert))) {
+        right -= 16.0;
+        let mr = Rect::from_center_size(pos2(right + 7.0, cy), vec2(14.0, 18.0));
+        paint_icon(ui, mr, "circle.dashed.inset.filled", 11.0, with_alpha(accent_text(), 0.85 * opacity));
+        let tip = if m.1 { crate::l10n::trf("Mask: %@ (inverted)", &[&m.0]) } else { crate::l10n::trf("Mask: %@", &[&m.0]) };
+        ui.interact(mr, Id::new(("maskbadge", node.id)), Sense::hover()).on_hover_text(tip);
+    }
     // name / rename field
     let name_rect = Rect::from_min_max(pos2(x, rect.top() + 6.0), pos2(right - 4.0, rect.bottom() - 6.0));
     if let Some(mut text) = renaming.take() {

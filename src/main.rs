@@ -7,6 +7,7 @@ mod canvas;
 mod depth;
 mod effects;
 mod exif;
+mod export;
 mod gpu;
 mod histogram;
 mod imageio;

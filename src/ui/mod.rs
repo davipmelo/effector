@@ -4,12 +4,14 @@
 pub mod browsers;
 pub mod canvas_view;
 pub mod dialogs;
+pub mod export_dialog;
 pub mod filmstrip;
 pub mod histogram;
 pub mod icons;
 pub mod inspector;
 pub mod layers;
 pub mod theme;
+pub mod tools;
 pub mod widgets;
 
 use std::path::PathBuf;
@@ -61,6 +63,7 @@ pub struct EffectorUi {
     out_tex: DisplayTex,
     orig_tex: DisplayTex,
     crop_tex: DisplayTex,
+    mask_tex: DisplayTex,
     checker: egui::TextureHandle,
     last_theme: Option<bool>,
     last_title: String,
@@ -68,7 +71,6 @@ pub struct EffectorUi {
     pending_open: Vec<PathBuf>,
     confirm_quit: bool,
     allow_close: bool,
-    canvas_btn_rect: Rect,
     presets_rect: Rect,
     filmstrip_rect: Rect,
     /// Where the last click happened: Delete acts on that area (images in the filmstrip, else layers).
@@ -106,6 +108,7 @@ impl EffectorUi {
             out_tex: DisplayTex::new(),
             orig_tex: DisplayTex::new(),
             crop_tex: DisplayTex::new(),
+            mask_tex: DisplayTex::new(),
             checker,
             last_theme: None,
             last_title: String::new(),
@@ -113,7 +116,6 @@ impl EffectorUi {
             pending_open: open,
             confirm_quit: false,
             allow_close: false,
-            canvas_btn_rect: Rect::NOTHING,
             presets_rect: Rect::NOTHING,
             filmstrip_rect: Rect::NOTHING,
             strip_focused: false,
@@ -180,7 +182,8 @@ impl EffectorUi {
                 continue;
             }
             if !combo.has_modifier() {
-                if picker_open || focused || self.app.show_command_palette || self.app.is_cropping {
+                let tool_key = matches!(action, Action::Crop | Action::ToolEdit | Action::ToolCanvas | Action::ToolMasks);
+                if picker_open || focused || self.app.show_command_palette || (self.app.is_cropping && !tool_key) {
                     continue;
                 }
                 // while a browser panel is open, plain keys belong to it
@@ -258,14 +261,6 @@ impl EffectorUi {
                 if tool_button(ui, "rectangle.split.2x1", &format!("{}  {}", tr("Split Before / After"), shortcuts::display(Action::Compare)), has, self.app.compare_split).clicked() {
                     self.app.perform(Action::Compare, &ctx);
                 }
-                if tool_button(ui, "crop", &format!("{}  {}", tr("Crop"), shortcuts::display(Action::Crop)), has, self.app.is_cropping).clicked() {
-                    self.app.perform(Action::Crop, &ctx);
-                }
-                let cb = tool_button(ui, "aspectratio", &tr("Canvas & Borders: fit the image in another aspect ratio (Instagram etc.)"), has, self.app.show_canvas_popover);
-                self.canvas_btn_rect = cb.rect;
-                if cb.clicked() {
-                    self.app.show_canvas_popover = !self.app.show_canvas_popover;
-                }
                 if tool_button(ui, "arrow.uturn.forward", &format!("{}  {}", tr("Redo"), shortcuts::display(Action::Redo)), self.app.can_redo(), false).clicked() {
                     self.app.redo();
                 }
@@ -319,7 +314,11 @@ impl EffectorUi {
                 item(ui, app, Action::Deselect, has);
             });
             ui.menu_button(tr("Image"), |ui| {
+                item(ui, app, Action::ToolEdit, has);
                 item(ui, app, Action::Crop, has);
+                item(ui, app, Action::ToolCanvas, has);
+                item(ui, app, Action::ToolMasks, has);
+                ui.separator();
                 item(ui, app, Action::BeforeAfter, has);
                 item(ui, app, Action::Compare, has);
                 ui.separator();
@@ -608,11 +607,13 @@ impl eframe::App for EffectorUi {
         self.app.pixels_per_point = ctx.pixels_per_point() as f64;
         if self.first_frame {
             self.first_frame = false;
-            // automatic update check (at most once a day, never in test runs)
+            // automatic update check every time the app opens (never in test runs); a new version
+            // opens the update pop-up
             let st = settings::get();
             let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
-            if st.check_updates && self.shot.is_none() && now.saturating_sub(st.last_update_check) > 20 * 3600 {
+            if st.check_updates && self.shot.is_none() {
                 settings::update(|s| s.last_update_check = now);
+                self.app.update_check_auto = true;
                 let c = ctx.clone();
                 crate::updater::check(move || c.request_repaint());
             }
@@ -653,7 +654,7 @@ impl eframe::App for EffectorUi {
         self.handle_keys(&ctx);
 
         // GPU textures → egui
-        let mut texs = canvas_view::CanvasTextures { output: None, original: None, crop: None, checker: self.checker.id(), out_size: vec2(0.0, 0.0) };
+        let mut texs = canvas_view::CanvasTextures { output: None, original: None, crop: None, mask: None, checker: self.checker.id(), out_size: vec2(0.0, 0.0) };
         if let Some(rs) = frame.wgpu_render_state() {
             let zoom_px = self.app.display_zoom() * self.app.pixels_per_point;
             let nearest = self.app.output.as_ref().map(|o| {
@@ -664,6 +665,8 @@ impl eframe::App for EffectorUi {
             texs.output = self.out_tex.sync(rs, self.app.display.as_ref(), nearest);
             texs.original = self.orig_tex.sync(rs, self.app.display_original.as_ref(), nearest);
             texs.crop = self.crop_tex.sync(rs, self.app.crop_view.as_ref(), false);
+            let mask = if self.app.tool == crate::app::Tool::Masks { self.app.mask_view.as_ref() } else { None };
+            texs.mask = self.mask_tex.sync(rs, mask, false);
         }
 
         let presenting = self.app.presenting;
@@ -690,7 +693,8 @@ impl eframe::App for EffectorUi {
                     .frame(egui::Frame::new().fill(panel_bg()))
                     .show(ui, |ui| {
                         histogram::panel(ui, &mut self.app);
-                        inspector::inspector(ui, &mut self.app);
+                        tools::tool_strip(ui, &mut self.app);
+                        tools::tool_panel(ui, &mut self.app);
                     });
                 let (lw, rw) = (left.response.rect.width() as f64, right.response.rect.width() as f64);
                 if (lw - s.left_width).abs() > 1.0 || (rw - s.right_width).abs() > 1.0 {
@@ -718,16 +722,16 @@ impl eframe::App for EffectorUi {
         if self.app.show_command_palette {
             browsers::command_palette(&ctx, &mut self.app);
         }
-        if self.app.show_canvas_popover && self.app.has_image() {
-            dialogs::canvas_popover(&ctx, &mut self.app, self.canvas_btn_rect);
-        }
         if self.app.show_export {
-            dialogs::export_sheet(&ctx, &mut self.app);
+            export_dialog::export_dialog(&ctx, &mut self.app);
         }
         if self.app.show_settings {
             dialogs::settings_window(&ctx, &mut self.app);
         }
         dialogs::dialogs(&ctx, &mut self.app);
+        if self.app.show_update_popup && self.app.dialog.is_none() && !self.app.show_export {
+            dialogs::update_popup(&ctx, &mut self.app);
+        }
         if self.confirm_quit {
             self.quit_dialog(&ctx);
         }
@@ -790,18 +794,33 @@ impl EffectorUi {
                 "dm" => {
                     let v: Vec<f64> = arg.split('/').filter_map(|x| x.parse().ok()).collect();
                     if let Some(id) = self.app.selected_id {
-                        self.app.update_layer(id, None, |n| {
-                            n.depth_mask = Some(crate::model::DepthMask { enabled: true, from: v.first().copied().unwrap_or(0.0), to: v.get(1).copied().unwrap_or(0.45), ..Default::default() })
-                        });
+                        let shape = crate::model::MaskShape::Depth { from: v.first().copied().unwrap_or(0.0), to: v.get(1).copied().unwrap_or(0.45), feather: 0.12 };
+                        self.app.create_mask(shape, Some(id));
                     }
                 }
                 "presets" => self.app.set_show_presets(true),
                 "palette" => self.app.show_command_palette = true,
                 "export" => self.app.show_export = true,
                 "settings" => self.app.show_settings = true,
+                "update" => {
+                    crate::updater::debug_set_available("9.9.9", "## Patch notes
+
+### Novidades
+- **Uma coisa nova** muito boa.
+- Outra coisa.
+
+---
+
+## Instalação
+...");
+                    self.app.show_update_popup = true;
+                }
                 "crop" => self.app.begin_crop(),
                 "split" => self.app.compare_split = true,
-                "canvas" => self.app.show_canvas_popover = true,
+                "canvas" => self.app.set_tool(crate::app::Tool::Canvas),
+                "masks" => self.app.set_tool(crate::app::Tool::Masks),
+                "edit" => self.app.set_tool(crate::app::Tool::Edit),
+                "hsladj" => settings::update(|s| s.hsl_by_adjustment = true),
                 "light" => settings::update(|s| s.theme = Theme::Light),
                 "pt" => settings::update(|s| s.language = settings::Language::Pt),
                 "select" => {

@@ -571,9 +571,20 @@ pub struct LayerNode {
     pub expanded: bool,
     #[serde(default)]
     pub children: Vec<LayerNode>,
-    /// Limits the layer to a range of distances (needs the depth map).
+    /// Legacy (<= 0.8.1) per-layer depth mask. Read from old projects / presets and turned into a
+    /// document mask (`DocumentState::adopt_masks`); never written by this version.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub depth_mask: Option<DepthMask>,
+    /// The document mask this layer is limited to (0.8.2).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mask: Option<MaskRef>,
+    /// A copy of the mask travelling with the layer (presets, copied layers, synced settings), so it
+    /// can be recreated in another image. Adopted into the document on paste / apply.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub embedded_mask: Option<Mask>,
+    /// Render-time only: the mask looked up in the document (`resolve_masks`).
+    #[serde(skip)]
+    pub resolved_mask: Option<ResolvedMask>,
 }
 
 
@@ -601,9 +612,12 @@ struct LayerNodeWire {
     pub expanded: bool,
     #[serde(default)]
     pub children: Vec<LayerNode>,
-    /// Limits the layer to a range of distances (needs the depth map).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub depth_mask: Option<DepthMask>,
+    #[serde(default)]
+    pub mask: Option<MaskRef>,
+    #[serde(default)]
+    pub embedded_mask: Option<Mask>,
 }
 
 impl From<LayerNodeWire> for LayerNode {
@@ -620,6 +634,9 @@ impl From<LayerNodeWire> for LayerNode {
             expanded: w.expanded,
             children: w.children,
             depth_mask: w.depth_mask,
+            mask: w.mask,
+            embedded_mask: w.embedded_mask,
+            resolved_mask: None,
         };
         if n.effect_id == "splittone" {
             n.effect_id = "colorgrade".into();
@@ -650,9 +667,157 @@ impl DepthMask {
         self.invert.hash(h);
         for v in [self.from, self.to, self.feather] { v.to_bits().hash(h); }
     }
-    pub fn uniforms(&self) -> [f32; 5] {
-        [if self.enabled { 1.0 } else { 0.0 }, self.from as f32, self.to as f32, self.feather as f32, if self.invert { 1.0 } else { 0.0 }]
+}
+
+// MARK: - Masks (0.8.2)
+
+/// How a mask part combines with the parts above it (the first part is always the base).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum MaskMode {
+    #[default]
+    Add,
+    Subtract,
+    Intersect,
+}
+
+impl MaskMode {
+    pub fn shader_index(&self) -> f32 {
+        match self {
+            MaskMode::Add => 0.0,
+            MaskMode::Subtract => 1.0,
+            MaskMode::Intersect => 2.0,
+        }
     }
+    pub fn label(&self) -> &'static str {
+        match self {
+            MaskMode::Add => "Add",
+            MaskMode::Subtract => "Subtract",
+            MaskMode::Intersect => "Intersect",
+        }
+    }
+}
+
+/// What a mask part selects. Only depth for now; brush, gradients and colour / luminance ranges
+/// will come here.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum MaskShape {
+    /// Distances between `from` and `to` (0 = farthest, 1 = nearest).
+    #[serde(rename_all = "camelCase")]
+    Depth { from: f64, to: f64, feather: f64 },
+}
+
+impl MaskShape {
+    pub fn kind_label(&self) -> &'static str {
+        match self {
+            MaskShape::Depth { .. } => "Depth Range",
+        }
+    }
+    pub fn symbol(&self) -> &'static str {
+        match self {
+            MaskShape::Depth { .. } => "square.3.layers.3d",
+        }
+    }
+    pub fn needs_depth(&self) -> bool { matches!(self, MaskShape::Depth { .. }) }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MaskPart {
+    #[serde(default = "Uuid::new_v4")]
+    pub id: Uuid,
+    #[serde(default)]
+    pub mode: MaskMode,
+    #[serde(default)]
+    pub invert: bool,
+    #[serde(default = "yes")]
+    pub enabled: bool,
+    pub shape: MaskShape,
+}
+
+impl MaskPart {
+    pub fn new(shape: MaskShape, mode: MaskMode) -> MaskPart { MaskPart { id: Uuid::new_v4(), mode, invert: false, enabled: true, shape } }
+}
+
+/// A named selection of the image, kept in the document. Effects point to it (`LayerNode::mask`),
+/// so one mask can limit several effects, Lightroom-style.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Mask {
+    #[serde(default = "Uuid::new_v4")]
+    pub id: Uuid,
+    pub name: String,
+    #[serde(default)]
+    pub parts: Vec<MaskPart>,
+}
+
+impl Mask {
+    pub fn hash_into<H: Hasher>(&self, h: &mut H) {
+        for p in self.parts.iter().filter(|p| p.enabled) {
+            p.mode.hash(h);
+            p.invert.hash(h);
+            match &p.shape {
+                MaskShape::Depth { from, to, feather } => {
+                    0u8.hash(h);
+                    for v in [from, to, feather] {
+                        v.to_bits().hash(h);
+                    }
+                }
+            }
+        }
+    }
+    /// Same selection (ignores ids and the name).
+    pub fn same_selection(&self, o: &Mask) -> bool {
+        self.parts.len() == o.parts.len()
+            && self.parts.iter().zip(&o.parts).all(|(a, b)| a.mode == b.mode && a.invert == b.invert && a.enabled == b.enabled && a.shape == b.shape)
+    }
+    pub fn is_active(&self) -> bool { self.parts.iter().any(|p| p.enabled) }
+    pub fn needs_depth(&self) -> bool { self.parts.iter().any(|p| p.enabled && p.shape.needs_depth()) }
+    pub fn from_depth(dm: &DepthMask) -> Mask {
+        let mut p = MaskPart::new(MaskShape::Depth { from: dm.from, to: dm.to, feather: dm.feather }, MaskMode::Add);
+        p.invert = dm.invert;
+        Mask { id: Uuid::new_v4(), name: String::new(), parts: vec![p] }
+    }
+}
+
+/// A layer's link to a document mask; `invert` uses everything outside it.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MaskRef {
+    pub id: Uuid,
+    #[serde(default)]
+    pub invert: bool,
+}
+
+/// The mask a layer renders with (filled in by `resolve_masks`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct ResolvedMask {
+    pub mask: Mask,
+    pub invert: bool,
+}
+
+/// Copies of `nodes` with each layer's mask looked up in `masks` (or taken from the copy it
+/// carries), ready for the renderer.
+pub fn resolve_masks(nodes: &[LayerNode], masks: &[Mask]) -> Vec<LayerNode> {
+    nodes
+        .iter()
+        .map(|n| {
+            let mut c = n.clone();
+            let invert = n.mask.map(|r| r.invert).unwrap_or(false);
+            let doc = n.mask.and_then(|r| masks.iter().find(|m| m.id == r.id));
+            c.resolved_mask = if let Some(m) = doc {
+                Some(ResolvedMask { mask: m.clone(), invert })
+            } else if let Some(e) = &n.embedded_mask {
+                Some(ResolvedMask { mask: e.clone(), invert })
+            } else {
+                n.depth_mask.as_ref().filter(|d| d.enabled).map(|d| ResolvedMask { mask: Mask::from_depth(d), invert: false })
+            }
+            .filter(|r| r.mask.is_active());
+            c.children = resolve_masks(&n.children, masks);
+            c
+        })
+        .collect()
 }
 
 impl LayerNode {
@@ -679,6 +844,9 @@ impl LayerNode {
             expanded: true,
             children: vec![],
             depth_mask: None,
+            mask: None,
+            embedded_mask: None,
+            resolved_mask: None,
         }
     }
 
@@ -695,6 +863,9 @@ impl LayerNode {
             expanded: true,
             children,
             depth_mask: None,
+            mask: None,
+            embedded_mask: None,
+            resolved_mask: None,
         }
     }
 
@@ -707,6 +878,9 @@ impl LayerNode {
         self.opacity.to_bits().hash(h);
         self.blend.hash(h);
         if let Some(m) = &self.depth_mask { m.hash_into(h); }
+        if let Some(m) = &self.mask { m.id.hash(h); m.invert.hash(h); }
+        if let Some(m) = &self.embedded_mask { m.hash_into(h); }
+        if let Some(r) = &self.resolved_mask { r.mask.hash_into(h); r.invert.hash(h); }
         for c in &self.children { c.render_hash(h); }
     }
 
@@ -947,6 +1121,7 @@ impl CanvasSpec {
 
 /// The editable state of a document. Value type so undo is a snapshot.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(from = "DocumentStateWire")]
 pub struct DocumentState {
     #[serde(default)]
     pub layers: Vec<LayerNode>,
@@ -955,6 +1130,29 @@ pub struct DocumentState {
     /// Aspect-ratio canvas with borders (None = off).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub canvas: Option<CanvasSpec>,
+    /// Masks of this image (Masks tool); layers point to them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub masks: Vec<Mask>,
+}
+
+#[derive(Deserialize)]
+struct DocumentStateWire {
+    #[serde(default)]
+    layers: Vec<LayerNode>,
+    #[serde(default)]
+    crop: CropRect,
+    #[serde(default)]
+    canvas: Option<CanvasSpec>,
+    #[serde(default)]
+    masks: Vec<Mask>,
+}
+
+impl From<DocumentStateWire> for DocumentState {
+    fn from(w: DocumentStateWire) -> DocumentState {
+        let mut s = DocumentState { layers: w.layers, crop: w.crop, canvas: w.canvas, masks: w.masks };
+        s.adopt_masks();
+        s
+    }
 }
 
 impl DocumentState {
@@ -962,10 +1160,110 @@ impl DocumentState {
     pub fn hash_value(&self) -> u64 {
         let mut h = std::collections::hash_map::DefaultHasher::new();
         self.layers.len().hash(&mut h);
-        for l in &self.layers { l.render_hash(&mut h); }
+        for l in &self.render_layers() {
+            l.render_hash(&mut h);
+        }
         self.crop.hash_into(&mut h);
-        if let Some(c) = &self.canvas { c.hash_into(&mut h); }
+        if let Some(c) = &self.canvas {
+            c.hash_into(&mut h);
+        }
         h.finish()
+    }
+
+    /// The layers with their masks resolved, for rendering.
+    pub fn render_layers(&self) -> Vec<LayerNode> { resolve_masks(&self.layers, &self.masks) }
+
+    pub fn mask(&self, id: Uuid) -> Option<&Mask> { self.masks.iter().find(|m| m.id == id) }
+
+    /// Layers (anywhere in the tree) limited by mask `id`.
+    pub fn layers_using(&self, id: Uuid) -> Vec<Uuid> {
+        fn walk(nodes: &[LayerNode], id: Uuid, out: &mut Vec<Uuid>) {
+            for n in nodes {
+                if n.mask.map(|m| m.id == id).unwrap_or(false) {
+                    out.push(n.id);
+                }
+                walk(&n.children, id, out);
+            }
+        }
+        let mut v = vec![];
+        walk(&self.layers, id, &mut v);
+        v
+    }
+
+    /// A name no other mask uses ("Mask 1", "Mask 2"…).
+    pub fn new_mask_name(&self, base: &str) -> String {
+        (1..1000).map(|i| format!("{base} {i}")).find(|n| !self.masks.iter().any(|m| &m.name == n)).unwrap_or_else(|| base.to_string())
+    }
+
+    /// Adds `m` (or finds a mask with the same selection) and returns its id.
+    fn intern_mask(&mut self, mut m: Mask) -> Uuid {
+        if let Some(e) = self.masks.iter().find(|e| e.same_selection(&m)) {
+            return e.id;
+        }
+        if m.id.is_nil() || self.masks.iter().any(|e| e.id == m.id) {
+            m.id = Uuid::new_v4();
+        }
+        if m.name.trim().is_empty() || self.masks.iter().any(|e| e.name == m.name) {
+            let base = if m.name.trim().is_empty() { crate::l10n::tr("Mask") } else { m.name.clone() };
+            m.name = self.new_mask_name(&base);
+        }
+        let id = m.id;
+        self.masks.push(m);
+        id
+    }
+
+    /// Turns masks that layers carry (old per-layer depth masks, copies inside presets / pasted
+    /// layers) into document masks, and drops links to masks that no longer exist.
+    pub fn adopt_masks(&mut self) {
+        fn needs(nodes: &[LayerNode], masks: &[Mask]) -> bool {
+            nodes.iter().any(|n| {
+                n.embedded_mask.is_some()
+                    || n.depth_mask.is_some()
+                    || n.mask.map(|r| !masks.iter().any(|m| m.id == r.id)).unwrap_or(false)
+                    || needs(&n.children, masks)
+            })
+        }
+        fn walk(nodes: &mut [LayerNode], s: &mut DocumentState) {
+            for n in nodes.iter_mut() {
+                let known = n.mask.map(|r| s.masks.iter().any(|m| m.id == r.id)).unwrap_or(false);
+                if !known {
+                    let invert = n.mask.map(|r| r.invert).unwrap_or(false);
+                    n.mask = None;
+                    if let Some(e) = n.embedded_mask.take() {
+                        let id = s.intern_mask(e);
+                        n.mask = Some(MaskRef { id, invert });
+                    } else if let Some(d) = n.depth_mask.clone().filter(|d| d.enabled) {
+                        let mut m = Mask::from_depth(&d);
+                        m.name = crate::l10n::tr("Depth Mask");
+                        let id = s.intern_mask(m);
+                        n.mask = Some(MaskRef { id, invert: false });
+                    }
+                }
+                n.embedded_mask = None;
+                n.depth_mask = None;
+                walk(&mut n.children, s);
+            }
+        }
+        if !needs(&self.layers, &self.masks) {
+            return;
+        }
+        let mut layers = std::mem::take(&mut self.layers);
+        walk(&mut layers, self);
+        self.layers = layers;
+    }
+
+    /// Copies of `nodes` that carry their masks along (presets, the clipboard and settings synced
+    /// to other images).
+    pub fn portable(&self, nodes: &[LayerNode]) -> Vec<LayerNode> {
+        nodes
+            .iter()
+            .map(|n| {
+                let mut c = n.clone();
+                c.embedded_mask = n.mask.and_then(|r| self.mask(r.id).cloned());
+                c.children = self.portable(&n.children);
+                c
+            })
+            .collect()
     }
 }
 
@@ -999,5 +1297,52 @@ mod migration_tests {
         assert_eq!(c.effect_id, "colorgrade");
         assert_eq!(c.params.choice("mode"), "split");
         assert_eq!(c.params.num("shadowAmt", 0.0), 42.0);
+    }
+
+    #[test]
+    fn old_depth_masks_become_document_masks() {
+        let mut a = LayerNode::effect("grain", None, None);
+        a.depth_mask = Some(DepthMask { enabled: true, from: 0.1, to: 0.5, feather: 0.1, invert: false });
+        let mut b = LayerNode::effect("blur", None, None);
+        b.depth_mask = Some(DepthMask { enabled: true, from: 0.1, to: 0.5, feather: 0.1, invert: false });
+        let mut c = LayerNode::effect("glow", None, None);
+        c.depth_mask = Some(DepthMask { enabled: false, ..Default::default() });
+        let old = DocumentState { layers: vec![a, b, c], ..Default::default() };
+        let json = serde_json::to_string(&old).unwrap();
+        let st: DocumentState = serde_json::from_str(&json).unwrap();
+        assert_eq!(st.masks.len(), 1, "same selection shares one mask");
+        assert_eq!(st.layers[0].mask.map(|r| r.id), Some(st.masks[0].id));
+        assert_eq!(st.layers[1].mask.map(|r| r.id), Some(st.masks[0].id));
+        assert!(st.layers[2].mask.is_none(), "a disabled old mask is dropped");
+        assert!(st.layers.iter().all(|l| l.depth_mask.is_none()));
+        let r = st.render_layers();
+        assert!(r[0].resolved_mask.is_some() && r[2].resolved_mask.is_none());
+        // saving writes the new format only
+        let again = serde_json::to_string(&st).unwrap();
+        assert!(!again.contains("depthMask") && again.contains("masks"));
+    }
+
+    #[test]
+    fn masks_travel_with_layers() {
+        let mut src = DocumentState::default();
+        let mut l = LayerNode::effect("grain", None, None);
+        let m = Mask { id: Uuid::new_v4(), name: "Sky".into(), parts: vec![MaskPart::new(MaskShape::Depth { from: 0.0, to: 0.3, feather: 0.1 }, MaskMode::Add)] };
+        l.mask = Some(MaskRef { id: m.id, invert: true });
+        src.masks.push(m);
+        src.layers.push(l);
+        // into another image (preset / paste / sync)
+        let carried = src.portable(&src.layers);
+        let mut dst = DocumentState::default();
+        dst.layers = carried.iter().map(|n| n.reidentified()).collect();
+        dst.adopt_masks();
+        assert_eq!(dst.masks.len(), 1);
+        assert_eq!(dst.masks[0].name, "Sky");
+        assert_eq!(dst.layers[0].mask.map(|r| r.invert), Some(true));
+        assert!(dst.layers[0].embedded_mask.is_none());
+        // back into the same image: no duplicate mask
+        let mut same = src.clone();
+        same.layers.extend(src.portable(&src.layers).iter().map(|n| n.reidentified()));
+        same.adopt_masks();
+        assert_eq!(same.masks.len(), 1);
     }
 }

@@ -131,20 +131,48 @@ impl Renderer {
     }
 }
 
-/// Depth mask of a layer (its own range mask × the effect's "Depth" weighting), if any.
+/// Mask of a layer: its document mask (`resolved_mask`) × the effect's "Depth" weighting, if any.
 fn layer_mask(node: &LayerNode, ctx: &mut Ctx) -> Option<T> {
-    let range = node.depth_mask.as_ref().filter(|m| m.enabled);
+    let rm = node.resolved_mask.as_ref().filter(|r| r.mask.is_active());
     let bias = if node.is_group { "off".to_string() } else { node.params.choice_or("depthBias", "off") };
     let dir = match bias.as_str() {
         "near" => 1.0,
         "far" => -1.0,
         _ => 0.0,
     };
-    if range.is_none() && dir == 0.0 {
+    if rm.is_none() && dir == 0.0 {
         return None;
     }
     let d = ctx.depth()?;
-    let r = range.map(|m| m.uniforms()).unwrap_or([0.0; 5]);
-    let amount = (node.params.num("depthBiasAmount", 80.0) / 100.0) as f32;
-    Some(ctx.apply("k_depthmask", &[&d], &[r[0], r[1], r[2], r[3], r[4], dir, amount]))
+    let mut m = rm.and_then(|r| mask_texture(&r.mask, r.invert, &d, ctx));
+    if dir != 0.0 {
+        let amount = (node.params.num("depthBiasAmount", 80.0) / 100.0) as f32;
+        let b = ctx.apply("k_depthmask", &[&d], &[0.0, 0.0, 0.0, 0.0, 0.0, dir, amount]);
+        m = Some(match m {
+            Some(x) => ctx.apply("k_maskop", &[&x, &b], &[MaskMode::Intersect.shader_index()]),
+            None => b,
+        });
+    }
+    m
+}
+
+/// Renders a document mask (1 = selected) at the size of `depth`. The first enabled part is the
+/// base; the others add, subtract or intersect. None when no part is enabled.
+pub fn mask_texture(mask: &Mask, invert: bool, depth: &T, ctx: &mut Ctx) -> Option<T> {
+    let mut acc: Option<T> = None;
+    for part in mask.parts.iter().filter(|p| p.enabled) {
+        let t = match &part.shape {
+            MaskShape::Depth { from, to, feather } => {
+                ctx.apply("k_depthmask", &[depth], &[1.0, *from as f32, *to as f32, *feather as f32, if part.invert { 1.0 } else { 0.0 }, 0.0, 0.0])
+            }
+        };
+        acc = Some(match acc {
+            None => t,
+            Some(a) => ctx.apply("k_maskop", &[&a, &t], &[part.mode.shader_index()]),
+        });
+    }
+    if invert {
+        acc = acc.map(|a| ctx.apply("k_maskop", &[&a, &a], &[3.0]));
+    }
+    acc
 }

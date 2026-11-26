@@ -6,7 +6,6 @@ use std::sync::{Mutex, OnceLock};
 
 use serde::{Deserialize, Serialize};
 
-use crate::imageio::Format;
 
 pub fn support_dir() -> PathBuf {
     // tests use their own folder so they never touch the user's settings / session
@@ -67,9 +66,10 @@ pub enum Theme {
 pub struct Settings {
     pub language: Language,
     pub theme: Theme,
-    pub export_format: Format,
-    pub export_quality: f64,
-    pub export_scale: i32,
+    /// Last export settings (the Export dialog opens with them).
+    pub export: crate::export::ExportSettings,
+    /// Saved export settings (the list on the left of the Export dialog).
+    pub export_presets: Vec<crate::export::ExportPreset>,
     /// Reopen the last image and its layers when the app starts.
     pub reopen_last_session: bool,
     /// Hovering effects / presets previews them on the image.
@@ -84,9 +84,11 @@ pub struct Settings {
     pub presets_list: bool,
     /// Favourite items in pickers (keys "picker:id").
     pub favorites: Vec<String>,
-    /// Look for a new version on GitHub at launch (at most once a day).
+    /// Look for a new version on GitHub every time the app opens.
     pub check_updates: bool,
     pub last_update_check: u64,
+    /// "Skip This Version" in the update pop-up: no pop-up again until a newer one comes out.
+    pub skipped_version: String,
     /// Background around the image in the central canvas ("" = theme default, else a swatch id).
     pub canvas_backdrop: String,
     /// Custom shortcuts: action id → shortcut string.
@@ -95,6 +97,11 @@ pub struct Settings {
     /// ("rgb", "luma", "red", "green", "blue", "all").
     pub histogram_open: bool,
     pub histogram_mode: String,
+    /// HSL effect laid out by adjustment (Hue / Saturation / Luminance, every colour in each),
+    /// like Lightroom Classic, instead of one section per colour.
+    pub hsl_by_adjustment: bool,
+    /// Masks tool: show the selected mask as a red overlay on the image.
+    pub mask_overlay: bool,
 }
 
 impl Default for Settings {
@@ -102,9 +109,8 @@ impl Default for Settings {
         Settings {
             language: Language::En,
             theme: Theme::Dark,
-            export_format: Format::Png,
-            export_quality: 0.92,
-            export_scale: 1,
+            export: Default::default(),
+            export_presets: vec![],
             reopen_last_session: true,
             hover_preview: true,
             show_filmstrip: true,
@@ -119,9 +125,12 @@ impl Default for Settings {
             canvas_backdrop: String::new(),
             check_updates: true,
             last_update_check: 0,
+            skipped_version: String::new(),
             shortcuts: Default::default(),
             histogram_open: true,
             histogram_mode: "rgb".into(),
+            hsl_by_adjustment: false,
+            mask_overlay: true,
         }
     }
 }

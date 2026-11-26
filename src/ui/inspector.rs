@@ -111,7 +111,6 @@ fn document_inspector(ui: &mut Ui, app: &mut AppState) {
                 }
             });
             separator_line(ui);
-            panel_section(ui, Id::new("doc-canvas"), "Canvas & Borders", None, None, |ui| canvas_controls(ui, app));
             egui::Frame::new().inner_margin(14).show(ui, |ui| {
                 ui.label(
                     egui::RichText::new(tr("Select a layer to edit its settings, or add an effect with the + button."))
@@ -276,8 +275,8 @@ fn layer_inspector(ui: &mut Ui, app: &mut AppState, layer: &LayerNode) {
             if let Some(v) = value_slider(ui, Id::new(("opacity", layer.id)), SliderSpec::new("Opacity", layer.opacity * 100.0, 0.0, 100.0, 100.0).step(1.0).unit("%")) {
                 app.update_layer(layer.id, Some(format!("{}-opacity", layer.id)), |n| n.opacity = v / 100.0);
             }
+            super::tools::layer_mask_row(ui, app, layer);
         });
-        depth_mask_section(ui, app, layer);
         if let Some(effect) = effect {
             if !effect.looks.is_empty() {
                 look_row(ui, app, layer, effect);
@@ -289,83 +288,6 @@ fn layer_inspector(ui: &mut Ui, app: &mut AppState, layer: &LayerNode) {
             });
         }
     });
-}
-
-/// Depth Mask: limit the layer to a range of distances (far … near), using the depth map.
-fn depth_mask_section(ui: &mut Ui, app: &mut AppState, layer: &LayerNode) {
-    let m = layer.depth_mask.clone().unwrap_or(DepthMask { enabled: false, ..Default::default() });
-    let lid = layer.id;
-    let id = Id::new(("sec-depth", lid));
-    // collapsed by default while off, so it doesn't push the effect settings down
-    let open_id = id.with("open");
-    if !m.enabled && ui.data(|d| d.get_temp::<bool>(open_id).is_none()) {
-        ui.data_mut(|d| d.insert_temp(open_id, false));
-    }
-    let track: Vec<Rgba> = (0..8).map(|i| { let v = 0.08 + 0.84 * i as f64 / 7.0; Rgba::new(v, v, v) }).collect();
-    let change = panel_section(ui, id, "Depth Mask", None, Some(m.enabled), |ui| {
-        if app.depth_busy() {
-            ui.horizontal(|ui| {
-                ui.add(egui::Spinner::new().size(11.0));
-                ui.label(egui::RichText::new(tr("Calculating depth…")).font(regular(11.0)).color(text_dim()));
-            });
-        } else if !crate::depth::model_available() {
-            ui.label(egui::RichText::new(tr("Depth model not found: reinstall EFFECTOR to use depth")).font(regular(11.0)).color(text_faint()));
-        }
-        let presets = [("Background", 0.0, 0.42), ("Middle", 0.3, 0.7), ("Subject", 0.55, 1.0)];
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 4.0;
-            for (name, a, b) in presets {
-                let on = m.enabled && (m.from - a).abs() < 1e-3 && (m.to - b).abs() < 1e-3;
-                if ui.add(egui::Button::selectable(on, tr(name))).clicked() {
-                    app.update_layer(lid, None, |n| {
-                        let mut dm = n.depth_mask.clone().unwrap_or_default();
-                        dm.enabled = true;
-                        dm.from = a;
-                        dm.to = b;
-                        n.depth_mask = Some(dm);
-                    });
-                }
-            }
-        });
-        ui.add_space(4.0);
-        let set = |app: &mut AppState, key: &str, f: &dyn Fn(&mut DepthMask)| {
-            app.update_layer(lid, Some(format!("{lid}-dm-{key}")), |n| {
-                let mut dm = n.depth_mask.clone().unwrap_or_default();
-                dm.enabled = true;
-                f(&mut dm);
-                n.depth_mask = Some(dm);
-            });
-        };
-        if let Some(v) = value_slider(ui, id.with("from"), SliderSpec::new("Far edge", m.from * 100.0, 0.0, 100.0, 0.0).step(1.0).unit("%").track(Some(&track))) {
-            set(app, "from", &|d| d.from = v / 100.0);
-        }
-        if let Some(v) = value_slider(ui, id.with("to"), SliderSpec::new("Near edge", m.to * 100.0, 0.0, 100.0, 45.0).step(1.0).unit("%").track(Some(&track))) {
-            set(app, "to", &|d| d.to = v / 100.0);
-        }
-        if let Some(v) = value_slider(ui, id.with("feather"), SliderSpec::new("Softness", m.feather * 100.0, 0.0, 50.0, 12.0).step(1.0).unit("%")) {
-            set(app, "feather", &|d| d.feather = v / 100.0);
-        }
-        if let Some(v) = toggle_row(ui, "Invert", m.invert) {
-            set(app, "invert", &|d| d.invert = v);
-        }
-        ui.add_space(2.0);
-        let dv = app.show_depth;
-        if ui.add(egui::Button::selectable(dv, format!("{}  {}", tr("View depth map"), crate::shortcuts::display(crate::shortcuts::Action::ShowDepth)))).clicked() {
-            app.show_depth = !dv;
-            app.request_render();
-        }
-        ui.label(egui::RichText::new(tr("0% = farthest, 100% = nearest. The depth map is estimated by AI on this computer.")).font(regular(10.5)).color(text_faint()));
-    });
-    if let Some(on) = change {
-        app.update_layer(lid, None, |n| {
-            let mut dm = n.depth_mask.clone().unwrap_or_default();
-            dm.enabled = on;
-            n.depth_mask = Some(dm);
-        });
-        if on {
-            ui.data_mut(|d| d.insert_temp(open_id, true));
-        }
-    }
 }
 
 fn look_row(ui: &mut Ui, app: &mut AppState, layer: &LayerNode, effect: &Effect) {
@@ -395,7 +317,35 @@ fn look_row(ui: &mut Ui, app: &mut AppState, layer: &LayerNode, effect: &Effect)
     separator_line(ui);
 }
 
+/// HSL "By Adjustment" view: a Hue, a Saturation and a Luminance section with every colour.
+fn hsl_by_adjustment(ui: &mut Ui, app: &mut AppState, layer: &LayerNode, effect: &Effect) {
+    for (suffix, title) in [("_h", "Hue"), ("_s", "Saturation"), ("_l", "Luminance")] {
+        panel_section(ui, Id::new(("sec-hsl", layer.id, suffix)), title, None, None, |ui| {
+            for d in effect.params.iter().filter(|d| d.key.ends_with(suffix)) {
+                let mut d = d.clone();
+                d.label = d.section.clone().unwrap_or_default();
+                param_control(ui, app, layer, &d);
+            }
+        });
+    }
+}
+
+fn hsl_view_toggle(ui: &mut Ui) -> bool {
+    let by_adj = crate::settings::get().hsl_by_adjustment;
+    egui::Frame::new().inner_margin(egui::Margin { left: 14, right: 14, top: 10, bottom: 4 }).show(ui, |ui| {
+        let opts = vec![("color".to_string(), tr("By Color")), ("adj".to_string(), tr("By Adjustment"))];
+        if let Some(v) = segmented_row(ui, "", &opts, if by_adj { "adj" } else { "color" }) {
+            crate::settings::update(|s| s.hsl_by_adjustment = v == "adj");
+        }
+    });
+    crate::settings::get().hsl_by_adjustment
+}
+
 fn param_sections(ui: &mut Ui, app: &mut AppState, layer: &LayerNode, effect: &Effect) {
+    if effect.id == "hsl" && hsl_view_toggle(ui) {
+        hsl_by_adjustment(ui, app, layer, effect);
+        return;
+    }
     let visible: Vec<&ParamDef> = effect.params.iter().filter(|d| d.is_visible(&layer.params)).collect();
     let mut order: Vec<String> = vec![];
     for d in &visible {

@@ -13,6 +13,8 @@ pub struct CanvasTextures {
     pub output: Option<egui::TextureId>,
     pub original: Option<egui::TextureId>,
     pub crop: Option<egui::TextureId>,
+    /// Red overlay of the selected mask (Masks tool).
+    pub mask: Option<egui::TextureId>,
     pub checker: egui::TextureId,
     /// texture px per screen px of the current output (for nearest filtering when zoomed in).
     pub out_size: egui::Vec2,
@@ -82,6 +84,9 @@ pub fn canvas(ui: &mut Ui, app: &mut AppState, tex: &CanvasTextures) {
         if let Some(t) = main {
             paint_image(ui, t, img_rect, rect, tex.checker, checker_px);
         }
+        if let (Some(m), false) = (tex.mask, app.show_original || app.show_depth) {
+            super::tools::paint_mask_overlay(ui, app, m, img_rect, rect);
+        }
         if app.compare_split && !app.show_original {
             if let Some(o) = tex.original {
                 let x = rect.left() + rect.width() * app.split_pos as f32;
@@ -103,13 +108,18 @@ pub fn canvas(ui: &mut Ui, app: &mut AppState, tex: &CanvasTextures) {
         if !app.presenting {
             backdrop_menu(ui, &resp, img_rect);
         }
-        // interaction: pan / zoom
+        // interaction: pan / zoom. The image can only be dragged along an axis where it is larger
+        // than the view (Lightroom-style): at "fit" or any smaller zoom, dragging does nothing.
+        let pannable = (size.x > vs.x + 0.5, size.y > vs.y + 0.5);
+        let can_pan = pannable.0 || pannable.1;
         if resp.double_clicked() {
             app.set_zoom(None);
-        } else if resp.dragged_by(egui::PointerButton::Primary) || resp.dragged_by(egui::PointerButton::Middle) {
+        } else if can_pan && (resp.dragged_by(egui::PointerButton::Primary) || resp.dragged_by(egui::PointerButton::Middle)) {
             let p = app.pan() + resp.drag_delta();
             app.set_pan(p);
             ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+        } else if can_pan && resp.hovered() && app.depth_pick.is_none() && ui.rect_contains_pointer(img_rect) {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
         }
         if resp.hovered() {
             let (scroll, zoom_delta, cmd, mouse) = ui.input(|i| (i.smooth_scroll_delta, i.zoom_delta(), i.modifiers.command, i.pointer.hover_pos()));
@@ -119,12 +129,20 @@ pub fn canvas(ui: &mut Ui, app: &mut AppState, tex: &CanvasTextures) {
                 } else if scroll != egui::Vec2::ZERO {
                     if cmd || scroll.x == 0.0 && is_wheel(ui) {
                         zoom_at(app, rect, (scroll.y as f64 * 0.0025).exp(), m);
-                    } else {
+                    } else if can_pan {
                         let p = app.pan() + scroll;
                         app.set_pan(p);
                     }
                 }
             }
+        }
+        // keep the image inside the view: no offset along an axis that fits, and never past the edges
+        let (z2, pan2) = (app.display_zoom(), app.pan());
+        let size2 = vec2((w as f64 * z2) as f32, (h as f64 * z2) as f32);
+        let lim = ((size2 - vs) / 2.0).max(vec2(0.0, 0.0));
+        let clamped = vec2(pan2.x.clamp(-lim.x, lim.x), pan2.y.clamp(-lim.y, lim.y));
+        if clamped != pan2 {
+            app.set_pan(clamped);
         }
     }
     // badges
@@ -375,7 +393,16 @@ fn crop_overlay(ui: &mut Ui, app: &mut AppState, view: Rect, ir: Rect) {
             }
         }
     }
-    // crop bar
+    // crop bar (only when the side panels are hidden: the Crop panel has the same controls)
+    if !(app.hide_side_panels || app.hide_all_panels) {
+        let (enter, esc) = ui.input(|i| (i.key_pressed(egui::Key::Enter), i.key_pressed(egui::Key::Escape)));
+        if enter {
+            app.commit_crop();
+        } else if esc {
+            app.cancel_crop();
+        }
+        return;
+    }
     let bar_w = 520.0f32.min(view.width() - 20.0);
     let bar = Rect::from_min_size(pos2(view.center().x - bar_w / 2.0, view.bottom() - 12.0 - 44.0), vec2(bar_w, 44.0));
     ui.painter().rect_filled(bar, CornerRadius::same(10), with_alpha(panel_bg2(), 0.96));
@@ -454,16 +481,24 @@ fn backdrop_menu(ui: &mut Ui, resp: &egui::Response, img_rect: Rect) {
             ui.set_min_width(170.0);
             ui.label(egui::RichText::new(tr("Background")).font(semibold(11.0)).color(text_dim()));
             ui.add_space(2.0);
+            ui.spacing_mut().item_spacing.y = 1.0;
             for (key, label, v) in BACKDROPS {
                 let c = (v * 255.0).round() as u8;
                 let on = current == key;
-                let r = ui.horizontal(|ui| {
-                    let (sw, _) = ui.allocate_exact_size(vec2(14.0, 14.0), Sense::hover());
-                    ui.painter().rect_filled(sw, CornerRadius::same(3), Color32::from_rgb(c, c, c));
-                    ui.painter().rect_stroke(sw, CornerRadius::same(3), Stroke::new(1.0, separator()), StrokeKind::Inside);
-                    ui.add(egui::Button::selectable(on, tr(label)).frame_when_inactive(false))
-                });
-                if r.inner.clicked() {
+                // the whole row is the button, not only its text
+                let w = ui.available_width().max(170.0);
+                let (r, resp) = ui.allocate_exact_size(vec2(w, 24.0), Sense::click());
+                if on || resp.hovered() {
+                    ui.painter().rect_filled(r, CornerRadius::same(5), if resp.hovered() { row_hover() } else { row_selected() });
+                }
+                let sw = Rect::from_center_size(pos2(r.left() + 13.0, r.center().y), vec2(14.0, 14.0));
+                ui.painter().rect_filled(sw, CornerRadius::same(3), Color32::from_rgb(c, c, c));
+                ui.painter().rect_stroke(sw, CornerRadius::same(3), Stroke::new(1.0, separator()), StrokeKind::Inside);
+                ui.painter().text(pos2(sw.right() + 9.0, r.center().y), Align2::LEFT_CENTER, tr(label), regular(12.5), text());
+                if on {
+                    paint_icon(ui, Rect::from_center_size(pos2(r.right() - 12.0, r.center().y), vec2(12.0, 12.0)), "checkmark", 11.0, accent_text());
+                }
+                if resp.clicked() {
                     crate::settings::update(|s| s.canvas_backdrop = key.to_string());
                     ui.close();
                 }
