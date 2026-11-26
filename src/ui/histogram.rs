@@ -1,7 +1,10 @@
-//! Histogram panel at the top of the right sidebar (Lightroom Classic style): RGB with the
-//! overlaps in cyan / magenta / yellow / grey, luminance, single channels or everything at once;
-//! clipping triangles in the top corners (click or J paints clipped areas on the image);
-//! collapsible, so the effect controls get the room back.
+//! Monitoring panel at the top of the right sidebar, with two tabs:
+//! - Histogram (Lightroom Classic style): RGB with the overlaps in cyan / magenta / yellow / grey,
+//!   luminance, single channels or everything at once; clipping triangles in the top corners
+//!   (click or J paints clipped areas on the image).
+//! - Vectorscope (Resolve style): chroma of every pixel in its own colour, 75 % targets for the
+//!   six primaries / secondaries and the skin tone line; 2× zoom.
+//! Collapsible, so the effect controls get the room back.
 
 use egui::{pos2, vec2, Align2, Color32, CornerRadius, Id, Rect, Sense, Stroke, StrokeKind, Ui};
 
@@ -34,18 +37,23 @@ pub fn panel(ui: &mut Ui, app: &mut AppState) {
     let (rect, resp) = ui.allocate_exact_size(vec2(w, 30.0), Sense::click());
     let cy = rect.center().y;
     paint_icon(ui, Rect::from_center_size(pos2(rect.left() + 18.0, cy), vec2(10.0, 10.0)), if open { "chevron.down" } else { "chevron.right" }, 9.0, text_faint());
-    ui.painter().text(pos2(rect.left() + 28.0, cy), Align2::LEFT_CENTER, spaced_upper(&tr("Histogram")), section_font(), text_dim());
-    if app.show_clipping {
+    ui.painter().text(pos2(rect.left() + 28.0, cy), Align2::LEFT_CENTER, spaced_upper(&tr("Monitoring")), section_font(), text_dim());
+    if app.show_clipping && st.monitor_tab != "vectorscope" {
         ui.painter().text(pos2(rect.right() - 14.0, cy), Align2::RIGHT_CENTER, tr("Clipping"), semibold(9.5), accent_text());
     }
     if resp.clicked() {
         app.perform(Action::ToggleHistogram, ui.ctx());
     }
-    resp.on_hover_text(action_hint(if open { "Hide histogram" } else { "Show histogram" }, Action::ToggleHistogram));
+    resp.on_hover_text(action_hint(if open { "Hide monitoring" } else { "Show monitoring" }, Action::ToggleHistogram));
     if open {
         egui::Frame::new().inner_margin(egui::Margin { left: 14, right: 14, top: 0, bottom: 10 }).show(ui, |ui| {
             ui.set_width(w - 28.0);
-            body(ui, app, &st.histogram_mode);
+            tabs(ui, &st.monitor_tab);
+            if st.monitor_tab == "vectorscope" {
+                vectorscope(ui, app, st.scope_zoom);
+            } else {
+                body(ui, app, &st.histogram_mode);
+            }
         });
     }
     let (sep, _) = ui.allocate_exact_size(vec2(w, 1.0), Sense::hover());
@@ -227,4 +235,123 @@ fn triangles(ui: &mut Ui, app: &mut AppState, rect: Rect, h: &Histogram) {
             app.perform(Action::ShowClipping, ui.ctx());
         }
     }
+}
+
+/// Histogram / Vectorscope tabs.
+fn tabs(ui: &mut Ui, cur: &str) {
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
+        let bw = ((ui.available_width() - 4.0) / 2.0).max(40.0);
+        for (id, label) in [("histogram", "Histogram"), ("vectorscope", "Vectorscope")] {
+            let on = cur == id || (id == "histogram" && cur != "vectorscope");
+            let (r, rr) = ui.allocate_exact_size(vec2(bw, 20.0), Sense::click());
+            let bg = if on { field_strong() } else if rr.hovered() { field() } else { Color32::TRANSPARENT };
+            ui.painter().rect_filled(r, CornerRadius::same(5), bg);
+            ui.painter().text(r.center(), Align2::CENTER_CENTER, tr(label), if on { semibold(10.5) } else { regular(10.5) }, if on { text() } else { text_dim() });
+            if rr.clicked() && !on {
+                settings::update(|s| s.monitor_tab = id.to_string());
+            }
+        }
+    });
+    ui.add_space(4.0);
+}
+
+/// Hue angle of the skin tone line (the "I" line), degrees counter-clockwise from +Cb.
+const SKIN_DEG: f32 = 123.0;
+
+fn vectorscope(ui: &mut Ui, app: &mut AppState, zoom: bool) {
+    let w = ui.available_width();
+    let side = w.min(230.0);
+    let (outer, resp) = ui.allocate_exact_size(vec2(w, side), Sense::hover());
+    let rect = Rect::from_center_size(outer.center(), vec2(side, side));
+    let p = ui.painter().with_clip_rect(rect);
+    p.rect_filled(rect, CornerRadius::same(6), dyn_bg());
+    let c = rect.center();
+    let k = if zoom { 2.0 } else { 1.0 };
+    // screen position of a (Cb, Cr) chroma
+    let at = |cb: f32, cr: f32| pos2(c.x + cb * side * k, c.y - cr * side * k);
+    let hist = if app.has_image() { app.histogram.clone() } else { None };
+    if let Some(h) = &hist {
+        let tex = scope_texture(ui, h);
+        let uv = if zoom { Rect::from_min_max(pos2(0.25, 0.25), pos2(0.75, 0.75)) } else { Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)) };
+        p.image(tex.id(), rect, uv, Color32::WHITE);
+    } else {
+        p.text(rect.center(), Align2::CENTER_CENTER, tr("No image"), regular(11.0), text_faint());
+    }
+    // graticule: outer circle (100 % saturation of the scope), crosshair, 75 % targets
+    let grid = with_alpha(text_faint(), 0.55);
+    p.circle_stroke(c, side * 0.5 * k.min(1.0) - 1.0, Stroke::new(1.0, grid));
+    p.line_segment([pos2(rect.left(), c.y), pos2(rect.right(), c.y)], Stroke::new(1.0, with_alpha(grid, 0.5)));
+    p.line_segment([pos2(c.x, rect.top()), pos2(c.x, rect.bottom())], Stroke::new(1.0, with_alpha(grid, 0.5)));
+    let targets = [
+        ("R", [0.75, 0.0, 0.0], RED),
+        ("Mg", [0.75, 0.0, 0.75], Color32::from_rgb(210, 80, 220)),
+        ("B", [0.0, 0.0, 0.75], BLUE),
+        ("Cy", [0.0, 0.75, 0.75], Color32::from_rgb(60, 200, 220)),
+        ("G", [0.0, 0.75, 0.0], GREEN),
+        ("Yl", [0.75, 0.75, 0.0], Color32::from_rgb(220, 210, 60)),
+    ];
+    for (name, rgb, col) in targets {
+        let (cb, cr) = crate::histogram::cbcr(rgb[0], rgb[1], rgb[2]);
+        let q = at(cb, cr);
+        let box_ = Rect::from_center_size(q, vec2(9.0, 9.0));
+        p.rect_stroke(box_, CornerRadius::same(1), Stroke::new(1.0, with_alpha(col, 0.8)), StrokeKind::Middle);
+        let off = (q - c).normalized() * 12.0;
+        p.text(q + off, Align2::CENTER_CENTER, name, regular(8.5), with_alpha(col, 0.9));
+    }
+    // skin tone line
+    let a = SKIN_DEG.to_radians();
+    let end = c + vec2(a.cos(), -a.sin()) * side;
+    p.line_segment([c, end], Stroke::new(1.0, Color32::from_rgb(235, 170, 120)));
+    p.text(c + vec2(a.cos(), -a.sin()) * (side * 0.36) + vec2(-10.0, -6.0), Align2::RIGHT_CENTER, tr("Skin"), regular(8.5), Color32::from_rgb(235, 170, 120));
+    if resp.hovered() {
+        resp.on_hover_text(tr("Colours of the image by hue (angle) and saturation (distance from the centre). Skin tones of any ethnicity fall on the skin line."));
+    }
+    // footer: zoom
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 3.0;
+        for (z, label) in [(false, "1×"), (true, "2×")] {
+            let on = zoom == z;
+            let (r, rr) = ui.allocate_exact_size(vec2(30.0, 18.0), Sense::click());
+            ui.painter().rect_filled(r, CornerRadius::same(4), if on { field_strong() } else if rr.hovered() { field() } else { Color32::TRANSPARENT });
+            ui.painter().text(r.center(), Align2::CENTER_CENTER, label, if on { semibold(10.0) } else { regular(10.0) }, if on { text() } else { text_dim() });
+            if rr.on_hover_text(tr("Zoom")).clicked() {
+                settings::update(|s| s.scope_zoom = z);
+            }
+        }
+    });
+}
+
+/// The colourised scope image of a measurement (cached per measurement).
+fn scope_texture(ui: &Ui, h: &std::sync::Arc<Histogram>) -> egui::TextureHandle {
+    let key = Id::new("vectorscope-tex");
+    let ptr = std::sync::Arc::as_ptr(h) as usize;
+    if let Some((p, t)) = ui.data(|d| d.get_temp::<(usize, egui::TextureHandle)>(key)) {
+        if p == ptr {
+            return t;
+        }
+    }
+    let n = crate::histogram::SCOPE;
+    let max = h.scope.iter().copied().max().unwrap_or(1).max(1) as f32;
+    let lmax = (1.0 + max).ln();
+    let mut px = vec![0u8; n * n * 4];
+    for i in 0..n * n {
+        let cnt = h.scope[i];
+        if cnt == 0 {
+            continue;
+        }
+        let s = h.scope_rgb[i];
+        let avg = [s[0] / cnt as f32, s[1] / cnt as f32, s[2] / cnt as f32];
+        // the pixel's own hue, brightened so dark colours still read
+        let m = avg[0].max(avg[1]).max(avg[2]).max(0.08);
+        let inten = ((1.0 + cnt as f32).ln() / lmax).powf(0.6);
+        for ch in 0..3 {
+            px[i * 4 + ch] = ((avg[ch] / m * 0.85 + 0.15).min(1.0) * 255.0) as u8;
+        }
+        px[i * 4 + 3] = (inten.clamp(0.12, 1.0) * 255.0) as u8;
+    }
+    let img = egui::ColorImage::from_rgba_unmultiplied([n, n], &px);
+    let t = ui.ctx().load_texture("vectorscope", img, egui::TextureOptions::LINEAR);
+    ui.data_mut(|d| d.insert_temp(key, (ptr, t.clone())));
+    t
 }

@@ -151,14 +151,6 @@ pub fn canvas(ui: &mut Ui, app: &mut AppState, tex: &CanvasTextures) {
     if app.subject_busy() {
         bx = badge(ui, pos2(bx, rect.top() + 12.0), &tr("Detecting the subject…")) + 6.0;
     }
-    if let Some(s) = app.solo_id {
-        if let Some(n) = app.layers().iter().flat_map(|n| std::iter::once(n.clone()).chain(n.children.clone())).find(|n| n.id == s).or_else(|| {
-            use crate::model::LayerTreeRead;
-            app.layers().find(s).cloned()
-        }) {
-            badge(ui, pos2(bx, rect.top() + 12.0), &format!("{} · {}", tr("SOLO"), n.name));
-        }
-    }
     if app.is_exporting {
         let r = Rect::from_center_size(rect.center(), vec2(72.0, 72.0));
         ui.painter().rect_filled(r, CornerRadius::same(14), with_alpha(panel_bg(), 0.92));
@@ -264,9 +256,47 @@ fn split_divider(ui: &mut Ui, app: &mut AppState, rect: Rect) {
     lab(&tr("AFTER"), pos2((x + 10.0).min(rect.right() - 60.0), rect.top() + 12.0));
 }
 
+/// A typed ratio: "2,39x1", "2.39:1", "16/9", "4 x 5", "1.85" (comma or point; x, :, / or a space).
+pub fn parse_ratio(s: &str) -> Option<f64> {
+    let t = s.trim().to_lowercase().replace(',', ".").replace('×', "x");
+    let parts: Vec<f64> = t.split(|c: char| c == 'x' || c == ':' || c == '/' || c.is_whitespace()).filter(|p| !p.is_empty()).map(|p| p.parse::<f64>()).collect::<Result<_, _>>().ok()?;
+    let r = match parts.as_slice() {
+        [a] => *a,
+        [a, b] if *b > 0.0 => a / b,
+        _ => return None,
+    };
+    (r.is_finite() && r > 0.01 && r < 100.0).then_some(r)
+}
+
+/// Crop ratio choices: the fixed ones, the custom ratios typed lately, then "Custom…".
+pub fn aspect_items() -> Vec<PickerItem> {
+    let mut v: Vec<PickerItem> = CROP_ASPECTS.iter().map(|o| PickerItem::new(o.0, &tr(o.1), None)).collect();
+    for c in crate::settings::get().crop_custom {
+        v.push(PickerItem::new(&format!("custom:{c}"), &c, Some(tr("Recent"))));
+    }
+    v.push(PickerItem::new("custom", &tr("Custom…"), Some(tr("Custom"))));
+    v
+}
+
+/// Remembers a typed custom ratio (newest first, at most 6).
+pub fn remember_custom_ratio(t: &str) {
+    let t = t.trim().to_string();
+    if parse_ratio(&t).is_none() {
+        return;
+    }
+    crate::settings::update(|s| {
+        s.crop_custom.retain(|x| x != &t);
+        s.crop_custom.insert(0, t.clone());
+        s.crop_custom.truncate(6);
+    });
+}
+
 fn norm_aspect(app: &AppState) -> Option<f64> {
     let src = app.source()?;
-    let a = CROP_ASPECTS.iter().find(|o| o.0 == app.crop_aspect)?.2?;
+    let a = match app.crop_aspect.strip_prefix("custom:") {
+        Some(t) => parse_ratio(t)?,
+        None => CROP_ASPECTS.iter().find(|o| o.0 == app.crop_aspect)?.2?,
+    };
     let pa = if a < 0.0 { src.width as f64 / src.height as f64 } else { a };
     Some(pa * src.height as f64 / src.width as f64)
 }
@@ -405,8 +435,9 @@ fn crop_overlay(ui: &mut Ui, app: &mut AppState, view: Rect, ir: Rect) {
     ui.scope_builder(egui::UiBuilder::new().max_rect(bar.shrink2(vec2(12.0, 8.0))), |ui| {
         ui.horizontal_centered(|ui| {
             ui.label(egui::RichText::new(icon_text("crop")).font(icon_font(14.0)).color(accent_text()));
-            let items: Vec<PickerItem> = CROP_ASPECTS.iter().map(|o| PickerItem::new(o.0, &tr(o.1), None)).collect();
-            let r = picker_field(ui, "crop.aspect", &items, &app.crop_aspect.clone(), None, &[], false);
+            let items = aspect_items();
+            let title = app.crop_aspect.strip_prefix("custom:").map(|t| t.to_string());
+            let r = picker_field(ui, "crop.aspect", &items, &app.crop_aspect.clone(), title.as_deref(), &[], false);
             if let Some(v) = r.selected {
                 app.crop_aspect = v;
                 apply_crop_aspect(app);
@@ -501,3 +532,20 @@ fn backdrop_menu(ui: &mut Ui, resp: &egui::Response, img_rect: Rect) {
         });
 }
 
+
+#[cfg(test)]
+mod tests {
+    use super::parse_ratio;
+
+    #[test]
+    fn typed_ratios() {
+        let close = |s: &str, v: f64| (parse_ratio(s).unwrap() - v).abs() < 1e-9;
+        assert!(close("2,39x1", 2.39));
+        assert!(close("2.39:1", 2.39));
+        assert!(close("16/9", 16.0 / 9.0));
+        assert!(close(" 4 x 5 ", 0.8));
+        assert!(close("1,85", 1.85));
+        assert!(close("3×2", 1.5));
+        assert!(parse_ratio("abc").is_none() && parse_ratio("4x0").is_none() && parse_ratio("").is_none());
+    }
+}

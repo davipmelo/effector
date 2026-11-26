@@ -182,7 +182,6 @@ pub struct AppState {
     /// All selected layers (shift / cmd-click).
     pub selected_ids: HashSet<Uuid>,
     selection_anchor: Option<Uuid>,
-    pub solo_id: Option<Uuid>,
     /// Temporary layers drawn on top while hovering / browsing effects and presets.
     pub preview_layers: Option<Vec<LayerNode>>,
     hover_pending: Option<(Option<Vec<LayerNode>>, Instant)>,
@@ -296,7 +295,6 @@ impl AppState {
             selected_id: None,
             selected_ids: HashSet::new(),
             selection_anchor: None,
-            solo_id: None,
             preview_layers: None,
             hover_pending: None,
             show_original: false,
@@ -434,7 +432,6 @@ impl AppState {
         self.active_id = Some(id);
         self.docs[i].last_used = Instant::now();
         self.preview_layers = None;
-        self.solo_id = None;
         self.last_coalesce_key = None;
         let sel = self.docs[i].selected_id.filter(|s| self.docs[i].state.layers.find(*s).is_some());
         self.set_selected(sel);
@@ -1045,11 +1042,6 @@ impl AppState {
                 s.layers.remove_node(*id);
             }
         });
-        if let Some(solo) = self.solo_id {
-            if self.layers().find(solo).is_none() {
-                self.solo_id = None;
-            }
-        }
         match loc {
             Some((parent, index)) => {
                 let siblings: Vec<LayerNode> =
@@ -1371,15 +1363,6 @@ impl AppState {
         self.is_rendering = true;
         let st = self.state();
         let mut layers = st.render_layers();
-        if let Some(solo) = self.solo_id {
-            if let Some(n) = layers.find(solo).cloned() {
-                let mut n = n;
-                n.enabled = true;
-                n.opacity = 1.0;
-                n.blend = BlendMode::Normal;
-                layers = vec![n];
-            }
-        }
         if let Some(pv) = &self.preview_layers {
             let mut l = resolve_masks(pv, &st.masks);
             l.extend(layers);
@@ -1813,7 +1796,7 @@ impl AppState {
         let repaint = self.ctx.clone();
         std::thread::spawn(move || {
             let tex = src.make_texture(&st.crop, 1.0);
-            let layers = st.render_layers();
+            let mut layers = st.render_layers();
             let extras = crate::renderer::Extras::for_render(&src, &st.crop, &layers, true);
             let out = crate::renderer::Renderer::new(false).render(&layers, &tex, crate::worker::content_key(src.id, &st.crop), true, st.active_canvas(), extras);
             let px = imageio::read_rgba8(&out);
@@ -2078,9 +2061,23 @@ impl AppState {
 
     /// Keys of the Masks tool, before the global shortcuts (Lightroom Classic): [ ] brush size,
     /// ⇧[ ⇧] brush feather, ' inverts the selected part, ⌫ deletes it, Esc stops drawing.
+    /// Also: Enter / Esc leave the Masks and Canvas tools back to Edit (Crop handles its own:
+    /// Enter applies, Esc cancels, both return to Edit).
     pub fn mask_key(&mut self, combo: &crate::shortcuts::KeyCombo) -> bool {
-        if self.tool != Tool::Masks || combo.cmd || combo.opt {
+        if combo.cmd || combo.opt {
             return false;
+        }
+        let leave = matches!(combo.key.as_str(), "escape" | "return") && !combo.shift;
+        if self.tool == Tool::Canvas && leave {
+            self.set_tool(Tool::Edit);
+            return true;
+        }
+        if self.tool != Tool::Masks {
+            return false;
+        }
+        if leave && self.mask_draw.is_none() {
+            self.set_tool(Tool::Edit);
+            return true;
         }
         let brush = self.mask_draw == Some(MaskDraw::Brush);
         match (combo.key.as_str(), combo.shift) {
@@ -2088,7 +2085,7 @@ impl AppState {
             ("]", false) if brush => self.brush.size = (self.brush.size * 1.15).min(0.5),
             ("[", true) if brush => self.brush.feather = (self.brush.feather - 0.1).max(0.0),
             ("]", true) if brush => self.brush.feather = (self.brush.feather + 0.1).min(1.0),
-            ("escape", false) if self.mask_draw.is_some() => self.mask_draw = None,
+            ("escape", false) | ("return", false) if self.mask_draw.is_some() => self.mask_draw = None,
             ("'", false) => {
                 let (Some(m), Some(p)) = (self.selected_mask, self.selected_part) else { return false };
                 self.update_part(m, p, None, |x| x.invert = !x.invert);

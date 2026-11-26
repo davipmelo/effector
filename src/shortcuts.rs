@@ -248,7 +248,7 @@ impl Action {
             SelectAll => "Select All",
             Deselect => "Deselect All",
             ShowClipping => "Show Clipping",
-            ToggleHistogram => "Show / Hide Histogram",
+            ToggleHistogram => "Show / Hide Monitoring",
             ToolEdit => "Edit Tool",
             ToolCanvas => "Canvas & Borders",
             ToolMasks => "Masks",

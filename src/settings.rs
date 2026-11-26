@@ -102,6 +102,12 @@ pub struct Settings {
     pub hsl_by_adjustment: bool,
     /// Masks tool: show the selected mask as a red overlay on the image.
     pub mask_overlay: bool,
+    /// Custom crop ratios typed lately (as typed, e.g. "2,39x1"), newest first.
+    pub crop_custom: Vec<String>,
+    /// Monitoring panel tab: "histogram" or "vectorscope".
+    pub monitor_tab: String,
+    /// Vectorscope zoomed 2×.
+    pub scope_zoom: bool,
 }
 
 impl Default for Settings {
@@ -131,6 +137,9 @@ impl Default for Settings {
             histogram_mode: "rgb".into(),
             hsl_by_adjustment: false,
             mask_overlay: true,
+            crop_custom: vec![],
+            monitor_tab: "histogram".into(),
+            scope_zoom: false,
         }
     }
 }

@@ -37,13 +37,22 @@
   `renderer::part_texture` desenha cada parte (`k_maskgeom` para gradientes, `brush::raster` na CPU até 1280 px +
   upload para o pincel, `k_subjectmask` para assunto/fundo). O renderer guarda em cache a saída do efeito **sem** a
   máscara (`LayerNode::effect_hash`), então pintar ou arrastar um gradiente só refaz a mescla.
-  UI: `ui/tools.rs` (painel, `MASK_KINDS`, `begin_kind`), `ui/mask_canvas.rs` (desenhar, pintar, alfinetes e alças;
-  `Geo` converte tela ↔ imagem), `AppState::{mask_draw, mask_draw_into, selected_part, brush}`,
+  UI: `ui/tools.rs` (painel, `MASK_KINDS`, `begin_kind`, cores dos modos em `mode_style`), `ui/mask_canvas.rs`
+  (desenhar, pintar, `hit_test` por prioridade: bolinhas → alfinete → anel de rotação → elipse da suavidade / linhas
+  do linear; `Op` guarda o arraste em andamento; ⇧ restringe todo arraste; ⌘/Alt + botão direito = tamanho e
+  suavidade do pincel; `Geo` converte tela ↔ imagem), `AppState::{mask_draw, mask_draw_into, selected_part, brush}`,
   `AppState::mask_key` (teclas [ ] ⇧[ ⇧] ' ⌫ ⎋ antes dos atalhos globais). Atalhos: `MaskBrush` (K), `MaskLinear` (M),
   `MaskRadial` (⇧M), `MaskSubject` (⇧S), `MaskBackground` (⇧G). Specs do `--render-test`: `mask=linear|radial|brush|
   subject|background[/inv]`; passos do script de screenshot: `mask:<tipo>`, `draw:<brush|linear|radial>`.
 - **Layers (0.8.3):** mesclagem + opacidade do(s) layer(s) selecionado(s) numa barra no topo da lista
-  (`layers::layer_props_bar`) e o slot de máscara em cada linha (`layer_mask_menu`); a seção "Layer" saiu do inspector.
+  (`layers::layer_props_bar`) e o slot de máscara fixo em cada linha (`layer_mask_menu`); a seção "Layer" saiu do
+  inspector e o Solo foi removido. ↩/⎋ voltam para Editar a partir de Máscaras e Canvas (`AppState::mask_key`).
+- **Monitoramento (0.8.3):** `ui/histogram.rs` tem as abas Histograma e Vectorscope (`settings.monitor_tab`,
+  `scope_zoom`). `Histogram::from_rgba` também acumula Cb/Cr Rec. 709 em `SCOPE`×`SCOPE` bins com a cor média
+  (`scope`, `scope_rgb`); a imagem do scope vira uma textura egui guardada por medição. Linha de pele a 123°.
+  Passo `scope` no script de screenshot.
+- **Recorte personalizado (0.8.3):** `canvas_view::parse_ratio` ("2,39x1", "2.39:1", "16/9"), `crop_aspect` =
+  `custom:<texto>`, recentes em `settings.crop_custom`.
 - **Filtros de lente (0.8.3):** `lensfilters::diffusion` (difusão física em luz linear que conserva energia:
   `k_diffsrc` + 3 blurs + `k_diffusion`, constantes por filtro em `diffuser`) e `lensfilters::ghost` (`k_ghostfx`,
   cópias/rastro misturados em luz linear). Categoria de presets "Lens Filters".

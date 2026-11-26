@@ -81,4 +81,18 @@ pub const PT_083: &[(&str, &str)] = &[
     ("Streak Filter", "Filtro Streak"),
     ("Night Glamour", "Glamour Noturno"),
     ("Dream Glass", "Vidro de Sonho"),
+    // add / subtract
+    ("Add to this mask: the new part makes the selection bigger", "Adicionar a esta máscara: a parte nova aumenta a seleção"),
+    ("Subtract from this mask: the new part cuts a hole in the selection", "Subtrair desta máscara: a parte nova abre um buraco na seleção"),
+    // crop
+    ("Recent", "Recentes"),
+    ("Width × height, e.g. 2,39x1 · 4:5 · 16/9", "Largura × altura, por exemplo 2,39x1 · 4:5 · 16/9"),
+    // monitoring
+    ("Monitoring", "Monitoramento"),
+    ("Vectorscope", "Vectorscope"),
+    ("Show / Hide Monitoring", "Mostrar / Ocultar Monitoramento"),
+    ("Hide monitoring", "Ocultar monitoramento"),
+    ("Show monitoring", "Mostrar monitoramento"),
+    ("Colours of the image by hue (angle) and saturation (distance from the centre). Skin tones of any ethnicity fall on the skin line.",
+     "Cores da imagem por matiz (ângulo) e saturação (distância do centro). Tons de pele de qualquer etnia caem sobre a linha de pele."),
 ];

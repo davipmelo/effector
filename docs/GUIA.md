@@ -17,9 +17,9 @@
 - O layer **de cima** é aplicado **por último**, sobre tudo o que está abaixo.
 - Arraste para reordenar. Soltar no meio de um grupo coloca o layer **dentro** dele.
 - **⌘G** agrupa e **⇧⌘G** desagrupa. **⌘J** duplica (como no Photoshop) e **⌫** exclui. Cada grupo tem a própria opacidade e o próprio modo de mesclagem.
-- Olho = mostrar/ocultar (**H**). Lixeira (ao lado do olho) = excluir. **S** (ao passar o mouse) = solo: mostra só aquele layer.
+- Olho = mostrar/ocultar (**H**). Lixeira (ao lado do olho) = excluir.
 - **Mesclagem e opacidade** ficam no topo da lista de layers, como no Photoshop, e valem para o layer selecionado (ou todos os selecionados). Na opacidade: clique ou arraste para ajustar, role o mouse para ajuste fino e dê duplo clique para 100%.
-- **Ícone de máscara** em cada layer (aparece ao passar o mouse; fica amarelo quando o layer tem máscara): clique para escolher uma máscara da imagem, inverter, criar uma nova ou editar.
+- **Ícone de máscara** em cada layer, sempre visível ao lado da lixeira e do olho (fica amarelo quando o layer tem máscara): clique para escolher uma máscara da imagem, inverter, criar uma nova ou editar.
 - O botão de salvar (no topo dos layers) guarda **a pilha inteira como preset**: ordem, grupos, parâmetros, opacidade e mesclagem.
 - Duplo clique no nome renomeia. Clique direito abre mais opções, como "Salvar como Preset".
 
@@ -53,7 +53,7 @@
 
 ## Visualização
 - **]** ou o botão na barra alterna **Antes / Depois**.
-- **Histograma** no topo da sidebar da direita: RGB, Luminância, R, G, B ou Tudo. Clique no título (ou ⇧⌘H) para recolher.
+- **Monitoramento** no topo da sidebar da direita, com duas abas. **Histograma**: RGB, Luminância, R, G, B ou Tudo. **Vectorscope**: as cores da imagem por matiz e saturação, cada ponto na sua cor, com alvos de R, Mg, B, Ci, G e Am e a **linha de tom de pele** (zoom 1× / 2×). Clique no título (ou ⇧⌘H) para recolher.
 - **J** mostra o **recorte** na imagem: altas luzes estouradas em vermelho, sombras esmagadas em azul. Os triângulos do histograma também ligam e desligam.
 - Pinça ou **⌘ + rolagem** para zoom. Arraste ou role para mover a imagem: isso só funciona quando a imagem é maior que a área de visualização (no eixo em que ela passa da tela). Ajustada à janela, ela não sai do lugar.
 - Duplo clique na imagem ajusta à janela.
@@ -66,18 +66,20 @@
 - Ícone **Canvas & Bordas** na fileira de ferramentas (ou **⇧B**): encaixa a imagem numa proporção — 4:5, 1:1, 9:16, 3:4, 1.91:1, 16:9, impressão, A4 ou personalizada — com borda mínima, fundo de **cor**, **degradê** ou a **própria foto desfocada**, posição, cantos arredondados e sombra. O export sai no tamanho do canvas.
 
 ## Recorte
-- **R** (como no Lightroom) ou o ícone de recorte na fileira de ferramentas. Escolha a proporção (Livre, 1:1, 4:5, 16:9…) no painel da direita e clique em **Concluir** (ou **↩**). **⎋** cancela. Trocar de ferramenta também aplica o recorte, como no Lightroom.
+- **R** (como no Lightroom) ou o ícone de recorte na fileira de ferramentas. Escolha a proporção (Livre, 1:1, 4:5, 16:9… ou **Personalizada**, digitando por exemplo "2,39x1", "4:5" ou "16/9"; as últimas ficam em Recentes) no painel da direita e clique em **Concluir** (ou **↩**). **⎋** cancela. Trocar de ferramenta também aplica o recorte, como no Lightroom.
 
 ## Máscaras
 - As máscaras são da **imagem**, não de cada efeito: crie uma vez e use em quantos efeitos quiser. Ícone **Máscaras** (ou **⇧W**) → **Criar Nova Máscara**, ou direto pelos atalhos do Lightroom Classic:
   - **Selecionar Assunto** (**⇧S**) e **Selecionar Fundo** (**⇧G**): a IA encontra o assunto principal da foto no próprio computador (cerca de 2 s na primeira vez em cada foto). Ajustes: **Suavidade da Borda** e **Expandir / Contrair**.
-  - **Pincel** (**K**): pinte na imagem. **[ ]** mudam o tamanho, **⇧[ ⇧]** a suavidade; segure **⌥** (Alt) para apagar, ou ligue **Apagar**. **Fluxo** controla quanto cada pincelada acumula. **⎋** ou **Concluído** para de pintar.
+  - **Pincel** (**K**): pinte na imagem. **[ ]** mudam o tamanho, **⇧[ ⇧]** a suavidade; ou segure **⌘** (Mac) / **Alt** (Windows) e arraste com o **botão direito**: para os lados muda o tamanho, para cima/baixo a suavidade. Segure **⌥** (Alt) para apagar, ou ligue **Apagar**. **Fluxo** controla quanto cada pincelada acumula. **⎋** ou **Concluído** para de pintar.
   - **Gradiente Linear** (**M**): arraste na imagem de onde o efeito é total até onde ele some.
   - **Gradiente Radial** (**⇧M**): arraste do centro para fora; segure **⇧** para um círculo. Ajustes: tamanho, arredondamento, suavidade e ângulo.
-- Gradientes mostram **alfinete e alças** na imagem: arraste o alfinete para mover, as alças para mudar tamanho, ângulo e largura da transição.
-- Cada máscara tem partes: a primeira é a base; **Adicionar / Subtrair** acrescentam outras partes de qualquer tipo, que podem **Adicionar**, **Subtrair** ou fazer **Interseção**. Cada parte tem inverter (**'**, como no Lightroom), olho e remover (**⌫** remove a parte selecionada).
+- Gradientes mostram **alfinete e alças** na imagem: arraste o alfinete (ou a linha pontilhada do meio do linear) para mover. No **anel em volta do alfinete** o cursor vira uma seta de girar: arraste para **rotacionar**. No linear, puxar uma das **linhas sólidas** mexe só aquele lado (a suavidade). No radial, as bolinhas mudam o tamanho e a **elipse pontilhada** muda a suavidade.
+- **⇧ em qualquer arraste:** gradiente linear reto (em passos de 45°), radial em círculo perfeito, mover só na horizontal ou na vertical, girar em passos de 15°.
+- Cada máscara tem partes: a primeira é a base; **Adicionar** (verde, **+**) e **Subtrair** (vermelho, **−**) acrescentam outras partes de qualquer tipo. Cada parte mostra a cor e o sinal do modo (verde soma, vermelho tira, azul **∩** fica só com o que as duas têm em comum). Na sobreposição vermelha, as áreas subtraídas aparecem listradas. Cada parte tem inverter (**'**, como no Lightroom), olho e remover (**⌫** remove a parte selecionada).
 - **Efeitos que Usam Esta Máscara**: marque os efeitos que a máscara limita, ou use o ícone de máscara de cada layer.
 - **Mostrar Sobreposição** (**O**) pinta de vermelho a área da máscara selecionada.
+- **↩ ou ⎋** voltam para Editar (com o pincel ou um gradiente armado, o primeiro ⎋ só para de desenhar). O mesmo vale para Canvas & Bordas; no Recorte, ↩ aplica e ⎋ cancela.
 - Projetos e presets antigos com máscaras de profundidade abrem com máscaras de Assunto ou Fundo no lugar. Presets e layers copiados levam as máscaras junto para outras imagens.
 
 ## Salvar e exportar
@@ -202,5 +204,7 @@ Baseados no **Lightroom Classic** quando a função existe lá, e no **Photoshop
 ## Novos na 0.8.3
 - **Máscaras de verdade**: Pincel (**K**), Gradiente Linear (**M**), Gradiente Radial (**⇧M**), Selecionar Assunto (**⇧S**) e Selecionar Fundo (**⇧G**), desenhadas e ajustadas direto na imagem.
 - **Detecção de assunto por IA** no lugar do mapa de profundidade: Desfoque de Fundo (antigo Desfoque de Profundidade), Emulação de Lentes e Neblina usam o assunto, e a seção **Onde** dos efeitos virou **Aplicar Em: Em tudo / Fundo / Assunto**. Paralaxe & Relevo saiu.
-- **Mesclagem, opacidade e máscara** na lista de layers, como no Photoshop.
+- **Mesclagem, opacidade e máscara** na lista de layers, como no Photoshop (o botão Solo saiu).
+- **Monitoramento** com Histograma e **Vectorscope** (linha de tom de pele).
+- **Proporção de recorte personalizada** ("2,39x1", "4:5"…).
 - **Filtros de Lente** (categoria nova de presets, no lugar de Sonho & Surreal) com dois efeitos novos: **Filtro de Difusão** (Black Pro-Mist, Pro-Mist, Cinebloom, Glimmerglass, Pearlescent, Hollywood Black Magic, Black Satin, Soft Focus e Fog, em graduações 1/8 a 2) e **Filtro Fantasma** (cópias deslocadas e rastros de obturador lento, de um lado, dos dois, nos cantos ou em volta do centro).

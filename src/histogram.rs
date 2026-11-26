@@ -1,5 +1,7 @@
-//! Histogram of the rendered image (what is on screen), computed on the render thread from a
-//! small copy of the output. 256 levels per channel on the sRGB-encoded values, like Lightroom.
+//! Histogram and vectorscope of the rendered image (what is on screen), computed on the render
+//! thread from a small copy of the output. 256 levels per channel on the sRGB-encoded values, like
+//! Lightroom; the vectorscope bins Rec. 709 Cb/Cr and keeps the average colour of each bin (for a
+//! colourised scope, like Resolve).
 
 use crate::gpu::{Ctx, T};
 
@@ -12,6 +14,19 @@ pub struct Histogram {
     pub l: Vec<u32>,
     /// Pixels counted (fully transparent ones are left out).
     pub total: u32,
+    /// Vectorscope: SCOPE×SCOPE bins over Cb (x, −0.5..0.5) and Cr (y, +0.5 at the top).
+    pub scope: Vec<u32>,
+    /// Sum of the colours that fell in each bin.
+    pub scope_rgb: Vec<[f32; 3]>,
+}
+
+/// Vectorscope resolution (bins per side).
+pub const SCOPE: usize = 160;
+
+/// Rec. 709 chroma of an sRGB-encoded colour (Cb, Cr in −0.5..0.5).
+pub fn cbcr(r: f32, g: f32, b: f32) -> (f32, f32) {
+    let y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    ((b - y) / 1.8556, (r - y) / 1.5748)
 }
 
 /// Longest side of the copy the histogram is measured on.
@@ -28,7 +43,7 @@ impl Histogram {
     }
 
     pub fn from_rgba(px: &[f32]) -> Histogram {
-        let mut hst = Histogram { r: vec![0; 256], g: vec![0; 256], b: vec![0; 256], l: vec![0; 256], total: 0 };
+        let mut hst = Histogram { r: vec![0; 256], g: vec![0; 256], b: vec![0; 256], l: vec![0; 256], total: 0, scope: vec![0; SCOPE * SCOPE], scope_rgb: vec![[0.0; 3]; SCOPE * SCOPE] };
         let level = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as usize;
         for p in px.chunks_exact(4) {
             if p[3] < 0.5 {
@@ -40,6 +55,15 @@ impl Histogram {
             hst.b[level(b)] += 1;
             hst.l[level(0.2126 * r + 0.7152 * g + 0.0722 * b)] += 1;
             hst.total += 1;
+            let (cb, cr) = cbcr(r, g, b);
+            let x = (((cb + 0.5) * SCOPE as f32) as usize).min(SCOPE - 1);
+            let y = (((0.5 - cr) * SCOPE as f32) as usize).min(SCOPE - 1);
+            let i = y * SCOPE + x;
+            hst.scope[i] += 1;
+            let s = &mut hst.scope_rgb[i];
+            s[0] += r;
+            s[1] += g;
+            s[2] += b;
         }
         hst
     }
@@ -66,5 +90,11 @@ mod tests {
         assert_eq!(h.l[255], 1);
         assert_eq!(h.g[128], 1);
         assert!((h.clipped(true)[3] - 1.0 / 3.0).abs() < 1e-6);
+        // greys sit in the centre of the vectorscope
+        let c = (SCOPE / 2) * SCOPE + SCOPE / 2;
+        assert_eq!(h.scope[c], 3);
+        // pure red is up and to the left (Cr > 0, Cb < 0)
+        let (cb, cr) = cbcr(1.0, 0.0, 0.0);
+        assert!(cb < 0.0 && cr > 0.4);
     }
 }

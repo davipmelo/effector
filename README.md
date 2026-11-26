@@ -7,7 +7,7 @@ Editor de efeitos para fotos em camadas, para **Windows** e **macOS**. Você emp
 ## Funções
 
 ### Edição em camadas
-- Pilha de **layers** com grupos, opacidade e 18 modos de mesclagem no topo da lista (como no Photoshop), máscara em cada layer, mostrar / ocultar, solo, duplicar, reordenar arrastando e seleção múltipla.
+- Pilha de **layers** com grupos, opacidade e 18 modos de mesclagem no topo da lista (como no Photoshop), máscara em cada layer, mostrar / ocultar, duplicar, reordenar arrastando e seleção múltipla.
 - **Looks** prontos em todo efeito, **paletas** de cores combinadas, degradês e paletas salvos, **LUTs** `.cube`.
 - Prévia ao vivo ao passar o mouse sobre efeitos e presets; **paleta de comandos** (⌘K / Ctrl+K); desfazer ilimitado por imagem.
 
@@ -27,7 +27,7 @@ Editor de efeitos para fotos em camadas, para **Windows** e **macOS**. Você emp
 
 ### Ferramentas (fileira de ícones da direita)
 - **Editar:** os controles do layer selecionado.
-- **Recorte** com proporções prontas.
+- **Recorte** com proporções prontas ou personalizadas ("2,39x1").
 - **Canvas & Bordas:** encaixa a foto em outra proporção (Instagram, impressão…) com borda de cor, degradê ou foto desfocada, cantos arredondados e sombra.
 - **Máscaras** (atalhos do Lightroom Classic): **Pincel** (K), **Gradiente Linear** (M), **Gradiente Radial** (⇧M), **Selecionar Assunto** (⇧S) e **Selecionar Fundo** (⇧G), desenhadas e ajustadas na imagem, com partes que somam, subtraem ou se cruzam e sobreposição vermelha (O). Uma máscara pode limitar vários efeitos.
 
@@ -35,7 +35,7 @@ Editor de efeitos para fotos em camadas, para **Windows** e **macOS**. Você emp
 - O app encontra o assunto principal da foto no próprio computador (IS-Net): máscaras de assunto e fundo, efeitos aplicados só no assunto ou só no fundo, bokeh atrás do assunto, neblina no fundo.
 
 ### Visualização
-- **Histograma** com avisos de recorte (**J**), antes / depois (**]**) e dividido (**Y**), tela cheia, zoom, fundo da área central escolhido com o botão direito.
+- **Monitoramento**: histograma com avisos de recorte (**J**) e **vectorscope** com linha de tom de pele, antes / depois (**]**) e dividido (**Y**), tela cheia, zoom, fundo da área central escolhido com o botão direito.
 
 ### Várias imagens
 - **Filmstrip** com várias fotos abertas, cada uma com os próprios layers; **sincronizar**, copiar e colar ajustes entre fotos.

@@ -85,13 +85,47 @@ pub fn crop_panel(ui: &mut Ui, app: &mut AppState) {
         egui::Frame::new().inner_margin(14).show(ui, |ui| {
             ui.spacing_mut().item_spacing.y = 10.0;
             labeled_row(ui, "Aspect Ratio", |ui| {
-                let items: Vec<PickerItem> = super::canvas_view::CROP_ASPECTS.iter().map(|o| PickerItem::new(o.0, &tr(o.1), None)).collect();
-                let r = picker_field(ui, "crop.aspect.panel", &items, &app.crop_aspect.clone(), None, &[], false);
+                let items = super::canvas_view::aspect_items();
+                let title = app.crop_aspect.strip_prefix("custom:").map(|t| t.to_string());
+                let r = picker_field(ui, "crop.aspect.panel", &items, &app.crop_aspect.clone(), title.as_deref(), &[], false);
                 if let Some(v) = r.selected {
+                    if v == "custom" {
+                        ui.data_mut(|d| d.insert_temp(Id::new("crop-custom-focus"), true));
+                    }
+                    ui.data_mut(|d| d.remove::<String>(Id::new("crop-custom-text")));
                     app.crop_aspect = v;
                     super::canvas_view::apply_crop_aspect(app);
                 }
             });
+            if app.crop_aspect.starts_with("custom") {
+                // typed ratio: "2,39x1", "2.39:1", "16/9"…
+                let tid = Id::new("crop-custom-text");
+                let mut t: String = ui.data(|d| d.get_temp(tid)).unwrap_or_else(|| app.crop_aspect.strip_prefix("custom:").unwrap_or("").to_string());
+                let ok = super::canvas_view::parse_ratio(&t).is_some() || t.trim().is_empty();
+                labeled_row(ui, "Custom", |ui| {
+                    let te = ui.add(
+                        egui::TextEdit::singleline(&mut t)
+                            .hint_text("2,39x1")
+                            .desired_width(110.0)
+                            .text_color(if ok { text() } else { Color32::from_rgb(240, 90, 90) }),
+                    );
+                    if ui.data(|d| d.get_temp::<bool>(Id::new("crop-custom-focus")).unwrap_or(false)) {
+                        te.request_focus();
+                        ui.data_mut(|d| d.remove::<bool>(Id::new("crop-custom-focus")));
+                    }
+                    if te.changed() {
+                        if super::canvas_view::parse_ratio(&t).is_some() {
+                            app.crop_aspect = format!("custom:{}", t.trim());
+                            super::canvas_view::apply_crop_aspect(app);
+                        }
+                    }
+                    if te.lost_focus() {
+                        super::canvas_view::remember_custom_ratio(&t);
+                    }
+                });
+                ui.data_mut(|d| d.insert_temp(tid, t));
+                hint(ui, &tr("Width × height, e.g. 2,39x1 · 4:5 · 16/9"));
+            }
             if let Some(src) = app.source() {
                 let r = app.crop_draft.pixel_rect(src.width, src.height);
                 ui.horizontal(|ui| {
@@ -138,6 +172,26 @@ pub fn canvas_panel(ui: &mut Ui, app: &mut AppState) {
 // MARK: - Masks
 
 /// Quick depth selections offered when creating a mask or a part.
+/// Colour and sign of each mask mode (green add, red subtract, blue intersect).
+pub fn mode_style(m: MaskMode) -> (Color32, &'static str) {
+    match m {
+        MaskMode::Add => (Color32::from_rgb(70, 200, 120), "+"),
+        MaskMode::Subtract => (Color32::from_rgb(240, 85, 85), "−"),
+        MaskMode::Intersect => (Color32::from_rgb(90, 160, 255), "∩"),
+    }
+}
+
+/// Outlined button in a mode colour, with its sign: "+ Add", "− Subtract".
+fn mode_button(ui: &mut Ui, mode: MaskMode, label: &str) -> egui::Response {
+    let (c, sign) = mode_style(mode);
+    let g = ui.painter().layout_no_wrap(format!("{sign}  {}", tr(label)), semibold(12.0), c);
+    let (r, resp) = ui.allocate_exact_size(vec2(g.size().x + 26.0, 28.0), Sense::click());
+    ui.painter().rect_filled(r, CornerRadius::same(7), with_alpha(c, if resp.hovered() { 0.22 } else { 0.1 }));
+    ui.painter().rect_stroke(r, CornerRadius::same(7), Stroke::new(1.2, with_alpha(c, 0.85)), egui::StrokeKind::Inside);
+    ui.painter().galley(r.center() - g.size() / 2.0, g, c);
+    resp
+}
+
 /// The five ways to make a mask (Lightroom Classic order), with their shortcut actions.
 const MASK_KINDS: [(&str, &str, Action); 5] = [
     ("mask.subject", "Select Subject", Action::MaskSubject),
@@ -409,15 +463,14 @@ fn mask_editor(ui: &mut Ui, app: &mut AppState, st: &DocumentState, mask: &Mask)
         mask_part(ui, app, mask, i, part, n);
     }
     egui::Frame::new().inner_margin(egui::Margin { left: 14, right: 14, top: 6, bottom: 10 }).show(ui, |ui| {
-        // Lightroom-style: add to or subtract from this mask with any kind
+        // Lightroom-style: add to (green) or subtract from (red) this mask with any kind
         ui.horizontal(|ui| {
-            let add = pill_icon_button(ui, "plus", &tr("Add"), false).on_hover_text(tr("Add to this mask"));
+            ui.spacing_mut().item_spacing.x = 8.0;
+            let add = mode_button(ui, MaskMode::Add, "Add").on_hover_text(tr("Add to this mask: the new part makes the selection bigger"));
             if let Some(i) = egui::Popup::menu(&add).show(kinds_menu).and_then(|r| r.inner) {
                 begin_kind(app, i, Some((mid, MaskMode::Add)));
             }
-        });
-        ui.horizontal(|ui| {
-            let sub = pill_icon_button(ui, "minus", &tr("Subtract"), false).on_hover_text(tr("Subtract from this mask"));
+            let sub = mode_button(ui, MaskMode::Subtract, "Subtract").on_hover_text(tr("Subtract from this mask: the new part cuts a hole in the selection"));
             if let Some(i) = egui::Popup::menu(&sub).show(kinds_menu).and_then(|r| r.inner) {
                 begin_kind(app, i, Some((mid, MaskMode::Subtract)));
             }
@@ -474,14 +527,19 @@ fn mask_part(ui: &mut Ui, app: &mut AppState, mask: &Mask, i: usize, part: &Mask
         app.update_part(mid, pid, Some(format!("{pid}-{key}")), |p| f(p));
     };
     egui::Frame::new().inner_margin(egui::Margin { left: 10, right: 10, top: 4, bottom: 4 }).show(ui, |ui| {
+        let (mc, sign) = mode_style(part.mode);
         let fr = egui::Frame::new()
             .fill(with_alpha(field(), if sel { 0.95 } else { 0.5 }))
-            .stroke(if sel { Stroke::new(1.0, with_alpha(ACCENT, 0.6)) } else { Stroke::NONE })
+            .stroke(Stroke::new(1.0, with_alpha(mc, if sel { 0.9 } else { 0.35 })))
             .corner_radius(CornerRadius::same(8))
-            .inner_margin(10)
+            .inner_margin(egui::Margin { left: 14, right: 10, top: 10, bottom: 10 })
             .show(ui, |ui| {
                 ui.spacing_mut().item_spacing.y = 8.0;
                 ui.horizontal(|ui| {
+                    // mode badge: + green, − red, ∩ blue
+                    let (br, _) = ui.allocate_exact_size(vec2(18.0, 18.0), Sense::hover());
+                    ui.painter().circle_filled(br.center(), 8.5, mc);
+                    ui.painter().text(br.center() - vec2(0.0, 0.5), egui::Align2::CENTER_CENTER, sign, semibold(13.0), Color32::BLACK);
                     let (ir, _) = ui.allocate_exact_size(vec2(16.0, 16.0), Sense::hover());
                     paint_icon(ui, ir, part.shape.symbol(), 13.0, accent_text());
                     let title = if i == 0 { tr(part.shape.kind_label()) } else { format!("{} · {}", tr(part.mode.label()), tr(part.shape.kind_label())) };
@@ -582,6 +640,9 @@ fn mask_part(ui: &mut Ui, app: &mut AppState, mask: &Mask, i: usize, part: &Mask
                     set(app, "invert", &move |p| p.invert = v);
                 }
             });
+        // colour stripe on the left edge (the mode at a glance)
+        let r = fr.response.rect;
+        ui.painter().rect_filled(Rect::from_min_size(r.min + vec2(1.0, 8.0), vec2(3.0, r.height() - 16.0)), CornerRadius::same(2), mc);
         if fr.response.interact(Sense::click()).clicked() {
             app.selected_part = Some(pid);
         }

@@ -794,6 +794,7 @@ impl EffectorUi {
                 }
                 "browser" => self.app.show_effect_browser = true,
                 "clip" => self.app.perform(Action::ShowClipping, ctx),
+                "scope" => crate::settings::update(|s| s.monitor_tab = "vectorscope".into()),
                 // mask:<subject|background|linear|radial|brush>: a new mask on the selected layer
                 "mask" => {
                     if let Some(shape) = crate::rendertest::test_mask_shape(arg) {

@@ -1,5 +1,5 @@
 //! Layers panel: Add Effect / Presets buttons, the layer tree with groups, multi-selection,
-//! drag to reorder (above / below / inside groups), rename, solo, visibility and context menu.
+//! drag to reorder (above / below / inside groups), rename, visibility, mask and context menu.
 
 use egui::{pos2, vec2, Align2, CornerRadius, Id, Rect, Sense, Stroke, StrokeKind, Ui};
 use uuid::Uuid;
@@ -264,11 +264,9 @@ fn layer_row(ui: &mut Ui, app: &mut AppState, node: &LayerNode, depth: usize, di
     right -= 20.0;
     let trash_r = Rect::from_center_size(pos2(right - 11.0, cy), vec2(18.0, 24.0));
     right -= 24.0;
-    let solo = app.solo_id == Some(node.id);
-    let solo_r = Rect::from_center_size(pos2(right - 9.0, cy), vec2(18.0, 24.0));
-    if hover || solo {
-        right -= 22.0;
-    }
+    // mask slot: always there, next to the trash and the eye (Photoshop-style)
+    let mask_r = Rect::from_center_size(pos2(right - 9.0, cy), vec2(18.0, 24.0));
+    right -= 22.0;
     let eye = ui.interact(eye_r, Id::new(("eye", node.id)), Sense::click());
     paint_icon(
         ui,
@@ -294,18 +292,23 @@ fn layer_row(ui: &mut Ui, app: &mut AppState, node: &LayerNode, depth: usize, di
         app.delete_selected();
     }
     trash.on_hover_text(format!("{} ({})", tr(if app.selected_ids.contains(&node.id) && app.is_multi_selection() { "Delete selected layers" } else { "Delete" }), display(Action::Delete)));
-    if hover || solo {
-        let s = ui.interact(solo_r, Id::new(("solo", node.id)), Sense::click());
-        ui.painter().circle_stroke(solo_r.center(), 6.5, Stroke::new(1.2, if solo { accent_text() } else { text_faint() }));
-        if solo {
-            ui.painter().circle_filled(solo_r.center(), 6.5, accent_text());
-        }
-        ui.painter().text(solo_r.center(), Align2::CENTER_CENTER, "S", bold(8.5), if solo { egui::Color32::BLACK } else { text_faint() });
-        if s.clicked() {
-            app.solo_id = if solo { None } else { Some(node.id) };
-            app.request_render();
-        }
-        s.on_hover_text(tr("Solo: show only this layer"));
+    {
+        let linked = node.mask.and_then(|r| app.state().mask(r.id).map(|m| (m.name.clone(), r.invert)));
+        let mresp = ui.interact(mask_r, Id::new(("maskslot", node.id)), Sense::click());
+        let col = match &linked {
+            Some(_) => with_alpha(accent_text(), 0.95 * opacity),
+            None if hover || mresp.hovered() => with_alpha(text_dim(), opacity),
+            None => with_alpha(with_alpha(text_faint(), 0.7), opacity),
+        };
+        paint_icon(ui, mask_r, if linked.as_ref().map(|l| l.1).unwrap_or(false) { "circle.lefthalf.filled" } else { "circle.dashed" }, 12.0, col);
+        let tip = match &linked {
+            Some((n, true)) => crate::l10n::trf("Mask: %@ (inverted)", &[n]),
+            Some((n, false)) => crate::l10n::trf("Mask: %@", &[n]),
+            None => tr("Add a mask to this layer"),
+        };
+        let mresp = mresp.on_hover_text(tip);
+        let lid = node.id;
+        egui::Popup::menu(&mresp).id(Id::new(("maskmenu", lid))).show(|ui| layer_mask_menu(ui, app, lid));
     }
     // badges: opacity, blend
     if node.opacity < 0.999 {
@@ -318,33 +321,6 @@ fn layer_row(ui: &mut Ui, app: &mut AppState, node: &LayerNode, depth: usize, di
         let g = ui.painter().layout_no_wrap(tr(node.blend.label()), regular(9.5), text_faint());
         right -= g.size().x + 6.0;
         ui.painter().galley(pos2(right, cy - g.size().y / 2.0), g, text_faint());
-    }
-    // mask slot (Photoshop-style): filled when a mask limits the layer, click for the mask menu
-    {
-        let linked = node.mask.and_then(|r| app.state().mask(r.id).map(|m| (m.name.clone(), r.invert)));
-        let mr = Rect::from_center_size(pos2(right - 9.0, cy), vec2(18.0, 20.0));
-        right -= 20.0;
-        let mresp = ui.interact(mr, Id::new(("maskslot", node.id)), Sense::click());
-        if mresp.hovered() {
-            ui.painter().rect_filled(mr.expand(1.0), CornerRadius::same(4), row_hover());
-        }
-        match &linked {
-            Some((_, inv)) => {
-                paint_icon(ui, mr, if *inv { "circle.dashed" } else { "circle.dashed.inset.filled" }, 12.0, with_alpha(accent_text(), 0.9 * opacity));
-            }
-            None if hover || selected || mresp.hovered() => {
-                paint_icon(ui, mr, "circle.dashed", 12.0, with_alpha(text_faint(), opacity));
-            }
-            None => {}
-        }
-        let tip = match &linked {
-            Some((n, true)) => crate::l10n::trf("Mask: %@ (inverted)", &[n]),
-            Some((n, false)) => crate::l10n::trf("Mask: %@", &[n]),
-            None => tr("Add a mask to this layer"),
-        };
-        let mresp = mresp.on_hover_text(tip);
-        let lid = node.id;
-        egui::Popup::menu(&mresp).id(Id::new(("maskmenu", lid))).show(|ui| layer_mask_menu(ui, app, lid));
     }
     // name / rename field
     let name_rect = Rect::from_min_max(pos2(x, rect.top() + 6.0), pos2(right - 4.0, rect.bottom() - 6.0));
@@ -424,11 +400,6 @@ fn layer_row(ui: &mut Ui, app: &mut AppState, node: &LayerNode, depth: usize, di
         if ui.button(if enabled { tr("Hide") } else { tr("Show") }).clicked() {
             select(app);
             app.toggle_selected_visibility();
-            ui.close();
-        }
-        if ui.button(if solo { tr("Unsolo") } else { tr("Solo") }).clicked() {
-            app.solo_id = if solo { None } else { Some(nid) };
-            app.request_render();
             ui.close();
         }
         ui.separator();
