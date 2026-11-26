@@ -802,6 +802,13 @@ impl EffectorUi {
                         self.app.add_mask_part(shape, None);
                     }
                 }
+                // maskadd:<kind> / masksub:<kind>: a part added to / subtracted from the selected mask
+                "maskadd" | "masksub" => {
+                    if let (Some(shape), Some(m)) = (crate::rendertest::test_mask_shape(arg), self.app.selected_mask) {
+                        let mode = if cmd == "maskadd" { crate::model::MaskMode::Add } else { crate::model::MaskMode::Subtract };
+                        self.app.add_mask_part(shape, Some((m, mode)));
+                    }
+                }
                 // draw:<brush|linear|radial>: arms a mask drawing tool
                 "draw" => self.app.start_mask_draw(match arg {
                     "brush" => Some(crate::app::MaskDraw::Brush),

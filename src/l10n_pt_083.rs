@@ -86,6 +86,7 @@ pub const PT_083: &[(&str, &str)] = &[
     ("Subtract from this mask: the new part cuts a hole in the selection", "Subtrair desta máscara: a parte nova abre um buraco na seleção"),
     // crop
     ("Recent", "Recentes"),
+    ("Main", "Principal"),
     ("Width × height, e.g. 2,39x1 · 4:5 · 16/9", "Largura × altura, por exemplo 2,39x1 · 4:5 · 16/9"),
     // monitoring
     ("Monitoring", "Monitoramento"),

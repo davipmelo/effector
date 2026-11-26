@@ -459,10 +459,22 @@ fn mask_editor(ui: &mut Ui, app: &mut AppState, st: &DocumentState, mask: &Mask)
         app.selected_part = mask.parts.first().map(|p| p.id);
     }
     let n = mask.parts.len();
+    let mut rects: Vec<(Rect, Color32)> = vec![];
     for (i, part) in mask.parts.iter().enumerate() {
-        mask_part(ui, app, mask, i, part, n);
+        rects.push((mask_part(ui, app, mask, i, part, n), if i == 0 { ACCENT } else { mode_style(part.mode).0 }));
     }
-    egui::Frame::new().inner_margin(egui::Margin { left: 14, right: 14, top: 6, bottom: 10 }).show(ui, |ui| {
+    // tree lines: the added / subtracted parts hang from the main part
+    if rects.len() > 1 {
+        let base = rects[0].0;
+        let x = base.left() + 14.0;
+        let last = rects.last().unwrap().0;
+        let line = Stroke::new(1.5, with_alpha(text_faint(), 0.6));
+        ui.painter().line_segment([pos2(x, base.bottom()), pos2(x, last.top() + 23.0)], line);
+        for (r, c) in &rects[1..] {
+            ui.painter().line_segment([pos2(x, r.top() + 23.0), pos2(r.left() - 1.0, r.top() + 23.0)], Stroke::new(1.5, with_alpha(*c, 0.8)));
+        }
+    }
+    egui::Frame::new().inner_margin(egui::Margin { left: CHILD_INDENT as i8 + 10, right: 14, top: 6, bottom: 10 }).show(ui, |ui| {
         // Lightroom-style: add to (green) or subtract from (red) this mask with any kind
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 8.0;
@@ -519,15 +531,23 @@ fn mask_editor(ui: &mut Ui, app: &mut AppState, st: &DocumentState, mask: &Mask)
     });
 }
 
-fn mask_part(ui: &mut Ui, app: &mut AppState, mask: &Mask, i: usize, part: &MaskPart, n: usize) {
+/// How far the added / subtracted parts sit to the right of the main part.
+const CHILD_INDENT: f32 = 26.0;
+
+/// One part of a mask as a card. The first part is the main one (yellow); the others are drawn
+/// indented under it, green when they add, red when they subtract, blue when they intersect.
+/// Returns the card's rect (for the tree lines).
+fn mask_part(ui: &mut Ui, app: &mut AppState, mask: &Mask, i: usize, part: &MaskPart, n: usize) -> Rect {
     let mid = mask.id;
     let pid = part.id;
     let sel = app.selected_part == Some(pid);
     let set = move |app: &mut AppState, key: &str, f: &dyn Fn(&mut MaskPart)| {
         app.update_part(mid, pid, Some(format!("{pid}-{key}")), |p| f(p));
     };
-    egui::Frame::new().inner_margin(egui::Margin { left: 10, right: 10, top: 4, bottom: 4 }).show(ui, |ui| {
-        let (mc, sign) = mode_style(part.mode);
+    let base = i == 0;
+    let left = if base { 10 } else { 10 + CHILD_INDENT as i8 };
+    egui::Frame::new().inner_margin(egui::Margin { left, right: 10, top: 4, bottom: 4 }).show(ui, |ui| {
+        let (mc, sign) = if base { (ACCENT, "") } else { mode_style(part.mode) };
         let fr = egui::Frame::new()
             .fill(with_alpha(field(), if sel { 0.95 } else { 0.5 }))
             .stroke(Stroke::new(1.0, with_alpha(mc, if sel { 0.9 } else { 0.35 })))
@@ -536,16 +556,24 @@ fn mask_part(ui: &mut Ui, app: &mut AppState, mask: &Mask, i: usize, part: &Mask
             .show(ui, |ui| {
                 ui.spacing_mut().item_spacing.y = 8.0;
                 ui.horizontal(|ui| {
-                    // mode badge: + green, − red, ∩ blue
+                    // main part: its kind in yellow; others: mode badge (+ green, − red, ∩ blue)
                     let (br, _) = ui.allocate_exact_size(vec2(18.0, 18.0), Sense::hover());
-                    ui.painter().circle_filled(br.center(), 8.5, mc);
-                    ui.painter().text(br.center() - vec2(0.0, 0.5), egui::Align2::CENTER_CENTER, sign, semibold(13.0), Color32::BLACK);
-                    let (ir, _) = ui.allocate_exact_size(vec2(16.0, 16.0), Sense::hover());
-                    paint_icon(ui, ir, part.shape.symbol(), 13.0, accent_text());
-                    let title = if i == 0 { tr(part.shape.kind_label()) } else { format!("{} · {}", tr(part.mode.label()), tr(part.shape.kind_label())) };
+                    if base {
+                        ui.painter().circle_filled(br.center(), 9.0, mc);
+                        paint_icon(ui, br, part.shape.symbol(), 11.0, Color32::BLACK);
+                    } else {
+                        ui.painter().circle_filled(br.center(), 8.5, mc);
+                        ui.painter().text(br.center() - vec2(0.0, 0.5), egui::Align2::CENTER_CENTER, sign, semibold(13.0), Color32::BLACK);
+                        let (ir, _) = ui.allocate_exact_size(vec2(16.0, 16.0), Sense::hover());
+                        paint_icon(ui, ir, part.shape.symbol(), 13.0, mc);
+                    }
+                    let title = if base { tr(part.shape.kind_label()) } else { format!("{} · {}", tr(part.mode.label()), tr(part.shape.kind_label())) };
                     let t = ui.add(egui::Label::new(egui::RichText::new(title).font(semibold(12.0)).color(if part.enabled { text() } else { text_faint() })).sense(Sense::click()));
                     if t.clicked() {
                         app.selected_part = Some(pid);
+                    }
+                    if base && n > 1 {
+                        ui.label(egui::RichText::new(tr("Main")).font(regular(10.5)).color(text_faint()));
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.spacing_mut().item_spacing.x = 2.0;
@@ -648,7 +676,9 @@ fn mask_part(ui: &mut Ui, app: &mut AppState, mask: &Mask, i: usize, part: &Mask
         if ui.input(|i| i.pointer.primary_clicked() && i.pointer.interact_pos().map(|p| r.contains(p)).unwrap_or(false)) {
             app.selected_part = Some(pid);
         }
-    });
+        r
+    })
+    .inner
 }
 
 /// Overlay of the selected mask on the image (Masks tool), placed over the photo inside the
