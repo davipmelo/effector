@@ -915,7 +915,11 @@ fn footer_galley(ui: &Ui, s: &str, w: f32) -> std::sync::Arc<egui::Galley> {
 }
 
 /// Height `browser_footer` will take at the current width.
-pub fn browser_footer_height(ui: &Ui, s: &str) -> f32 { footer_galley(ui, s, ui.available_width()).size().y + 11.0 }
+/// Counts every gap `browser_footer` adds (the item spacing before the separator, between the
+/// separator / spaces / text, and after) so the scroll area above leaves exactly enough room.
+pub fn browser_footer_height(ui: &Ui, s: &str) -> f32 {
+    footer_galley(ui, s, ui.available_width()).size().y + 11.0 + ui.spacing().item_spacing.y * 5.0 + 2.0
+}
 
 pub fn browser_footer(ui: &mut Ui, s: &str) {
     separator_line(ui);
