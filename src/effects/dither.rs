@@ -52,6 +52,7 @@ pub fn apply_dither(input: &T, p: &Params, ctx: &mut Ctx) -> T {
 
 pub fn dither() -> Effect {
     Effect::new("dither", "Dither", Category::Stylize, apply_dither)
+        .fine_pattern()
         .symbol("circle.grid.3x3.fill")
         .summary("Classic dithering (ordered and error diffusion) with palettes and pixel size.")
         .params(vec![

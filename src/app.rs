@@ -183,6 +183,8 @@ pub struct AppState {
     /// The update installer was started: quit now (the UI closes the window).
     pub quit_for_update: bool,
     update_announced: bool,
+    /// On-screen size the last display copy was made for (a new zoom makes a new copy).
+    last_display_target: Option<(usize, usize)>,
     /// The launch check is running: when it finds a new version, the update pop-up opens.
     pub update_check_auto: bool,
     /// The "update available" pop-up is open.
@@ -281,6 +283,7 @@ impl AppState {
             depth_pick: None,
             quit_for_update: false,
             update_announced: false,
+            last_display_target: None,
             update_check_auto: false,
             show_update_popup: false,
             depth_gen: 0,
@@ -1292,9 +1295,34 @@ impl AppState {
         )
     }
 
+    /// Does the stack (or the effect / preset being previewed) draw a fine pixel pattern?
+    fn has_fine_pattern(&self) -> bool {
+        fn any(nodes: &[LayerNode]) -> bool {
+            nodes.iter().any(|n| n.enabled && (any(&n.children) || (!n.is_group && crate::effects::effect(&n.effect_id).map(|e| e.fine_pattern).unwrap_or(false))))
+        }
+        any(self.layers()) || self.preview_layers.as_deref().map(any).unwrap_or(false)
+    }
+
+    /// Size of the image on screen in physical pixels (None before the first layout).
+    fn display_target(&self) -> Option<(usize, usize)> {
+        let (w, h) = self.output_size();
+        let z = self.display_zoom() * self.pixels_per_point;
+        if w == 0 || z <= 0.0 || self.viewport.x <= 10.0 {
+            return None;
+        }
+        Some((((w as f64 * z).round() as usize).max(1), ((h as f64 * z).round() as usize).max(1)))
+    }
+
     fn current_scale(&mut self) -> f64 {
         let mut s = self.preview_scale;
-        if Instant::now() < self.interactive_until && s > 0.3 {
+        // dots, dither and characters at a reduced scale make patterns the export doesn't have:
+        // render them at full resolution and let the display copy shrink them properly
+        let fine = self.has_fine_pattern();
+        if fine {
+            s = 1.0;
+        }
+        let big = self.source().map(|x| x.width.max(x.height) > 4500).unwrap_or(false);
+        if Instant::now() < self.interactive_until && s > 0.3 && (!fine || big) {
             s *= 0.5;
             self.refine_at = Some(Instant::now() + Duration::from_millis(300));
         }
@@ -1340,7 +1368,9 @@ impl AppState {
             show_clipping: self.show_clipping,
             want_histogram: settings::get().histogram_open,
             mask_overlay: self.mask_overlay(),
+            display_size: self.display_target(),
         });
+        self.last_display_target = self.display_target();
     }
 
     /// Starts the depth map of the active image when something needs it; re-renders when it lands.
@@ -1575,6 +1605,11 @@ impl AppState {
                 crate::updater::State::UpToDate | crate::updater::State::Failed(_) => self.update_announced = true,
                 _ => {}
             }
+        }
+        // the display copy is made for the on-screen size: zooming asks for a new one (the layers
+        // come from the render cache, so only the shrinking runs again)
+        if self.has_image() && !self.render_pending && self.display_target() != self.last_display_target {
+            self.request_render();
         }
         self.kick_render();
         if self.render_running || self.render_pending {

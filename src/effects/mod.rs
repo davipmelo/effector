@@ -102,6 +102,10 @@ pub struct Effect {
     pub hidden: bool,
     /// Does this effect (with these params) read the depth map? (`ctx.depth()`)
     pub uses_depth: fn(&Params) -> bool,
+    /// Draws a fine pixel pattern (dots, dither, characters): the preview renders it at full
+    /// resolution and shrinks it for the screen, so zooming out never shows patterns the export
+    /// doesn't have.
+    pub fine_pattern: bool,
     pub apply: ApplyFn,
 }
 
@@ -119,6 +123,7 @@ impl Effect {
             produces_alpha: false,
             hidden: false,
             uses_depth: uses_depth_bias,
+            fine_pattern: false,
             apply,
         }
     }
@@ -128,6 +133,7 @@ impl Effect {
     pub fn looks(mut self, l: Vec<Look>) -> Self { self.looks = l; self }
     pub fn section_colors(mut self, c: Vec<(String, Rgba)>) -> Self { self.section_colors = c; self }
     pub fn hidden(mut self) -> Self { self.hidden = true; self }
+    pub fn fine_pattern(mut self) -> Self { self.fine_pattern = true; self }
     pub fn depth(mut self, f: fn(&Params) -> bool) -> Self { self.uses_depth = f; self }
     /// Adds the standard "Depth" section (stronger in the background or the foreground).
     pub fn depth_bias(mut self) -> Self {

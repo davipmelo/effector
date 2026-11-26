@@ -15,6 +15,7 @@ pub fn halftone() -> Effect {
         u.extend([p.fd("angC", 15.0), p.fd("angM", 75.0), p.fd("angY", 0.0), p.fd("angK", 45.0), p.fd("gcr", 80.0) / 100.0]);
         ctx.apply("k_halftone", &[&smoothed], &u)
     })
+    .fine_pattern()
     .symbol("circle.hexagongrid")
     .summary("Print screen dots: B&W, CMYK or colour, with angles and shapes.")
     .params(vec![

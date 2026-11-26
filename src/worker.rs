@@ -29,6 +29,9 @@ pub struct RenderRequest {
     pub want_histogram: bool,
     /// Masks tool: also render this mask as a red overlay (`RenderResult::mask_view`).
     pub mask_overlay: Option<Mask>,
+    /// Size of the image on screen (physical px): a larger result is shrunk to it with a proper
+    /// filter for the display copy, instead of the GPU skipping pixels (moiré on fine patterns).
+    pub display_size: Option<(usize, usize)>,
 }
 
 pub struct RenderResult {
@@ -93,7 +96,14 @@ impl RenderWorker {
                         let extras = crate::renderer::Extras::for_render(&req.source, &req.crop, &req.layers, false);
                         let out = renderer.render(&req.layers, &src_tex, skey, false, req.canvas.as_ref(), extras);
                         let mut ctx = Ctx::new(1.0, out.clone(), false);
-                        let mut display = if req.show_clipping { ctx.apply("k_clipview", &[&out], &[]) } else { to_display(&mut ctx, &out) };
+                        let shrink = |ctx: &mut Ctx, t: &T| -> T {
+                            match req.display_size {
+                                Some((w, h)) if w + 1 < t.width() && h + 1 < t.height() => ctx.resize(t, w, h, false),
+                                _ => t.clone(),
+                            }
+                        };
+                        let shown = shrink(&mut ctx, &out);
+                        let mut display = if req.show_clipping { ctx.apply("k_clipview", &[&shown], &[]) } else { to_display(&mut ctx, &shown) };
                         let histogram = if req.want_histogram { Some(Arc::new(crate::histogram::Histogram::of(&mut ctx, &out))) } else { None };
                         if req.show_depth {
                             if let Some(map) = crate::depth::get(req.source.id) {
@@ -120,7 +130,15 @@ impl RenderWorker {
                                 dc.flush();
                             }
                         }
-                        let display_original = to_display(&mut ctx, &src_tex);
+                        let orig_shown = match req.canvas {
+                            // the original has no canvas borders: shrink it by the same factor
+                            Some(_) => {
+                                let f = shown.width() as f64 / out.width().max(1) as f64;
+                                if f < 0.999 { ctx.resize(&src_tex, ((src_tex.width() as f64 * f).round() as usize).max(1), ((src_tex.height() as f64 * f).round() as usize).max(1), false) } else { src_tex.clone() }
+                            }
+                            None => shrink(&mut ctx, &src_tex),
+                        };
+                        let display_original = to_display(&mut ctx, &orig_shown);
                         let crop_view = if req.want_crop_view {
                             match &crop_cache {
                                 Some((id, t)) if *id == req.source.id => Some(t.clone()),

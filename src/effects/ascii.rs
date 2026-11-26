@@ -115,6 +115,7 @@ pub fn ascii() -> Effect {
         u.extend([p.b("invert"), p.f("contrast"), p.f("brightness")]);
         ctx.apply_sized("k_ascii", &[&grid, &atl], &u, Some(&ex), input.width(), input.height())
     })
+    .fine_pattern()
     .symbol("textformat.characters")
     .summary("Rebuilds the image from characters.")
     .params(vec![
