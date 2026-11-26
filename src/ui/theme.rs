@@ -130,6 +130,8 @@ pub fn apply_style(ctx: &egui::Context) {
     ctx.global_style_mut(|s| {
         s.spacing.item_spacing = egui::vec2(6.0, 6.0);
         s.spacing.button_padding = egui::vec2(8.0, 4.0);
+        // lists stop dead at their ends (no elastic overscroll past the first / last item)
+        s.spacing.scroll.kinetic.rubber_band = false;
         s.interaction.tooltip_delay = 0.6;
         s.text_styles.insert(egui::TextStyle::Body, regular(12.0));
         s.text_styles.insert(egui::TextStyle::Button, regular(12.0));
