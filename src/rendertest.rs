@@ -25,6 +25,7 @@ pub fn dump_params() {
                 ParamKind::Text(t) => format!("text def '{t}'"),
                 ParamKind::Curves => "curves".into(),
                 ParamKind::Lut => "lut".into(),
+                ParamKind::Image(r) => format!("image def {}", r.id),
                 ParamKind::Seed => "seed".into(),
                 ParamKind::Wheel(p) => format!("wheel {p}"),
                 ParamKind::WheelRow(v) => format!("wheels {}", v.join(",")),

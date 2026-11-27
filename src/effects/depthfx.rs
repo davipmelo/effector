@@ -1,6 +1,6 @@
 //! Effects that use the AI subject matte (0.9.0; the depth map of 0.8.0–0.8.2 is gone):
-//! Background Blur (bokeh behind a sharp subject), Lens Emulation and Fog & Haze. Without the
-//! matte they fall back to sensible 2D versions. Parallax & Relief only worked with depth and is
+//! Background Blur (bokeh behind a sharp subject) and Lens Emulation. Without the matte they
+//! fall back to sensible 2D versions. Fog & Haze was removed in 0.9.1 (see `model::REMOVED_EFFECTS`). Parallax & Relief only worked with depth and is
 //! kept hidden for old projects.
 
 use super::*;
@@ -159,53 +159,6 @@ pub fn lens_emulation() -> Effect {
         ]),
         look_g("wide", "Cheap Wide Zoom", "Toy", vals!["focusOn" => false, "distortion" => 35.0, "ca" => 70.0, "cornerSoft" => 60.0, "vignette" => 35.0]),
         look_g("macro", "Macro", "Cinema", vals!["amount" => 30.0, "transition" => 8.0, "bokeh" => 30.0]),
-    ])
-}
-
-pub fn fog() -> Effect {
-    Effect::new("fog", "Fog & Haze", Category::Film, |input, p, ctx| {
-        let d = ctx.subject();
-        let has = d.is_some() as i32 as f32;
-        let dt = d.unwrap_or_else(|| input.clone());
-        let glow = p.fd("glow", 30.0) / 100.0;
-        let g = if glow > 0.001 {
-            let b = ctx.apply("k_bright", &[input], &[0.6, 0.2, 1.0, 1.0, 1.0, 0.0, 1.0]);
-            ctx.blur(&b, ctx.px(p.num("glowRadius", 40.0)))
-        } else {
-            input.clone()
-        };
-        let c = p.color_or("color", hex("#C9D3DC"));
-        ctx.apply("k_fog", &[input, &dt, &g], &[
-            p.fd("density", 60.0) / 100.0, p.fd("curve", 150.0) / 100.0, c.r as f32, c.g as f32, c.b as f32, p.fd("start", 10.0) / 100.0,
-            p.f("height") / 100.0, p.fd("heightPos", 70.0) / 100.0, p.fd("patchy", 25.0) / 100.0, ctx.px(p.num("patchScale", 120.0)) as f32,
-            p.fd("seed", 1.0) * 3.3, glow, has, p.fd("lift", 30.0) / 100.0,
-        ])
-    })
-    .symbol("cloud.fog")
-    .summary("Atmospheric fog and haze over the background while the subject (detected by AI) stays clear, with glow around lights.")
-    .subject(|_| true)
-    .params(vec![
-        s("density", "Density", 0.0, 100.0, 60.0).step(1.0).unit("%").sec("Fog"),
-        s("start", "Starts At", 0.0, 90.0, 10.0).step(1.0).unit("%").sec("Fog"),
-        s("curve", "Falloff", 30.0, 400.0, 150.0).step(1.0).unit("%").curve(1.4).sec("Fog"),
-        ParamDef::color("color", "Color", hex("#C9D3DC")).sec("Fog"),
-        s("lift", "Haze Lift", 0.0, 100.0, 30.0).step(1.0).unit("%").sec("Fog"),
-        s("height", "Ground Fog", 0.0, 100.0, 0.0).step(1.0).unit("%").sec("Shape"),
-        s("heightPos", "Ground Level", 0.0, 100.0, 70.0).step(1.0).unit("%").sec("Shape"),
-        s("patchy", "Patchiness", 0.0, 100.0, 25.0).step(1.0).unit("%").sec("Shape"),
-        s("patchScale", "Patch Size", 10.0, 600.0, 120.0).step(1.0).curve(1.6).sec("Shape"),
-        ParamDef::seed("seed").sec("Shape"),
-        s("glow", "Light Glow", 0.0, 100.0, 30.0).step(1.0).unit("%").sec("Glow"),
-        s("glowRadius", "Glow Radius", 5.0, 200.0, 40.0).step(1.0).curve(1.6).sec("Glow"),
-    ])
-    .looks(vec![
-        look("morning", "Morning Mist", vals![]),
-        look("smog", "City Smog", vals!["color" => hex("#B8AE96"), "density" => 55.0, "curve" => 110.0, "lift" => 45.0]),
-        look("blue", "Blue Hour Haze", vals!["color" => hex("#7F97C4"), "density" => 50.0, "glow" => 55.0]),
-        look("ground", "Ground Fog", vals!["height" => 80.0, "heightPos" => 75.0, "density" => 80.0, "patchy" => 45.0]),
-        look("dense", "Pea Soup", vals!["density" => 92.0, "curve" => 70.0, "start" => 0.0, "lift" => 60.0]),
-        look("golden", "Golden Dust", vals!["color" => hex("#E8B77A"), "density" => 45.0, "glow" => 60.0, "patchy" => 40.0]),
-        look("subtle", "Aerial Perspective", vals!["density" => 30.0, "curve" => 200.0, "patchy" => 0.0, "lift" => 15.0]),
     ])
 }
 

@@ -74,12 +74,21 @@ struct BrowserMem {
     highlight: Option<String>,
     key_nav_mouse: Option<egui::Pos2>,
     focus_done: bool,
+    /// The highlight came from the arrow keys (keep it while the pointer is elsewhere).
+    kb_nav: bool,
+    /// `AppState::hover_epoch` seen last: an edit dropped the preview, so forget the highlight.
+    epoch: u64,
 }
 
 /// The floating "Add Effect" panel. Returns false when it should close.
 pub fn effect_browser(ui: &mut Ui, app: &mut AppState) {
     let id = Id::new("effect-browser");
     let mut mem: BrowserMem = ui.data(|d| d.get_temp(id).unwrap_or_default());
+    if mem.epoch != app.hover_epoch {
+        mem.epoch = app.hover_epoch;
+        mem.highlight = None;
+    }
+    let mut any_hovered = false;
     let list = ordered_effects(&mem.query);
     let mut list_mode = settings::get().browser_list;
     let mut add: Option<&'static str> = None;
@@ -131,6 +140,7 @@ pub fn effect_browser(ui: &mut Ui, app: &mut AppState) {
         let i = mem.highlight.as_ref().and_then(|h| list.iter().position(|e| e.id == h)).map(|i| i as i64).unwrap_or(if d > 0 { -1 } else { list.len() as i64 });
         let n = (i + d).clamp(0, list.len() as i64 - 1) as usize;
         mem.key_nav_mouse = mouse;
+        mem.kb_nav = true;
         mem.highlight = Some(list[n].id.to_string());
         app.hover_preview(Some(vec![LayerNode::effect(list[n].id, None, None)]));
         scroll_to_highlight = true;
@@ -170,7 +180,7 @@ pub fn effect_browser(ui: &mut Ui, app: &mut AppState) {
                         if hl && scroll_to_highlight {
                             ui.scroll_to_rect(r, None);
                         }
-                        hover_logic(ui, app, &mut mem, &resp, e.id, mouse);
+                        any_hovered |= hover_logic(ui, app, &mut mem, &resp, e.id, mouse);
                         let resp = if e.summary.is_empty() { resp } else { resp.on_hover_text(tr(e.summary)) };
                         if resp.clicked() {
                             add = Some(e.id);
@@ -194,7 +204,7 @@ pub fn effect_browser(ui: &mut Ui, app: &mut AppState) {
                                 if hl && scroll_to_highlight {
                                     ui.scroll_to_rect(r, None);
                                 }
-                                hover_logic(ui, app, &mut mem, &resp, e.id, mouse);
+                                any_hovered |= hover_logic(ui, app, &mut mem, &resp, e.id, mouse);
                                 let resp = resp.on_hover_text(tr(e.summary));
                                 if resp.clicked() {
                                     add = Some(e.id);
@@ -209,6 +219,11 @@ pub fn effect_browser(ui: &mut Ui, app: &mut AppState) {
         });
     });
     browser_footer(ui, &hint);
+    // the pointer left the cards (still inside the panel): back to the real image
+    if !any_hovered && !mem.kb_nav && mem.highlight.is_some() {
+        mem.highlight = None;
+        app.hover_preview(None);
+    }
     if let Some(eid) = add {
         app.set_preview_layers(None);
         app.add_effect(eid);
@@ -221,20 +236,24 @@ pub fn effect_browser(ui: &mut Ui, app: &mut AppState) {
     ui.data_mut(|d| d.insert_temp(id, mem));
 }
 
-fn hover_logic(ui: &Ui, app: &mut AppState, mem: &mut BrowserMem, resp: &egui::Response, eid: &str, mouse: Option<egui::Pos2>) {
+/// True while the pointer is over this card.
+fn hover_logic(ui: &Ui, app: &mut AppState, mem: &mut BrowserMem, resp: &egui::Response, eid: &str, mouse: Option<egui::Pos2>) -> bool {
     let _ = ui;
     if resp.hovered() {
         if let Some(m) = mem.key_nav_mouse {
             if Some(m) == mouse {
-                return;
+                return true;
             }
             mem.key_nav_mouse = None;
         }
+        mem.kb_nav = false;
         if mem.highlight.as_deref() != Some(eid) {
             mem.highlight = Some(eid.to_string());
             app.hover_preview(Some(vec![LayerNode::effect(eid, None, None)]));
         }
+        return true;
     }
+    false
 }
 
 // MARK: - Presets panel
@@ -245,6 +264,7 @@ struct PresetMem {
     highlight: Option<Uuid>,
     key_nav_mouse: Option<egui::Pos2>,
     search_focused: bool,
+    epoch: u64,
 }
 
 fn preset_sections(list: &[Preset]) -> Vec<(String, Vec<Preset>)> {
@@ -265,6 +285,10 @@ fn preset_sections(list: &[Preset]) -> Vec<(String, Vec<Preset>)> {
 pub fn presets_panel(ui: &mut Ui, app: &mut AppState) {
     let id = Id::new("presets-panel");
     let mut mem: PresetMem = ui.data(|d| d.get_temp(id).unwrap_or_default());
+    if mem.epoch != app.hover_epoch {
+        mem.epoch = app.hover_epoch;
+        mem.highlight = None;
+    }
     let q = mem.query.to_lowercase();
     let list: Vec<Preset> = presets::all()
         .into_iter()

@@ -27,7 +27,7 @@
   ~2 s por foto em 1024×1024, só quando `subject::layers_need_subject` diz que algum layer ou máscara usa. Matte 0..1
   (1 = assunto) da imagem inteira; `Ctx::subject()` recorta e amplia com filtro bilateral guiado pela foto (`k_matteup`).
   O encanamento é o da antiga profundidade: `depthBias` "near"/"far" (chaves antigas) = assunto/fundo, o Background
-  Blur usa o matte como "distância" (foco em 1), o Fog põe névoa onde o matte é 0. `.subject(|p| …)` declara uso.
+  Blur usa o matte como "distância" (foco em 1). `.subject(|p| …)` declara uso.
   Pesos: `assets/models/subject_isnet.onnx` (fora do git, ~170 MB) baixado por `packaging/fetch_model.sh` (tenta o
   release `subject-model-v1` deste repo e depois o release do rembg, com SHA-256); vai em
   `EFFECTOR.app/Contents/Resources/models` e `{app}\models`. `effector --subject-view <img> <out.png>` testa.
@@ -56,6 +56,24 @@
 - **Filtros de lente (0.9.0):** `lensfilters::diffusion` (difusão física em luz linear que conserva energia:
   `k_diffsrc` + 3 blurs + `k_diffusion`, constantes por filtro em `diffuser`) e `lensfilters::ghost` (`k_ghostfx`,
   cópias/rastro misturados em luz linear). Categoria de presets "Lens Filters".
+- **Sobreposição de Imagem (0.9.1):** `effects/overlayimg.rs` (`k_imgoverlay`: encaixe, distorções e tom; sai com alfa
+  próprio, `produces_alpha`, e a mesclagem do layer mistura). `Effect::blend` define o modo de um layer novo (Screen).
+  Parâmetro `ParamKind::Image` / `ParamValue::Image(ImageRef)`: `tex:<cat>/<nome>` (biblioteca) ou `user:<fnv64>` com o
+  arquivo embutido em base64 (≤3072 px, JPEG ou PNG com alfa), então presets, projetos e layers copiados levam a imagem.
+  O hash do parâmetro é o id + se a imagem está disponível. `src/textures.rs`: biblioteca baixada uma vez do release
+  `textures-v1` (pré-release, não mexe no "latest" do atualizador) para `<suporte>/Textures` (`manifest.json`,
+  `<cat>/<cat>-N.jpg`, `thumbs/`), cache de texturas na GPU (4), import das imagens do usuário. `AppState::tick` começa o
+  download quando um layer (ou a prévia) usa uma textura do app (`layers_use_library`, só parâmetros visíveis).
+  `EFFECTOR_TEXTURES_ZIP=<zip>` instala de um arquivo local. O pacote é gerado por `tools/build_textures.py <fonte.zip>
+  <saída.zip>` (limpa lixo do macOS, renomeia, 2560 px, cinza quando não tem cor, miniaturas de 256 px).
+  UI: `ui/image_picker.rs`.
+- **Papel Rasgado (0.9.1):** estilo `torn` das Molduras & Bordas (`frame::torn`, `k_torn`): distância com sinal até a linha
+  do rasgo de cada lado (ruído com seed), faixa branca de fibras, sombra; fundo cor / papel (`tornPaper`) / transparente.
+- **Efeitos removidos (0.9.1):** `model::REMOVED_EFFECTS` (Fog & Haze). `adopt_masks` chama `strip_removed`, e o app
+  avisa uma vez (`take_removed_notice`).
+- **HSL (0.9.1):** abas Matiz / Saturação / Luminância (`inspector::hsl_tabs`, `settings.hsl_tab`).
+- **⌘C / ⌘X / ⌘V:** o egui-winit transforma essas teclas em eventos Copy / Cut / Paste e não manda a tecla; `ui/mod.rs`
+  recria os atalhos a partir desses eventos.
 - **Extras do render:** `renderer::Extras` leva o matte do assunto, o recorte, a proporção da imagem + data EXIF (`src/exif.rs`, DateTimeOriginal) para `Ctx`.
 - **Atualizações (0.8):** `src/updater.rs` lê `releases/latest` do GitHub (repo público), baixa o asset da plataforma e instala
   (Windows: Inno Setup `/SILENT`, o `[Run] Check: WizardSilent` reabre o app; Mac: script que espera o app fechar, troca o
@@ -67,7 +85,7 @@
   `mask=<tipo>` nas specs do `--render-test`, passos `mask:` e `draw:` no script de screenshot.
 - **CI:** `.github/workflows/ci.yml` compila e roda o lint no Windows e no Mac a cada push na `main`.
 - **Traduções 0.8:** `src/l10n_pt_080.rs` (sobrepõe `PT`); 0.8.1 em `src/l10n_pt_081.rs`; 0.8.2 em `src/l10n_pt_082.rs`;
-  0.9.0 em `src/l10n_pt_090.rs`.
+  0.9.0 em `src/l10n_pt_090.rs`; 0.9.1 em `src/l10n_pt_091.rs`.
   Cuidado com chaves curtas ("Add", "Custom Text"…): uma tabela nova sobrepõe a tradução antiga em todo o app.
 - **Histograma (0.8.1):** `src/histogram.rs` mede a saída na thread de render (cópia de ≤640 px, só com o painel aberto);
   `ui/histogram.rs` desenha. **J** = `Action::ShowClipping` (cópia de exibição via `k_clipview`), ⇧⌘H abre/fecha.

@@ -8,6 +8,7 @@ pub mod export_dialog;
 pub mod filmstrip;
 pub mod histogram;
 pub mod icons;
+pub mod image_picker;
 pub mod inspector;
 pub mod layers;
 pub mod mask_canvas;
@@ -161,8 +162,19 @@ impl EffectorUi {
                 }
             }
         }
+        // egui-winit turns ⌘/Ctrl + C / X / V into Copy / Cut / Paste events and never sends the key
+        // itself, so those shortcuts are rebuilt here (Paste Image is ⌘V).
         let events: Vec<(egui::Key, egui::Modifiers)> = ctx.input(|i| {
-            i.events.iter().filter_map(|e| if let egui::Event::Key { key, pressed: true, repeat: false, modifiers, .. } = e { Some((*key, *modifiers)) } else { None }).collect()
+            i.events
+                .iter()
+                .filter_map(|e| match e {
+                    egui::Event::Key { key, pressed: true, repeat: false, modifiers, .. } => Some((*key, *modifiers)),
+                    egui::Event::Paste(_) | egui::Event::PasteImage(_) => Some((egui::Key::V, egui::Modifiers::COMMAND)),
+                    egui::Event::Copy => Some((egui::Key::C, egui::Modifiers::COMMAND)),
+                    egui::Event::Cut => Some((egui::Key::X, egui::Modifiers::COMMAND)),
+                    _ => None,
+                })
+                .collect()
         });
         let editing = ctx.egui_wants_keyboard_input();
         let focused = ctx.memory(|m| m.focused().is_some());
@@ -837,7 +849,7 @@ impl EffectorUi {
                 "canvas" => self.app.set_tool(crate::app::Tool::Canvas),
                 "masks" => self.app.set_tool(crate::app::Tool::Masks),
                 "edit" => self.app.set_tool(crate::app::Tool::Edit),
-                "hsladj" => settings::update(|s| s.hsl_by_adjustment = true),
+                "hsladj" => settings::update(|s| s.hsl_tab = "s".into()),
                 "light" => settings::update(|s| s.theme = Theme::Light),
                 "pt" => settings::update(|s| s.language = settings::Language::Pt),
                 "select" => {

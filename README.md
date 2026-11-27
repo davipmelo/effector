@@ -12,14 +12,14 @@ Editor de efeitos para fotos em camadas, para **Windows** e **macOS**. Você emp
 - Prévia ao vivo ao passar o mouse sobre efeitos e presets; **paleta de comandos** (⌘K / Ctrl+K); desfazer ilimitado por imagem.
 
 ### Efeitos (48)
-- **Ajuste & Cor:** Ajustes Básicos, Curvas, HSL (por cor ou por ajuste), Matiz / Saturação, Preto & Branco, Color Grading (rodas de cor e Split Tone), Mapa de Degradê, LUT, Detalhe (textura, claridade, remover névoa e nitidez), Inverter, Posterizar, Threshold.
+- **Ajuste & Cor:** Ajustes Básicos, Curvas, HSL (abas Matiz / Saturação / Luminância), Matiz / Saturação, Preto & Branco, Color Grading (rodas de cor e Split Tone), Mapa de Degradê, LUT, Detalhe (textura, claridade, remover névoa e nitidez), Inverter, Posterizar, Threshold.
 - **Impressão & Pixel:** Dither, Halftone, ASCII, Desgaste de Impressão.
-- **Filme & Luz:** Emulação de Filme, Grão, Glow, Bloom, Halation, Vazamento de Luz, Neblina & Névoa.
+- **Filme & Luz:** Emulação de Filme, Grão, Glow, Bloom, Halation, Vazamento de Luz.
 - **Filtros de Lente:** Emulação de Lentes, Filtro de Difusão (Black Pro-Mist, Pro-Mist, Cinebloom, Glimmerglass, Pearlescent, Hollywood Black Magic, Black Satin, Soft Focus, Fog), Filtro Fantasma, Flare Anamórfico, Filtro Estrela, Prisma & Caleidoscópio, Aberração Cromática, Vinheta.
 - **Desfoque:** Desfoque, Desfoque de Fundo (bokeh atrás do assunto), Desfoque de Lente & Tilt-Shift, Desfoque de Movimento, Desfoque Radial.
 - **Distorção:** Olho de Peixe, Distorção de Borda, Vidro Canelado, Espelho & Repetição, Pixel Stretch.
 - **Glitch & Retrô:** Camcorder (VHS, Digicam, NightShot, carimbo de data), Tela CRT, Display de LED, Trail & Rastro.
-- **Sobreposições:** Blob Tracker, Poeira & Arranhões, Moldura & Letterbox.
+- **Sobreposições:** Blob Tracker, Poeira & Arranhões, **Sobreposição de Imagem** (291 texturas do app em Poeira, Grunge, Vidro, Papel e Plástico, ou uma imagem sua, com encaixe, posição, rotação, distorção e tom; a imagem vai junto nos presets e projetos), **Molduras & Bordas** (letterbox, Polaroid, borda, cópia arredondada e **papel rasgado** com rasgo gerado por seed, lados e recuos independentes).
 
 ### Presets
 - **100 presets** do app em 10 categorias (DM's Specials, Cinema, Filme, Retrato & Luz, Y2K & Digital, Vídeo Retrô, Impressão & Gráfico, Pixel & Código, Filtros de Lente, Rastreio & HUD), em grade ou lista compacta. Presets com moldura vêm com ela desligada.
@@ -32,7 +32,7 @@ Editor de efeitos para fotos em camadas, para **Windows** e **macOS**. Você emp
 - **Máscaras** (atalhos do Lightroom Classic): **Pincel** (K), **Gradiente Linear** (M), **Gradiente Radial** (⇧M), **Selecionar Assunto** (⇧S) e **Selecionar Fundo** (⇧G), desenhadas e ajustadas na imagem, com partes que somam, subtraem ou se cruzam e sobreposição vermelha (O). Uma máscara pode limitar vários efeitos.
 
 ### Assunto por IA
-- O app encontra o assunto principal da foto no próprio computador (IS-Net): máscaras de assunto e fundo, efeitos aplicados só no assunto ou só no fundo, bokeh atrás do assunto, neblina no fundo.
+- O app encontra o assunto principal da foto no próprio computador (IS-Net): máscaras de assunto e fundo, efeitos aplicados só no assunto ou só no fundo, bokeh atrás do assunto.
 
 ### Visualização
 - **Monitoramento**: histograma com avisos de recorte (**J**) e **vectorscope** com linha de tom de pele, antes / depois (**]**) e dividido (**Y**), tela cheia, zoom, fundo da área central escolhido com o botão direito.

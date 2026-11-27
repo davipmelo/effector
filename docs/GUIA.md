@@ -33,7 +33,7 @@
 - **Duplo clique** em qualquer slider (ou no nome dele) volta ao valor padrão.
 - **Menus suspensos** (filmes, degradês, paletas, mesclagem, formatos, LUTs, Looks): clique e use **↑ ↓** ou **W / S** para ir passando com prévia ao vivo. **↩** mantém, **⎋** volta ao que estava antes. Com o menu fechado mas selecionado, ↑ ↓ também trocam a opção. A estrela ★ favorita: os favoritos aparecem no topo.
 - **Look**: todos os efeitos têm um seletor de Look no topo com pontos de partida prontos (de 3 a 20 por efeito).
-- **Paleta**: efeitos com cores escolhíveis (Light Leak, Threshold, Dither, Halftone, LED, Trail, Neblina…) têm um seletor de **Paleta** que troca todas as cores de uma vez, com combinações prontas para cada efeito.
+- **Paleta**: efeitos com cores escolhíveis (Light Leak, Threshold, Dither, Halftone, LED, Trail…) têm um seletor de **Paleta** que troca todas as cores de uma vez, com combinações prontas para cada efeito.
 - **LUT**: arraste arquivos `.cube` para o campo da LUT (ou direto para a imagem, que cria um layer de LUT). Toda LUT carregada fica salva na sua biblioteca e aparece no menu.
 
 ## Presets
@@ -164,7 +164,15 @@ Baseados no **Lightroom Classic** quando a função existe lá, e no **Photoshop
 - **Olho de Peixe** (barril ou olho de peixe real até 340°), **Redemoinho**, **Pinçar & Inflar**, **Ondas & Ondulações**, **Mini Planeta & Túnel**, **Líquido & Vidro**, **Espelho & Mosaico** e **Esticar Pixels**. As bordas são preenchidas espelhando, sem buracos pretos.
 
 ## Molduras
-- **Faixas pretas (letterbox)** em proporções de cinema (1.33 a 3.00:1), com **Reenquadrar** e legenda opcional; Polaroid, borda simples e foto arredondada.
+- **Molduras & Bordas**: **faixas pretas (letterbox)** em proporções de cinema (1.33 a 3.00:1), com **Reenquadrar** e legenda opcional; Polaroid, borda simples e foto arredondada.
+- **Papel Rasgado** (estilo das Molduras & Bordas): **Foto Rasgada** (a foto vira um pedaço de papel rasgado sobre um fundo) ou **Moldura de Papel** (um papel rasgado em volta da foto). **Fora do Rasgo**: cor, uma textura de papel da biblioteca ou transparente (exporte em PNG). Ligue cada lado (Topo, Base, Esquerda, Direita) e ajuste o **recuo** de cada um. **Largura do Rasgo**, **Irregularidade**, **Escala do Rasgo**, **Fibras Brancas** e **Sombra** mudam o rasgo, e o dado do **Seed** gera outro rasgo, diferente a cada clique.
+
+## Sobreposição de Imagem
+- Coloca uma textura ou uma imagem sua por cima da foto. Começa em **Tela (Screen)**; troque o modo de mesclagem e a opacidade na lista de layers.
+- **Texturas** abre a biblioteca do app por categoria (Poeira, Grunge, Vidro, Papel, Plástico). Na primeira vez que o efeito é usado, a biblioteca é baixada (cerca de 235 MB, uma vez só).
+- **Escolher Arquivo…** ou arrastar uma imagem para o quadro usa uma imagem sua. Ela é reduzida para no máximo 3072 px e fica **salva dentro dos presets e projetos**, então quem abrir o preset exportado vê a mesma imagem.
+- O **dado** (Embaralhar) troca por outra textura da mesma categoria, espelhada ou girada.
+- **Posicionamento**: Preencher, Caber, Esticar ou Repetir, Escala, Posição X/Y, Rotação e Espelhar. **Distorção**: Perspectiva, Inclinação, Abaular / Comprimir e Onda. **Tom**: Inverter, Ponto Preto, Ponto Branco, Meios-tons, Saturação, Cor do Tom e Desfoque.
 - O controle **Só Luzes Pequenas** (Anamórfico e Estrela) evita que áreas claras grandes estourem.
 
 ## Desfoque
@@ -208,3 +216,12 @@ Baseados no **Lightroom Classic** quando a função existe lá, e no **Photoshop
 - **Monitoramento** com Histograma e **Vectorscope** (linha de tom de pele).
 - **Proporção de recorte personalizada** ("2,39x1", "4:5"…).
 - **Filtros de Lente** (categoria nova de presets, no lugar de Sonho & Surreal) com dois efeitos novos: **Filtro de Difusão** (Black Pro-Mist, Pro-Mist, Cinebloom, Glimmerglass, Pearlescent, Hollywood Black Magic, Black Satin, Soft Focus e Fog, em graduações 1/8 a 2) e **Filtro Fantasma** (cópias deslocadas e rastros de obturador lento, de um lado, dos dois, nos cantos ou em volta do centro).
+
+## Novos na 0.9.1
+- **Sobreposição de Imagem** (efeito novo em Sobreposições) com 291 texturas do app ou imagens suas, que viajam dentro dos presets.
+- **Papel Rasgado** nas **Molduras & Bordas** (antiga Moldura & Letterbox).
+- **HSL** em abas: **Matiz**, **Saturação** e **Luminância**, cada uma com as 8 cores num bloco só, sem rolar.
+- **Neblina & Névoa** saiu. Projetos e presets que usavam o efeito abrem sem ele, com um aviso.
+- **Curvas**: um clique na linha cria um ponto só; clicar fora da linha não cria nada.
+- **⌘V / Ctrl+V** volta a colar imagens na filmstrip.
+- A prévia ao passar o mouse sobre efeitos e presets não para mais de funcionar.

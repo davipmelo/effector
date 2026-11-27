@@ -26,6 +26,7 @@ pub mod frame;
 pub mod grain;
 pub mod lens;
 pub mod lensfilters;
+pub mod overlayimg;
 pub mod looks080;
 pub mod palettes080;
 pub mod light;
@@ -106,6 +107,8 @@ pub struct Effect {
     /// resolution and shrinks it for the screen, so zooming out never shows patterns the export
     /// doesn't have.
     pub fine_pattern: bool,
+    /// Blend mode of a new layer of this effect (Image Overlay starts in Screen).
+    pub default_blend: BlendMode,
     pub apply: ApplyFn,
 }
 
@@ -124,6 +127,7 @@ impl Effect {
             hidden: false,
             uses_subject: uses_subject_bias,
             fine_pattern: false,
+            default_blend: BlendMode::Normal,
             apply,
         }
     }
@@ -134,6 +138,7 @@ impl Effect {
     pub fn section_colors(mut self, c: Vec<(String, Rgba)>) -> Self { self.section_colors = c; self }
     pub fn hidden(mut self) -> Self { self.hidden = true; self }
     pub fn fine_pattern(mut self) -> Self { self.fine_pattern = true; self }
+    pub fn blend(mut self, b: BlendMode) -> Self { self.default_blend = b; self }
     pub fn subject(mut self, f: fn(&Params) -> bool) -> Self { self.uses_subject = f; self }
     /// Adds the standard "Where" section (only on the subject or the background, AI-detected).
     pub fn depth_bias(mut self) -> Self {
@@ -206,7 +211,7 @@ pub fn all() -> &'static [Effect] {
             // Print & pixel
             dither::dither(), print::halftone(), ascii::ascii(), extra::print_wear(), copy::photocopy(), copy::thermal(),
             // Film & light
-            film::film(), grain::grain(), light::glow(), light::bloom(), light::halation(), texture::light_leak(), depthfx::fog(),
+            film::film(), grain::grain(), light::glow(), light::bloom(), light::halation(), texture::light_leak(),
             // Lens filters
             depthfx::lens_emulation(), lensfilters::diffusion(), lensfilters::ghost(), lensfilters::anamorphic(), lensfilters::star(), lensfilters::prism(), lensfilters::halo(),
             lens::chromatic(), lens::vignette(),
@@ -217,7 +222,7 @@ pub fn all() -> &'static [Effect] {
             // Glitch & retro
             camcorder::camcorder(), vhs::vhs(), lens::crt(), extra::led_display(), digital::digicam(), light::trail(),
             // Overlays & tracking
-            texture::dust(), frame::frame(), blob::blob_tracker(),
+            texture::dust(), overlayimg::image_overlay(), frame::frame(), blob::blob_tracker(),
         ];
         for e in v.iter_mut() {
             e.looks.extend(looks080::for_effect(e.id));

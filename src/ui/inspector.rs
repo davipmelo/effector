@@ -299,33 +299,33 @@ fn look_row(ui: &mut Ui, app: &mut AppState, layer: &LayerNode, effect: &Effect)
     separator_line(ui);
 }
 
-/// HSL "By Adjustment" view: a Hue, a Saturation and a Luminance section with every colour.
-fn hsl_by_adjustment(ui: &mut Ui, app: &mut AppState, layer: &LayerNode, effect: &Effect) {
-    for (suffix, title) in [("_h", "Hue"), ("_s", "Saturation"), ("_l", "Luminance")] {
-        panel_section(ui, Id::new(("sec-hsl", layer.id, suffix)), title, None, None, |ui| {
-            for d in effect.params.iter().filter(|d| d.key.ends_with(suffix)) {
-                let mut d = d.clone();
-                d.label = d.section.clone().unwrap_or_default();
-                param_control(ui, app, layer, &d);
-            }
-        });
+/// HSL (0.9.1): tabs Hue | Saturation | Luminance, each with the 8 colours in one compact block.
+fn hsl_tabs(ui: &mut Ui, app: &mut AppState, layer: &LayerNode, effect: &Effect) {
+    let mut tab = crate::settings::get().hsl_tab;
+    if !matches!(tab.as_str(), "h" | "s" | "l") {
+        tab = "h".into();
     }
-}
-
-fn hsl_view_toggle(ui: &mut Ui) -> bool {
-    let by_adj = crate::settings::get().hsl_by_adjustment;
-    egui::Frame::new().inner_margin(egui::Margin { left: 14, right: 14, top: 10, bottom: 4 }).show(ui, |ui| {
-        let opts = vec![("color".to_string(), tr("By Color")), ("adj".to_string(), tr("By Adjustment"))];
-        if let Some(v) = segmented_row(ui, "", &opts, if by_adj { "adj" } else { "color" }) {
-            crate::settings::update(|s| s.hsl_by_adjustment = v == "adj");
+    egui::Frame::new().inner_margin(egui::Margin { left: 14, right: 14, top: 10, bottom: 2 }).show(ui, |ui| {
+        let opts = vec![("h".to_string(), tr("Hue")), ("s".to_string(), tr("Saturation")), ("l".to_string(), tr("Luminance"))];
+        if let Some(v) = segmented_row(ui, "", &opts, &tab) {
+            crate::settings::update(|s| s.hsl_tab = v.clone());
+            tab = v;
         }
     });
-    crate::settings::get().hsl_by_adjustment
+    let suffix = format!("_{tab}");
+    egui::Frame::new().inner_margin(egui::Margin { left: 14, right: 14, top: 4, bottom: 10 }).show(ui, |ui| {
+        ui.spacing_mut().item_spacing.y = 2.0;
+        for d in effect.params.iter().filter(|d| d.key.ends_with(&suffix)) {
+            let mut d = d.clone();
+            d.label = d.section.clone().unwrap_or_default();
+            param_control(ui, app, layer, &d);
+        }
+    });
 }
 
 fn param_sections(ui: &mut Ui, app: &mut AppState, layer: &LayerNode, effect: &Effect) {
-    if effect.id == "hsl" && hsl_view_toggle(ui) {
-        hsl_by_adjustment(ui, app, layer, effect);
+    if effect.id == "hsl" {
+        hsl_tabs(ui, app, layer, effect);
         return;
     }
     let visible: Vec<&ParamDef> = effect.params.iter().filter(|d| d.is_visible(&layer.params)).collect();
@@ -428,6 +428,7 @@ fn param_control(ui: &mut Ui, app: &mut AppState, layer: &LayerNode, def: &Param
             }
         }
         ParamKind::Lut => lut_control(ui, app, lid, &def.key, p.lut(&def.key)),
+        ParamKind::Image(_) => super::image_picker::image_control(ui, app, layer, &def.key, p.image(&def.key)),
         ParamKind::Wheel(prefix) => {
             let size = ui.available_width().min(190.0);
             ui.vertical_centered(|ui| {
@@ -664,19 +665,26 @@ pub fn curve_editor(ui: &mut Ui, id: Id, curves: &CurveSet) -> Option<CurveSet> 
                 }
             }
         }
-    } else if resp.drag_started() || (resp.is_pointer_button_down_on() && drag_index.is_none()) {
-        if let Some(pos) = resp.interact_pointer_pos() {
+    } else if resp.hovered() && ui.input(|i| i.pointer.primary_pressed()) {
+        // Only on the frame the button goes down: grab the point under the pointer, or add one
+        // when the click lands on the line (never two points for one click).
+        if let Some(pos) = ui.input(|i| i.pointer.interact_pos()) {
             if let Some(i) = nearest(&pts, pos) {
                 drag_index = Some(i);
             } else {
                 let x = to_norm(pos).0.clamp(0.0, 1.0);
-                let np = CurvePoint { x, y: crate::effects::adjust::curve_eval(&pts, x) };
-                pts.push(np);
-                pts.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap());
-                drag_index = pts.iter().position(|q| *q == np);
-                let mut c = curves.clone();
-                *c.channel_mut(channel) = pts.clone();
-                out = Some(c);
+                let y = crate::effects::adjust::curve_eval(&pts, x);
+                let on_line = ((rect.top() + (1.0 - y as f32) * w) - pos.y).abs() <= 10.0;
+                let free = pts.iter().all(|q| (q.x - x).abs() >= 0.02);
+                if on_line && free {
+                    let np = CurvePoint { x, y };
+                    pts.push(np);
+                    pts.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap());
+                    drag_index = pts.iter().position(|q| *q == np);
+                    let mut c = curves.clone();
+                    *c.channel_mut(channel) = pts.clone();
+                    out = Some(c);
+                }
             }
         }
     }
@@ -719,7 +727,7 @@ pub fn curve_editor(ui: &mut Ui, id: Id, curves: &CurveSet) -> Option<CurveSet> 
         None => d.remove::<usize>(drag_id),
     });
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(tr("Click to add · drag out to remove")).font(regular(10.0)).color(text_faint()));
+        ui.label(egui::RichText::new(tr("Click the line to add · drag out to remove")).font(regular(10.0)).color(text_faint()));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if ui.add(egui::Label::new(egui::RichText::new(tr("Reset")).font(regular(11.0)).color(accent_text())).sense(Sense::click())).clicked() {
                 let mut c = curves.clone();

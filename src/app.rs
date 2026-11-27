@@ -185,6 +185,10 @@ pub struct AppState {
     /// Temporary layers drawn on top while hovering / browsing effects and presets.
     pub preview_layers: Option<Vec<LayerNode>>,
     hover_pending: Option<(Option<Vec<LayerNode>>, Instant)>,
+    /// Bumped when a real edit drops the hover preview (see `state_changed`).
+    pub hover_epoch: u64,
+    /// `textures::generation()` seen last (the library arrived: render and thumbnails again).
+    tex_gen: u64,
 
     // View
     pub show_original: bool,
@@ -297,6 +301,8 @@ impl AppState {
             selection_anchor: None,
             preview_layers: None,
             hover_pending: None,
+            hover_epoch: 0,
+            tex_gen: 0,
             show_original: false,
             compare_split: false,
             split_pos: 0.5,
@@ -351,7 +357,7 @@ impl AppState {
             last_coalesce_time: Instant::now() - Duration::from_secs(10),
             browsing: false,
             browse_undo_pushed: false,
-            render: RenderWorker::start(ctx.clone()),
+            render: { crate::textures::set_notify(ctx.clone()); RenderWorker::start(ctx.clone()) },
             thumbs: ThumbWorker::start(ctx.clone()),
             render_pending: false,
             render_running: false,
@@ -892,6 +898,8 @@ impl AppState {
         // highlighted while its search field kept focus) would be drawn on top and hide the edit.
         self.hover_pending = None;
         self.preview_layers = None;
+        // browsers forget their highlighted card, so hovering it again previews it again
+        self.hover_epoch += 1;
         let new = self.state();
         if let Some(d) = self.doc_mut() {
             d.is_dirty = true;
@@ -1256,6 +1264,8 @@ impl AppState {
         }
         let delay = if layers.is_none() { 180 } else { 60 };
         self.hover_pending = Some((layers, Instant::now() + Duration::from_millis(delay)));
+        // the pointer may stop right on the card: without this no frame comes to apply it
+        self.ctx.request_repaint_after(Duration::from_millis(delay + 5));
     }
 
     pub fn set_preview_layers(&mut self, layers: Option<Vec<LayerNode>>) {
@@ -1477,6 +1487,22 @@ impl AppState {
     /// Called every frame: timers, worker results, pending renders.
     pub fn tick(&mut self, ctx: &egui::Context) {
         let now = Instant::now();
+        // Image Overlay: the built-in textures are downloaded the first time a layer uses them
+        if !crate::textures::is_ready() && crate::textures::download_state() == crate::textures::Download::Idle {
+            let uses = self.has_image()
+                && (crate::textures::layers_use_library(self.layers()) || self.preview_layers.as_deref().map(crate::textures::layers_use_library).unwrap_or(false));
+            if uses {
+                crate::textures::ensure_library(false);
+            }
+        }
+        if crate::textures::generation() != self.tex_gen {
+            self.tex_gen = crate::textures::generation();
+            self.request_render();
+            self.regenerate_thumbnails();
+        }
+        for name in crate::model::take_removed_notice() {
+            self.flash(&trf("%@ was removed from EFFECTOR and was left out", &[&tr(name)]));
+        }
         // render results
         // Watchdog: a render thread that died or hangs must never freeze the preview for good.
         if self.render_running && (self.render.is_dead() || now.duration_since(self.render_started) > Duration::from_secs(20)) {

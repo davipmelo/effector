@@ -173,6 +173,65 @@ impl LutData {
     pub fn is_empty(&self) -> bool { self.size == 0 }
 }
 
+/// An image used by an effect (Image Overlay, 0.9.1). Built-in textures are referenced by id
+/// (`tex:<category>/<name>`, downloaded once into the texture library); the user's own images
+/// travel inside the value (`user:<hash>` + the encoded file), so presets, projects and copied
+/// layers carry them along.
+#[derive(Clone, Default)]
+pub struct ImageRef {
+    pub id: String,
+    pub name: String,
+    /// Encoded image (JPEG / PNG) for `user:` images.
+    pub data: Option<Arc<Vec<u8>>>,
+}
+
+impl ImageRef {
+    pub fn builtin(id: &str, name: &str) -> ImageRef { ImageRef { id: format!("tex:{id}"), name: name.into(), data: None } }
+    pub fn is_empty(&self) -> bool { self.id.is_empty() }
+    /// `category/name` of a built-in texture.
+    pub fn builtin_id(&self) -> Option<&str> { self.id.strip_prefix("tex:") }
+}
+
+impl PartialEq for ImageRef {
+    fn eq(&self, o: &Self) -> bool { self.id == o.id && self.name == o.name && self.data.is_some() == o.data.is_some() }
+}
+
+impl std::fmt::Debug for ImageRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ImageRef({}, {}, {} bytes)", self.id, self.name, self.data.as_ref().map(|d| d.len()).unwrap_or(0))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct ImageRefRepr {
+    id: String,
+    #[serde(default)]
+    name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    data: Option<String>,
+}
+
+impl Serialize for ImageRef {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        use base64::Engine;
+        ImageRefRepr {
+            id: self.id.clone(),
+            name: self.name.clone(),
+            data: self.data.as_ref().map(|d| base64::engine::general_purpose::STANDARD.encode(d.as_slice())),
+        }
+        .serialize(s)
+    }
+}
+
+impl<'de> Deserialize<'de> for ImageRef {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        use base64::Engine;
+        let r = ImageRefRepr::deserialize(d)?;
+        let data = r.data.and_then(|b| base64::engine::general_purpose::STANDARD.decode(b).ok()).map(Arc::new);
+        Ok(ImageRef { id: r.id, name: r.name, data })
+    }
+}
+
 // MARK: - Parameter values
 
 #[derive(Clone, Debug, PartialEq)]
@@ -186,6 +245,7 @@ pub enum ParamValue {
     Palette(PaletteSpec),
     Text(String),
     Lut(LutData),
+    Image(ImageRef),
 }
 
 /// Swift encodes `case number(Double)` as `{"number":{"_0":1.5}}`.
@@ -201,6 +261,7 @@ enum ParamValueRepr {
     Palette { #[serde(rename = "_0")] v: PaletteSpec },
     Text { #[serde(rename = "_0")] v: String },
     Lut { #[serde(rename = "_0")] v: LutData },
+    Image { #[serde(rename = "_0")] v: ImageRef },
 }
 
 impl Serialize for ParamValue {
@@ -215,6 +276,7 @@ impl Serialize for ParamValue {
             ParamValue::Palette(v) => ParamValueRepr::Palette { v },
             ParamValue::Text(v) => ParamValueRepr::Text { v },
             ParamValue::Lut(v) => ParamValueRepr::Lut { v },
+            ParamValue::Image(v) => ParamValueRepr::Image { v },
         };
         r.serialize(s)
     }
@@ -232,6 +294,7 @@ impl<'de> Deserialize<'de> for ParamValue {
             ParamValueRepr::Palette { v } => ParamValue::Palette(v),
             ParamValueRepr::Text { v } => ParamValue::Text(v),
             ParamValueRepr::Lut { v } => ParamValue::Lut(v),
+            ParamValueRepr::Image { v } => ParamValue::Image(v),
         })
     }
 }
@@ -263,6 +326,11 @@ impl ParamValue {
                 l.size.hash(h);
                 (Arc::as_ptr(&l.values) as usize).hash(h);
                 l.values.len().hash(h);
+            }
+            // the id names the content (built-in name / hash of the user's file)
+            ParamValue::Image(i) => {
+                i.id.hash(h);
+                crate::textures::is_available(i).hash(h);
             }
         }
     }
@@ -317,6 +385,9 @@ impl Params {
     pub fn lut(&self, k: &str) -> Option<LutData> {
         if let Some(ParamValue::Lut(v)) = self.values.get(k) { Some(v.clone()) } else { None }
     }
+    pub fn image(&self, k: &str) -> Option<ImageRef> {
+        if let Some(ParamValue::Image(v)) = self.values.get(k) { Some(v.clone()) } else { None }
+    }
 
     pub fn hash_into<H: Hasher>(&self, h: &mut H) {
         self.values.len().hash(h);
@@ -352,6 +423,8 @@ pub enum ParamKind {
     Palette(PaletteSpec),
     Text(String),
     Lut,
+    /// An image (built-in texture or the user's own file); the value is the default.
+    Image(ImageRef),
     Seed,
     /// Colour wheel driving `{prefix}Hue` / `{prefix}Sat` (degrees / %), drawn large.
     Wheel(String),
@@ -385,6 +458,7 @@ impl ParamDef {
             ParamKind::Gradient(d) => ParamValue::Gradient(d.clone()),
             ParamKind::Palette(d) => ParamValue::Palette(d.clone()),
             ParamKind::Text(d) => ParamValue::Text(d.clone()),
+            ParamKind::Image(d) => ParamValue::Image(d.clone()),
             ParamKind::Lut | ParamKind::Wheel(_) | ParamKind::WheelRow(_) => return None,
             ParamKind::Seed => ParamValue::Number(1.0),
         })
@@ -414,6 +488,7 @@ impl ParamDef {
     pub fn palette(key: &str, label: &str, def: PaletteSpec) -> ParamDef { Self::base(key, label, ParamKind::Palette(def)) }
     pub fn text(key: &str, label: &str, def: &str) -> ParamDef { Self::base(key, label, ParamKind::Text(def.into())) }
     pub fn lut(key: &str, label: &str) -> ParamDef { Self::base(key, label, ParamKind::Lut) }
+    pub fn image(key: &str, label: &str, def: ImageRef) -> ParamDef { Self::base(key, label, ParamKind::Image(def)) }
     /// On/off switch for a whole section, drawn in the section header.
     pub fn section_switch(key: &str, section: &str, def: bool) -> ParamDef {
         let mut d = Self::base(key, section, ParamKind::Toggle(def));
@@ -933,7 +1008,7 @@ impl LayerNode {
             params: p,
             enabled: true,
             opacity: 1.0,
-            blend: BlendMode::Normal,
+            blend: eff.map(|e| e.default_blend).unwrap_or_default(),
             expanded: true,
             children: vec![],
             depth_mask: None,
@@ -1315,6 +1390,7 @@ impl DocumentState {
     /// Turns masks that layers carry (old per-layer depth masks, copies inside presets / pasted
     /// layers) into document masks, and drops links to masks that no longer exist.
     pub fn adopt_masks(&mut self) {
+        strip_removed(&mut self.layers);
         fn needs(nodes: &[LayerNode], masks: &[Mask]) -> bool {
             nodes.iter().any(|n| {
                 n.embedded_mask.is_some()
@@ -1475,3 +1551,44 @@ mod migration_tests {
         assert_eq!(same.masks.len(), 1);
     }
 }
+
+// MARK: - Removed effects (0.9.1)
+
+/// Effects taken out of the app: (id, name). Layers using them are dropped when a project,
+/// preset or session is read, and the app says so once.
+pub const REMOVED_EFFECTS: &[(&str, &str)] = &[("fog", "Fog & Haze")];
+
+fn removed_seen() -> &'static std::sync::Mutex<Vec<&'static str>> {
+    static S: std::sync::OnceLock<std::sync::Mutex<Vec<&'static str>>> = std::sync::OnceLock::new();
+    S.get_or_init(Default::default)
+}
+
+/// Drops layers of removed effects (also inside groups). True when something was dropped.
+pub fn strip_removed(nodes: &mut Vec<LayerNode>) -> bool {
+    let mut any = false;
+    nodes.retain(|n| {
+        if n.is_group {
+            return true;
+        }
+        match REMOVED_EFFECTS.iter().find(|(id, _)| *id == n.effect_id) {
+            Some((_, name)) => {
+                let mut seen = removed_seen().lock().unwrap_or_else(|e| e.into_inner());
+                if !seen.contains(name) {
+                    seen.push(name);
+                }
+                any = true;
+                false
+            }
+            None => true,
+        }
+    });
+    for n in nodes.iter_mut() {
+        if n.is_group {
+            any |= strip_removed(&mut n.children);
+        }
+    }
+    any
+}
+
+/// Names of removed effects dropped since the last call (for a one-time notice).
+pub fn take_removed_notice() -> Vec<&'static str> { std::mem::take(&mut *removed_seen().lock().unwrap_or_else(|e| e.into_inner())) }

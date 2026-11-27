@@ -97,9 +97,8 @@ pub struct Settings {
     /// ("rgb", "luma", "red", "green", "blue", "all").
     pub histogram_open: bool,
     pub histogram_mode: String,
-    /// HSL effect laid out by adjustment (Hue / Saturation / Luminance, every colour in each),
-    /// like Lightroom Classic, instead of one section per colour.
-    pub hsl_by_adjustment: bool,
+    /// HSL effect tab (0.9.1): "h", "s" or "l" — the 8 colours of one adjustment, like Lightroom.
+    pub hsl_tab: String,
     /// Masks tool: show the selected mask as a red overlay on the image.
     pub mask_overlay: bool,
     /// Custom crop ratios typed lately (as typed, e.g. "2,39x1"), newest first.
@@ -135,7 +134,7 @@ impl Default for Settings {
             shortcuts: Default::default(),
             histogram_open: true,
             histogram_mode: "rgb".into(),
-            hsl_by_adjustment: false,
+            hsl_tab: "h".into(),
             mask_overlay: true,
             crop_custom: vec![],
             monitor_tab: "histogram".into(),

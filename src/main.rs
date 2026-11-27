@@ -24,6 +24,7 @@ mod settings;
 mod shortcuts;
 mod swatches;
 mod sysdecode;
+mod textures;
 mod ui;
 mod updater;
 mod worker;
